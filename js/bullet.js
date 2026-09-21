@@ -140,3 +140,52 @@ class Laser {
         ctx.restore();
     }
 }
+
+// 敵の短いレーザー弾 (EnemyLaser: 高速で鋭いビーム光線)
+class EnemyLaser extends Bullet {
+    constructor(x, y, speedX, speedY, color = '#00ffee') {
+        super(x - 6, y - 6, speedX, speedY, color, true);
+        this.length = 42; // レーザーの長さ
+        this.thickness = 5; // レーザーの太さ
+        this.angle = Math.atan2(speedY, speedX);
+        this.width = 14;
+        this.height = 14;
+        this.color = color;
+    }
+
+    draw(ctx) {
+        ctx.save();
+        ctx.translate(this.x + this.width / 2, this.y + this.height / 2);
+        ctx.rotate(this.angle);
+
+        // 外側グロー光彩
+        ctx.shadowColor = this.color;
+        ctx.shadowBlur = 8;
+
+        // レーザー外郭 (鋭い先端を持つ細長いビーム)
+        const halfL = this.length / 2;
+        const halfT = this.thickness / 2;
+
+        const grad = ctx.createLinearGradient(-halfL, 0, halfL, 0);
+        grad.addColorStop(0.0, 'rgba(0, 255, 255, 0.2)');
+        grad.addColorStop(0.3, this.color);
+        grad.addColorStop(0.8, '#ffffff');
+        grad.addColorStop(1.0, '#ffffff');
+
+        ctx.fillStyle = grad;
+        ctx.beginPath();
+        ctx.moveTo(halfL + 4, 0); // 先頭鋭角
+        ctx.lineTo(halfL - 4, -halfT);
+        ctx.lineTo(-halfL, -halfT * 0.7);
+        ctx.lineTo(-halfL, halfT * 0.7);
+        ctx.lineTo(halfL - 4, halfT);
+        ctx.closePath();
+        ctx.fill();
+
+        // 中心ホワイトコア
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(-halfL * 0.7, -1, this.length * 0.8, 2);
+
+        ctx.restore();
+    }
+}

@@ -1488,3 +1488,170 @@ class TurretEnemy extends Enemy {
         ctx.restore();
     }
 }
+
+// 浮遊大陸用レーザー砲台 (LaserTurretEnemy: 短いレーザーを放つハイテク重砲台)
+class LaserTurretEnemy extends Enemy {
+    constructor(parentIsland, relX, isCeiling = false) {
+        super(0, 0);
+        this.parentIsland = parentIsland;
+        this.relX = relX;
+        this.isCeiling = isCeiling; // false: 上面, true: 下面
+        this.width = 36;
+        this.height = 28;
+        this.hp = 2;
+        this.shootTimer = Math.floor(Math.random() * 80);
+        this.barrelAngle = isCeiling ? Math.PI / 2 : -Math.PI / 2;
+        this.updatePosition();
+    }
+
+    updatePosition() {
+        if (this.parentIsland) {
+            this.x = this.parentIsland.x + this.relX;
+            if (this.isCeiling) {
+                // 浮遊大陸の底面
+                this.groundY = this.parentIsland.y + this.parentIsland.height;
+                this.y = this.groundY;
+            } else {
+                // 浮遊大陸の上面
+                this.groundY = this.parentIsland.y;
+                this.y = this.groundY - this.height;
+            }
+        }
+    }
+
+    update() {
+        this.updatePosition();
+
+        if (this.parentIsland && !this.parentIsland.active) {
+            this.active = false;
+            return;
+        }
+
+        if (this.x < -100) {
+            this.active = false;
+            return;
+        }
+
+        // 自機方向への砲身トラッキング
+        if (typeof player !== 'undefined') {
+            const centerX = this.x + this.width / 2;
+            const centerY = this.isCeiling ? this.groundY + 12 : this.groundY - 12;
+            const targetAngle = Math.atan2(player.y - centerY, player.x - centerX);
+            this.barrelAngle = targetAngle;
+        }
+
+        this.shootTimer++;
+        if (this.shootTimer > 140) {
+            this.shootTimer = 0;
+            this.shoot();
+        }
+    }
+
+    shoot() {
+        if (typeof player === 'undefined' || typeof enemyBullets === 'undefined') return;
+        const centerX = this.x + this.width / 2;
+        const centerY = this.isCeiling ? this.groundY + 14 : this.groundY - 14;
+
+        const dx = (player.x + player.width / 2) - centerX;
+        const dy = (player.y + player.height / 2) - centerY;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+
+        if (dist > 0 && dist < 700) {
+            const speed = 4.8; // レーザー特有のシャープな高速弾速
+            const speedX = (dx / dist) * speed;
+            const speedY = (dy / dist) * speed;
+
+            // 砲身先端から発射
+            const barrelLen = 22;
+            const spawnX = centerX + Math.cos(this.barrelAngle) * barrelLen;
+            const spawnY = centerY + Math.sin(this.barrelAngle) * barrelLen;
+
+            if (typeof EnemyLaser !== 'undefined') {
+                enemyBullets.push(new EnemyLaser(spawnX, spawnY, speedX, speedY, '#00ffff'));
+            } else {
+                enemyBullets.push(new EnemyBullet(spawnX, spawnY, speedX, speedY));
+            }
+
+            // マズルフラッシュ (シアンの光彩)
+            if (typeof particles !== 'undefined') {
+                for (let i = 0; i < 5; i++) {
+                    particles.push(new Particle(spawnX, spawnY, '#00ffff'));
+                }
+            }
+        }
+    }
+
+    draw(ctx) {
+        ctx.save();
+        const centerX = this.x + this.width / 2;
+        ctx.translate(centerX, this.groundY);
+        if (this.isCeiling) ctx.scale(1, -1);
+
+        // --- 1. ベースマウント（ハイテク・ネイビーチタン） ---
+        const baseGrad = ctx.createLinearGradient(-20, 0, 20, 0);
+        baseGrad.addColorStop(0.0, '#0f172a');
+        baseGrad.addColorStop(0.3, '#1e293b');
+        baseGrad.addColorStop(0.5, '#334155');
+        baseGrad.addColorStop(0.7, '#1e293b');
+        baseGrad.addColorStop(1.0, '#020617');
+        ctx.fillStyle = baseGrad;
+        ctx.beginPath();
+        ctx.ellipse(0, 0, 20, 5, 0, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.strokeStyle = '#38bdf8';
+        ctx.lineWidth = 1;
+        ctx.stroke();
+
+        // --- 2. 旋回レーザー砲身 ---
+        ctx.save();
+        ctx.translate(0, -10);
+        // isCeiling反転を考慮した砲身回転角の調整
+        const drawAngle = this.isCeiling ? -this.barrelAngle : this.barrelAngle;
+        ctx.rotate(drawAngle);
+
+        // 砲身（ダブルバレル風のハイテクレーザーキャノン）
+        const barrelGrad = ctx.createLinearGradient(0, -5, 24, 5);
+        barrelGrad.addColorStop(0.0, '#475569');
+        barrelGrad.addColorStop(0.5, '#94a3b8');
+        barrelGrad.addColorStop(1.0, '#1e293b');
+        ctx.fillStyle = barrelGrad;
+        ctx.fillRect(0, -5, 22, 10);
+
+        // レーザー集束コイル（シアンの発光ライン）
+        ctx.fillStyle = '#00ffff';
+        ctx.shadowColor = '#00ffff';
+        ctx.shadowBlur = 6;
+        ctx.fillRect(6, -6, 2, 12);
+        ctx.fillRect(12, -6, 2, 12);
+        ctx.fillRect(18, -6, 2, 12);
+        ctx.shadowBlur = 0;
+
+        // 砲口レンズ
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(22, -4, 2, 8);
+
+        ctx.restore();
+
+        // --- 3. コントロール砲塔ドーム ---
+        const domeGrad = ctx.createRadialGradient(-3, -16, 2, 0, -10, 14);
+        domeGrad.addColorStop(0.0, '#e2e8f0');
+        domeGrad.addColorStop(0.4, '#64748b');
+        domeGrad.addColorStop(1.0, '#0f172a');
+        ctx.fillStyle = domeGrad;
+        ctx.beginPath();
+        ctx.arc(0, -10, 13, Math.PI, 0);
+        ctx.closePath();
+        ctx.fill();
+
+        // 光学アイ (シアンに輝くレンズ)
+        ctx.fillStyle = '#00ffff';
+        ctx.shadowColor = '#00ffff';
+        ctx.shadowBlur = 5;
+        ctx.beginPath();
+        ctx.arc(0, -10, 3.5, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.restore();
+    }
+}

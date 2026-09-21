@@ -212,10 +212,15 @@ function update(dt) {
 }
 
 function handleCollisions() {
+    // ステージ2: ストーンヘンジ面での石ブロック掘削処理
+    if (levelManager.stage === 2 && typeof stonehengeStage !== 'undefined' && stonehengeStage && stonehengeStage.active) {
+        stonehengeStage.handleBulletCollisions(playerBullets);
+    }
+
     // プレイヤーの弾と敵の当たり判定
     playerBullets.forEach(bullet => {
-        // 弾と地形
-        if (bullet.active && levelManager.terrain.checkCollision(bullet)) {
+        // 弾と地形・浮遊大陸（ステージ1）
+        if (levelManager.stage === 1 && bullet.active && levelManager.checkCollision(bullet)) {
             if (!(bullet instanceof Missile)) {
                 bullet.active = false;
                 createExplosion(bullet.x, bullet.y, '#555555');
@@ -280,13 +285,13 @@ function handleCollisions() {
             }
         }
         
-        if (bullet.active && levelManager.terrain.checkCollision(bullet)) {
+        if (bullet.active && levelManager.checkCollision(bullet)) {
             bullet.active = false;
         }
     });
 
-    // プレイヤーと地形
-    if (levelManager.terrain.checkCollision(player)) {
+    // プレイヤーと地形・浮遊大陸・石ブロック
+    if (levelManager.checkCollision(player)) {
         if (player.shieldActive) {
             player.shieldActive = false;
         }
@@ -308,8 +313,8 @@ function handleCollisions() {
         
         playerBullets.forEach(bullet => {
             if (bullet.active && boss.active) {
-                const topHull = { x: boss.x - 20, y: boss.y, width: boss.width + 20, height: 32 };
-                const bottomHull = { x: boss.x - 20, y: boss.y + 68, width: boss.width + 20, height: 32 };
+                const topHull = typeof boss.getTopHullBounds === 'function' ? boss.getTopHullBounds() : { x: boss.x - 20, y: boss.y, width: boss.width + 20, height: 32 };
+                const bottomHull = typeof boss.getBottomHullBounds === 'function' ? boss.getBottomHullBounds() : { x: boss.x - 20, y: boss.y + 68, width: boss.width + 20, height: 32 };
                 const shieldBounds = boss.getShieldBounds();
                 const coreHitbox = boss.getCoreBounds();
 

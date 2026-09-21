@@ -226,61 +226,275 @@ class Terrain {
     }
 }
 
+// 浮遊大陸 (FloatingIsland: 空中に浮かぶ巨大岩石島 & 4門のレーザー砲台)
+class FloatingIsland {
+    constructor(x, y, width, height, scrollSpeed = 1.5) {
+        this.x = x;
+        this.y = y;
+        this.width = width;
+        this.height = height;
+        this.scrollSpeed = scrollSpeed;
+        this.active = true;
+        this.turrets = [];
+
+        // 浮遊大陸に4つのレーザー砲台を設置（上面に2基、下面に2基）
+        if (typeof LaserTurretEnemy !== 'undefined' && typeof enemies !== 'undefined') {
+            const relX1 = width * 0.22;
+            const relX2 = width * 0.68;
+            
+            // 上面レーザー砲台 2基
+            const tTop1 = new LaserTurretEnemy(this, relX1, false);
+            const tTop2 = new LaserTurretEnemy(this, relX2, false);
+            // 下面レーザー砲台 2基
+            const tBottom1 = new LaserTurretEnemy(this, relX1, true);
+            const tBottom2 = new LaserTurretEnemy(this, relX2, true);
+
+            this.turrets.push(tTop1, tTop2, tBottom1, tBottom2);
+            enemies.push(tTop1, tTop2, tBottom1, tBottom2);
+        }
+    }
+
+    update() {
+        this.x -= this.scrollSpeed;
+        if (this.x + this.width < -150) {
+            this.active = false;
+        }
+    }
+
+    checkCollision(rect) {
+        if (!this.active) return false;
+        // 自機または弾との矩形衝突判定
+        return (
+            rect.x < this.x + this.width &&
+            rect.x + rect.width > this.x &&
+            rect.y < this.y + this.height &&
+            rect.y + rect.height > this.y
+        );
+    }
+
+    draw(ctx) {
+        if (!this.active) return;
+        ctx.save();
+
+        const w = this.width;
+        const h = this.height;
+        const bevelX = 35;
+        const bevelY = 20;
+
+        // 立体感を際立たせるドロップシャドウ
+        ctx.shadowColor = 'rgba(0, 0, 0, 0.8)';
+        ctx.shadowBlur = 10;
+        ctx.shadowOffsetX = -4;
+        ctx.shadowOffsetY = 6;
+
+        // 地形画像パターンまたは金属光沢岩盤グラデーション
+        if (typeof images !== 'undefined' && images.terrain && images.terrain.complete) {
+            const pattern = ctx.createPattern(images.terrain, 'repeat');
+            ctx.fillStyle = pattern;
+        } else {
+            const grad = ctx.createLinearGradient(this.x, this.y, this.x, this.y + h);
+            grad.addColorStop(0.0, '#85542b');
+            grad.addColorStop(0.3, '#623f20');
+            grad.addColorStop(0.7, '#432913');
+            grad.addColorStop(1.0, '#221408');
+            ctx.fillStyle = grad;
+        }
+
+        // アーケード・グラディウス特有の重厚なオクタゴナル浮遊岩盤ポリゴン
+        ctx.beginPath();
+        ctx.moveTo(this.x + bevelX, this.y);
+        ctx.lineTo(this.x + w - bevelX, this.y);
+        ctx.lineTo(this.x + w, this.y + bevelY);
+        ctx.lineTo(this.x + w - 12, this.y + h - bevelY);
+        ctx.lineTo(this.x + w - bevelX - 10, this.y + h);
+        ctx.lineTo(this.x + bevelX + 10, this.y + h);
+        ctx.lineTo(this.x, this.y + h - bevelY);
+        ctx.lineTo(this.x + 12, this.y + bevelY);
+        ctx.closePath();
+        ctx.fill();
+
+        ctx.shadowColor = 'transparent';
+
+        // 重厚な外郭エッジライン
+        ctx.strokeStyle = '#221100';
+        ctx.lineWidth = 3;
+        ctx.stroke();
+
+        // 上部・側面エッジの光沢ハイライトライン
+        ctx.strokeStyle = 'rgba(255, 230, 180, 0.45)';
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.moveTo(this.x + bevelX, this.y + 2);
+        ctx.lineTo(this.x + w - bevelX, this.y + 2);
+        ctx.lineTo(this.x + w - 2, this.y + bevelY);
+        ctx.stroke();
+
+        ctx.restore();
+    }
+}
+
 class LevelManager {
     constructor(canvasWidth, canvasHeight) {
         this.starfield = new Starfield(canvasWidth, canvasHeight);
         this.terrain = new Terrain(canvasWidth, canvasHeight);
         this.time = 0;
-        this.state = 'WAVES'; // WAVES -> BOSS_WARNING -> BOSS -> CLEAR
+        this.state = 'WAVES'; // WAVES -> BOSS -> STAGE_CLEAR -> STAGE2
+        this.stage = 1;
         this.boss = null;
+        this.floatingIslands = [];
+        this.islandSpawnTimes = [60000, 85000, 110000]; // 途中に3つ浮遊大陸を設置
+        this.islandSpawnedCount = 0;
+        this.stageClearTimer = 0;
     }
 
     update(dt) {
         this.starfield.update();
-        this.terrain.update();
-        
-        if (this.state === 'WAVES') {
-            this.time += dt;
+
+        if (this.stage === 1) {
+            this.terrain.update();
+
+            // 浮遊大陸の更新
+            this.floatingIslands.forEach(island => island.update());
+            this.floatingIslands = this.floatingIslands.filter(island => island.active);
             
-            // 40秒経過で地形が出現（たっぷりの空中戦フェーズから陸地・メイン戦へ突入）
-            if (this.time > 40000 && !this.terrain.active && this.terrain.topPoints.length === 0) {
-                this.terrain.start();
-                if (typeof Sound !== 'undefined') {
-                    Sound.playStageBgm(); // 陸地出現！最高に溌剌としたメインBGMへ劇的転換！
+            if (this.state === 'WAVES') {
+                this.time += dt;
+                
+                // 40秒経過で地上地形が出現
+                if (this.time > 40000 && !this.terrain.active && this.terrain.topPoints.length === 0) {
+                    this.terrain.start();
+                    if (typeof Sound !== 'undefined') {
+                        Sound.playStageBgm(); // 陸地出現！最高に溌剌としたメインBGMへ劇的転換！
+                    }
                 }
-            }
 
-            // 130秒経過で地形生成を終了（約90秒間の地形洞窟戦を経て離脱へ）
-            if (this.time > 130000 && this.terrain.generating) {
-                this.terrain.stopGenerating();
-            }
+                // 途中に3つの浮遊大陸を順次出現（各島に4つのレーザー砲台）
+                if (this.islandSpawnedCount < 3 && this.time > this.islandSpawnTimes[this.islandSpawnedCount]) {
+                    const idx = this.islandSpawnedCount;
+                    // 島ごとに高さを変えてルートの戦略性を生む
+                    const heights = [220, 310, 240];
+                    const widths = [270, 290, 310];
+                    const thicks = [70, 80, 75];
+                    const island = new FloatingIsland(
+                        this.starfield.width + 50,
+                        heights[idx],
+                        widths[idx],
+                        thicks[idx],
+                        this.terrain.scrollSpeed
+                    );
+                    this.floatingIslands.push(island);
+                    this.islandSpawnedCount++;
+                }
 
-            // 145秒経過（約2分25秒）でボス戦へ直結突入（安っぽいWARNINGや警告音はカットし、グラディウス本来の演出へ）
-            if (this.time > 145000) {
-                this.state = 'BOSS';
-                this.time = 0;
-                this.terrain.active = false;
-                if (typeof Sound !== 'undefined') Sound.playBossBgm();
-                if (typeof Boss !== 'undefined') {
-                    this.boss = new Boss(this.starfield.width, this.starfield.height / 2 - 50);
+                // 130秒経過で地形生成を終了
+                if (this.time > 130000 && this.terrain.generating) {
+                    this.terrain.stopGenerating();
+                }
+
+                // 145秒経過でボス戦へ突入（3倍ビッグコア）
+                if (this.time > 145000) {
+                    this.state = 'BOSS';
+                    this.time = 0;
+                    this.terrain.active = false;
+                    if (typeof Sound !== 'undefined') Sound.playBossBgm();
+                    if (typeof Boss !== 'undefined') {
+                        this.boss = new Boss(this.starfield.width, 150);
+                    }
+                }
+            } else if (this.state === 'BOSS') {
+                if (this.boss) {
+                    this.boss.update();
+                    if (!this.boss.active) {
+                        this.state = 'STAGE_CLEAR';
+                        this.stageClearTimer = 0;
+                    }
+                }
+            } else if (this.state === 'STAGE_CLEAR') {
+                this.stageClearTimer += dt;
+                // 自機を前進加速させてステージクリア演出
+                if (typeof player !== 'undefined') {
+                    player.x += 3.5;
+                }
+                // 約3秒後にステージ2（ストーンヘンジ面）へ突入
+                if (this.stageClearTimer > 3000) {
+                    this.startStage2();
                 }
             }
-        } else if (this.state === 'BOSS') {
-            if (this.boss) {
-                this.boss.update();
-                if (!this.boss.active) {
-                    this.state = 'CLEAR';
-                }
+        } else if (this.stage === 2) {
+            // ステージ2: ストーンヘンジ面の更新
+            if (typeof stonehengeStage !== 'undefined' && stonehengeStage) {
+                stonehengeStage.update(dt);
             }
         }
     }
 
+    startStage2() {
+        this.stage = 2;
+        this.state = 'STAGE2';
+        this.time = 0;
+        this.boss = null;
+        this.floatingIslands = [];
+        this.terrain.active = false;
+        this.terrain.topPoints = [];
+        this.terrain.bottomPoints = [];
+
+        if (typeof player !== 'undefined') {
+            player.x = 80;
+            player.y = this.starfield.height / 2 - 10;
+        }
+
+        if (typeof StonehengeStage !== 'undefined') {
+            stonehengeStage = new StonehengeStage(this.starfield.width, this.starfield.height);
+            stonehengeStage.start();
+        }
+        if (typeof Sound !== 'undefined') {
+            Sound.playAirBgm(true); // ステージ2専用の疾走感あふれる楽曲へ
+        }
+    }
+
+    checkCollision(rect) {
+        if (this.stage === 1) {
+            // 地形との衝突
+            if (this.terrain && this.terrain.checkCollision(rect)) return true;
+            // 浮遊大陸との衝突
+            for (let i = 0; i < this.floatingIslands.length; i++) {
+                if (this.floatingIslands[i].checkCollision(rect)) return true;
+            }
+        } else if (this.stage === 2) {
+            if (typeof stonehengeStage !== 'undefined' && stonehengeStage) {
+                return stonehengeStage.checkCollision(rect);
+            }
+        }
+        return false;
+    }
+
     draw(ctx) {
-        this.starfield.draw(ctx);
-        this.terrain.draw(ctx);
-        
-        if (this.state === 'BOSS' && this.boss) {
-            this.boss.draw(ctx);
+        if (this.stage === 1) {
+            this.starfield.draw(ctx);
+            this.terrain.draw(ctx);
+            
+            // 浮遊大陸の描画
+            this.floatingIslands.forEach(island => island.draw(ctx));
+            
+            if (this.state === 'BOSS' && this.boss) {
+                this.boss.draw(ctx);
+            }
+
+            // ステージクリア演出テキスト
+            if (this.state === 'STAGE_CLEAR') {
+                ctx.save();
+                ctx.font = 'bold 36px "Courier New", monospace';
+                ctx.fillStyle = '#ffea00';
+                ctx.textAlign = 'center';
+                ctx.shadowColor = '#ff8800';
+                ctx.shadowBlur = 12;
+                ctx.fillText('STAGE 1 CLEAR', this.starfield.width / 2, this.starfield.height / 2 - 40);
+                ctx.restore();
+            }
+        } else if (this.stage === 2) {
+            if (typeof stonehengeStage !== 'undefined' && stonehengeStage) {
+                stonehengeStage.draw(ctx);
+            }
         }
     }
 }

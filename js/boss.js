@@ -1,19 +1,20 @@
 class Boss {
     constructor(x, y) {
-        this.x = x + 200; // 画面外から登場
-        this.targetX = x - 100; // 定位置
-        this.y = y;
-        this.width = 80;
-        this.height = 100;
-        this.maxHp = 30;
-        this.hp = 30;
+        this.scale = 3; // ユーザー要望によりボスを3倍の大きさに巨大化！
+        this.width = 80 * this.scale;  // 240px
+        this.height = 100 * this.scale; // 300px
+        this.x = x + 300; // 画面外から登場
+        this.targetX = x - 270; // 巨大な巨体が画面右側に堂々陣取る定位置
+        this.y = 150;
+        this.maxHp = 45;
+        this.hp = 45;
         this.active = true;
         this.color = '#aa4444';
         
-        // 遮蔽板: 5枚の金属風シールドプレート (各3発耐久、合計15発で全滅)
+        // 遮蔽板: 5枚の金属風シールドプレート (各4発耐久、合計20発で全滅)
         this.maxShields = 5;
         this.shields = 5;
-        this.shieldHpPerPlate = 3;
+        this.shieldHpPerPlate = 4;
         this.currentShieldHp = this.shieldHpPerPlate;
         this.shieldFlashTimer = 0;
         this.hitFlashTimer = 0;
@@ -29,15 +30,16 @@ class Boss {
     update() {
         if (this.isDying) return; // 撃破中は行動停止
 
-        // 登場シーン
+        // 登場シーン（巨大戦艦が重厚に侵入）
         if (this.x > this.targetX) {
-            this.x -= 2;
-            return; // 登場中は攻撃しない
+            this.x -= 2.2;
+            return;
         }
 
-        this.moveTimer += 0.02;
-        this.y = 250 + Math.sin(this.moveTimer) * 150; // 上下移動
-        this.rotationAngle += 0.04; // コア内部の回転
+        this.moveTimer += 0.016; // 巨体ならではの重厚で滑らかな浮遊移動
+        // 高さ300pxの巨体が画面(600px)の上下中央付近(Y: 50〜250)を雄大に浮遊
+        this.y = 150 + Math.sin(this.moveTimer) * 95;
+        this.rotationAngle += 0.035; // コア内部の回転
 
         if (this.shieldFlashTimer > 0) this.shieldFlashTimer--;
         if (this.hitFlashTimer > 0) this.hitFlashTimer--;
@@ -53,10 +55,10 @@ class Boss {
                 }
             }
         } else {
-            // 遮蔽板全滅時はコア露出＆激しい攻撃モード
+            // 遮蔽板全滅時はコア露出＆激しい猛攻モード
             this.coreOpen = true;
             this.coreTimer++;
-            if (this.coreTimer > 80) {
+            if (this.coreTimer > 75) {
                 this.coreTimer = 0;
                 this.shoot();
             }
@@ -68,15 +70,15 @@ class Boss {
     }
 
     shoot() {
-        // ビッグコア伝統の4連レーザー・スプレッドショット！
-        const startX = this.x - 10;
-        const coreCenterY = this.y + 50;
+        // ビッグコア伝統の超巨大4連レーザー・スプレッドショット！
+        const startX = this.x - 25;
+        const coreCenterY = this.y + 150;
         
-        // 上下アーム砲台から2門ずつ、計4連ビーム
-        this.bullets.push(new Bullet(startX, coreCenterY - 24, -6.5, 0, '#00ffff'));
-        this.bullets.push(new Bullet(startX, coreCenterY - 8,  -6.5, 0, '#ffaa00'));
-        this.bullets.push(new Bullet(startX, coreCenterY + 8,  -6.5, 0, '#ffaa00'));
-        this.bullets.push(new Bullet(startX, coreCenterY + 24, -6.5, 0, '#00ffff'));
+        // 上下アーム先端の砲門（上下に大きく広がった4門）から超高速極太ビーム斉射！
+        this.bullets.push(new Bullet(startX, coreCenterY - 80, -7.0, 0, '#00ffff'));
+        this.bullets.push(new Bullet(startX, coreCenterY - 28, -7.0, 0, '#ffaa00'));
+        this.bullets.push(new Bullet(startX, coreCenterY + 28, -7.0, 0, '#ffaa00'));
+        this.bullets.push(new Bullet(startX, coreCenterY + 80, -7.0, 0, '#00ffff'));
     }
 
     // 遮蔽板ダメージ処理
@@ -102,21 +104,21 @@ class Boss {
 
         // 撃破時の激しい振動（シェイク）と赤白フラッシュ
         if (this.isDying) {
-            ctx.translate((Math.random() - 0.5) * 8, (Math.random() - 0.5) * 8);
+            ctx.translate((Math.random() - 0.5) * 16, (Math.random() - 0.5) * 16);
             if (Math.floor(Date.now() / 60) % 2 === 0) {
-                ctx.filter = 'brightness(2.2) saturate(2.0)';
+                ctx.filter = 'brightness(2.5) saturate(2.5)';
             }
         }
 
-        // 1. ボス本体の描画
+        // 1. ボス本体の描画 (3倍スケール)
         if (typeof images !== 'undefined' && images.boss && images.boss.complete) {
-            // 立体感を際立たせるドロップシャドウ
-            ctx.shadowColor = 'rgba(0, 0, 0, 0.7)';
-            ctx.shadowBlur = 12;
-            ctx.shadowOffsetX = -6;
-            ctx.shadowOffsetY = 6;
+            ctx.shadowColor = 'rgba(0, 0, 0, 0.8)';
+            ctx.shadowBlur = 24;
+            ctx.shadowOffsetX = -12;
+            ctx.shadowOffsetY = 12;
 
-            ctx.drawImage(images.boss, this.x - 60, this.y - 50, 200, 200);
+            // 600px × 600px の大迫力スプライト描画
+            ctx.drawImage(images.boss, this.x - 180, this.y - 150, 600, 600);
 
             ctx.shadowBlur = 0;
             ctx.shadowOffsetX = 0;
@@ -126,14 +128,15 @@ class Boss {
             this.drawMechanicalHull(ctx);
         }
 
-        const coreX = this.x + 36;
-        const coreY = this.y + 50;
-        const coreR = 16;
+        // 3倍スケールのコア中心と半径
+        const coreX = this.x + 108;
+        const coreY = this.y + 150;
+        const coreR = 48;
 
-        // 2. 立体感と輝きのあるコアの描画
+        // 2. 立体感と輝きのある超巨大ハイテク・クリスタルコア
         this.drawHighTechCore(ctx, coreX, coreY, coreR);
 
-        // 3. 5枚の金属風遮蔽板（シールドプレート）の描画
+        // 3. 3倍サイズの5枚の金属風遮蔽板（シールドプレート）
         this.drawShieldPlates(ctx, coreX, coreY);
 
         ctx.restore();
@@ -142,7 +145,7 @@ class Boss {
         this.bullets.forEach(b => b.draw(ctx));
     }
 
-    // メカニカルなハル（船体）の代替描画
+    // メカニカルなハル（船体）の代替描画 (3倍スケール)
     drawMechanicalHull(ctx) {
         // メインハル
         const grad = ctx.createLinearGradient(this.x, this.y, this.x + this.width, this.y + this.height);
@@ -152,13 +155,13 @@ class Boss {
         ctx.fillStyle = grad;
         ctx.fillRect(this.x, this.y, this.width, this.height);
 
-        // 上部・下部アーム
+        // 上部・下部巨大アーム
         ctx.fillStyle = '#1e2631';
-        ctx.fillRect(this.x - 20, this.y - 10, 40, 30);
-        ctx.fillRect(this.x - 20, this.y + 80, 40, 30);
+        ctx.fillRect(this.x - 60, this.y - 30, 120, 90);
+        ctx.fillRect(this.x - 60, this.y + 240, 120, 90);
     }
 
-    // 立体感と輝きのあるハイテク・クリスタルコア
+    // 立体感と輝きのあるハイテク・クリスタルコア (3倍スケール)
     drawHighTechCore(ctx, coreX, coreY, r) {
         ctx.save();
 
@@ -168,17 +171,14 @@ class Boss {
         // HPに応じたコアの基本色（青 -> 黄 -> 赤）
         let baseColor, glowColor, darkColor;
         if (hpRatio > 0.6) {
-            // 健全: 神秘のクリスタルブルー
             baseColor = '#00ddff';
             glowColor = '#0088ff';
             darkColor = '#002255';
         } else if (hpRatio > 0.3) {
-            // 警告: エナジー過負荷イエロー
             baseColor = '#ffea00';
             glowColor = '#ff8800';
             darkColor = '#553300';
         } else {
-            // 瀕死: 暴走クリムゾンレッド（激しく点滅）
             const flash = (Math.floor(Date.now() / 100) % 2 === 0);
             baseColor = flash ? '#ffffff' : '#ff2200';
             glowColor = '#ff0033';
@@ -191,29 +191,29 @@ class Boss {
             glowColor = '#ffffff';
         }
 
-        // A. コア・マウントリング（外枠の重厚金属フレーム）
+        // A. コア・マウントリング（重厚金属フレーム）
         ctx.beginPath();
-        ctx.arc(coreX, coreY, r + 4, 0, Math.PI * 2);
+        ctx.arc(coreX, coreY, r + 10, 0, Math.PI * 2);
         ctx.fillStyle = '#1c232d';
         ctx.fill();
         ctx.strokeStyle = '#4a5b6e';
-        ctx.lineWidth = 2.5;
+        ctx.lineWidth = 6;
         ctx.stroke();
 
-        // 4箇所の固定リベット
-        for (let i = 0; i < 4; i++) {
-            const angle = (Math.PI / 2) * i + Math.PI / 4;
-            const rx = coreX + Math.cos(angle) * (r + 2.5);
-            const ry = coreY + Math.sin(angle) * (r + 2.5);
+        // 8箇所の固定ボルトリベット
+        for (let i = 0; i < 8; i++) {
+            const angle = (Math.PI / 4) * i;
+            const rx = coreX + Math.cos(angle) * (r + 6);
+            const ry = coreY + Math.sin(angle) * (r + 6);
             ctx.fillStyle = '#88a0b8';
             ctx.beginPath();
-            ctx.arc(rx, ry, 1.5, 0, Math.PI * 2);
+            ctx.arc(rx, ry, 3.5, 0, Math.PI * 2);
             ctx.fill();
         }
 
-        // B. 多重エネルギーオーラ（輝きとグロー）
+        // B. 多重エネルギーオーラ
         ctx.shadowColor = glowColor;
-        ctx.shadowBlur = (this.coreOpen ? 22 : 10) * pulse;
+        ctx.shadowBlur = (this.coreOpen ? 50 : 25) * pulse;
 
         // C. 球体立体グラデーション（3D光沢スフィア）
         const sphereGrad = ctx.createRadialGradient(
@@ -235,7 +235,7 @@ class Boss {
         ctx.translate(coreX, coreY);
         ctx.rotate(this.rotationAngle);
         ctx.strokeStyle = `rgba(255, 255, 255, ${0.45 * pulse})`;
-        ctx.lineWidth = 1.5;
+        ctx.lineWidth = 3.5;
         ctx.beginPath();
         for (let i = 0; i < 6; i++) {
             const a = (Math.PI / 3) * i;
@@ -248,18 +248,18 @@ class Boss {
         ctx.stroke();
         ctx.restore();
 
-        // E. 鏡面ハイライト（ガラス球体の反射光）
+        // E. 鏡面ハイライト
         ctx.fillStyle = `rgba(255, 255, 255, ${0.65 * pulse})`;
         ctx.beginPath();
         ctx.ellipse(coreX - r * 0.3, coreY - r * 0.3, r * 0.45, r * 0.22, -Math.PI / 4, 0, Math.PI * 2);
         ctx.fill();
 
-        // F. コアが開いている時の放出パルスリング
+        // F. コア開放時の強力パルス波動
         if (this.coreOpen) {
-            const waveR = r + (Date.now() * 0.02 % 12);
-            const waveAlpha = Math.max(0, 1 - (waveR - r) / 12);
-            ctx.strokeStyle = `rgba(255, 255, 255, ${waveAlpha * 0.6})`;
-            ctx.lineWidth = 1.5;
+            const waveR = r + (Date.now() * 0.03 % 30);
+            const waveAlpha = Math.max(0, 1 - (waveR - r) / 30);
+            ctx.strokeStyle = `rgba(255, 255, 255, ${waveAlpha * 0.75})`;
+            ctx.lineWidth = 3.5;
             ctx.beginPath();
             ctx.arc(coreX, coreY, waveR, 0, Math.PI * 2);
             ctx.stroke();
@@ -268,80 +268,74 @@ class Boss {
         ctx.restore();
     }
 
-    // ボス本体に合わせた5枚の金属風遮蔽板（シールドプレート）
+    // 3倍サイズの5枚の金属風遮蔽板（シールドプレート）
     drawShieldPlates(ctx, coreX, coreY) {
-        if (this.shields <= 0) return; // 全滅時は描画なし
+        if (this.shields <= 0) return;
 
-        // 遮蔽板の配置: コアの前方（左側）に5枚配置
-        const plateW = 5;
-        const plateH = 38;
-        const spacing = 7;
-        const startX = coreX - 18; // 最奥（第5プレート）の位置
+        const plateW = 15;
+        const plateH = 114;
+        const spacing = 21;
+        const startX = coreX - 54;
 
         for (let i = 0; i < this.shields; i++) {
-            // 左側（外側）が0番、奥（右側）が4番
-            // 外側から破壊されていくため、残っている枚数に応じて内側から配置
-            const plateIndex = (this.maxShields - this.shields) + i;
             const px = startX - (this.shields - 1 - i) * spacing;
             const py = coreY - plateH / 2;
 
-            // 最前列（先頭）の板がダメージを受けている時のフラッシュ
             const isFrontPlate = (i === 0);
             const isFlashing = isFrontPlate && (this.shieldFlashTimer > 0);
 
             ctx.save();
 
-            // ドロップシャドウ
-            ctx.shadowColor = 'rgba(0, 0, 0, 0.6)';
-            ctx.shadowBlur = 4;
-            ctx.shadowOffsetX = -2;
-            ctx.shadowOffsetY = 2;
+            ctx.shadowColor = 'rgba(0, 0, 0, 0.7)';
+            ctx.shadowBlur = 8;
+            ctx.shadowOffsetX = -4;
+            ctx.shadowOffsetY = 4;
 
-            // 金属グラデーション（チタンシルバー〜ガンメタル）
+            // チタングラデーション
             const metalGrad = ctx.createLinearGradient(px, py, px + plateW, py);
             if (isFlashing) {
                 metalGrad.addColorStop(0, '#ffffff');
                 metalGrad.addColorStop(0.5, '#ffeeaa');
                 metalGrad.addColorStop(1, '#ffffff');
             } else {
-                metalGrad.addColorStop(0, '#e2ecf5');   // 明るいハイライト面
-                metalGrad.addColorStop(0.35, '#8da0b3'); // 中間チタン
-                metalGrad.addColorStop(0.85, '#3b4958'); // 濃い金属シャドウ
-                metalGrad.addColorStop(1, '#1b232c');   // 境界シャドウ
+                metalGrad.addColorStop(0, '#e2ecf5');
+                metalGrad.addColorStop(0.35, '#8da0b3');
+                metalGrad.addColorStop(0.85, '#3b4958');
+                metalGrad.addColorStop(1, '#1b232c');
             }
 
             ctx.fillStyle = metalGrad;
             ctx.fillRect(px, py, plateW, plateH);
 
-            // 金属プレートのシャープなベベル枠（立体感エッジ）
+            // 金属ベベル枠
             ctx.strokeStyle = isFlashing ? '#ffffff' : '#99b3cc';
-            ctx.lineWidth = 1;
+            ctx.lineWidth = 2;
             ctx.strokeRect(px, py, plateW, plateH);
 
-            // 上下のリベット（固定六角ボルト）
+            // リベットボルト
             ctx.fillStyle = isFlashing ? '#ffffff' : '#222d38';
-            ctx.fillRect(px + 1, py + 2, 3, 2);
-            ctx.fillRect(px + 1, py + plateH - 4, 3, 2);
+            ctx.fillRect(px + 3, py + 6, 8, 6);
+            ctx.fillRect(px + 3, py + plateH - 12, 8, 6);
 
-            // 中央の冷却スリット / エナジーライン
+            // 冷却エナジーライン
             ctx.fillStyle = isFlashing ? '#ffaa00' : '#00ffee';
             ctx.shadowColor = ctx.fillStyle;
-            ctx.shadowBlur = 4;
-            ctx.fillRect(px + 2, py + plateH * 0.35, 1.5, plateH * 0.3);
+            ctx.shadowBlur = 8;
+            ctx.fillRect(px + 5, py + plateH * 0.35, 4, plateH * 0.3);
 
             ctx.restore();
         }
     }
 
-    // 遮蔽板全体の当たり判定バウンディングボックスを取得
+    // 遮蔽板の当たり判定バウンディングボックス (3倍スケール)
     getShieldBounds() {
         if (this.shields <= 0) return null;
-        const coreX = this.x + 36;
-        const coreY = this.y + 50;
-        const plateW = 5;
-        const plateH = 38;
-        const spacing = 7;
-        const startX = coreX - 18;
+        const coreX = this.x + 108;
+        const coreY = this.y + 150;
+        const plateW = 15;
+        const plateH = 114;
+        const spacing = 21;
+        const startX = coreX - 54;
         const frontX = startX - (this.shields - 1) * spacing;
         const totalW = (this.shields - 1) * spacing + plateW;
 
@@ -353,16 +347,36 @@ class Boss {
         };
     }
 
-    // コアの当たり判定バウンディングボックスを取得
+    // コアの当たり判定バウンディングボックス (3倍スケール)
     getCoreBounds() {
-        const coreX = this.x + 36;
-        const coreY = this.y + 50;
-        const r = 16;
+        const coreX = this.x + 108;
+        const coreY = this.y + 150;
+        const r = 48;
         return {
             x: coreX - r,
             y: coreY - r,
             width: r * 2,
             height: r * 2
+        };
+    }
+
+    // 上部ハル（無敵装甲アーム）の当たり判定 (3倍スケール)
+    getTopHullBounds() {
+        return {
+            x: this.x - 50,
+            y: this.y,
+            width: this.width + 50,
+            height: 96
+        };
+    }
+
+    // 下部ハル（無敵装甲アーム）の当たり判定 (3倍スケール)
+    getBottomHullBounds() {
+        return {
+            x: this.x - 50,
+            y: this.y + 204,
+            width: this.width + 50,
+            height: 96
         };
     }
 }
