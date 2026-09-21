@@ -4,7 +4,7 @@ class Player {
         this.y = y;
         this.width = 40;
         this.height = 20;
-        this.speed = 4; // 初期スピード
+        this.speed = 2; // 初期スピード（4から半分に調整）
         this.color = '#00ffff'; // 仮の色（ビックバイパー風の青系）
         this.lastShotTime = 0;
         this.shotDelay = 200; // 弾の発射間隔（ミリ秒）
@@ -96,7 +96,7 @@ class Player {
 
         switch (this.powerUpIndex) {
             case 0: // SPEED
-                if (this.speed < 10) this.speed += 2;
+                if (this.speed < 8) this.speed += 1; // スピードアップ率を2から1（半分）に調整
                 break;
             case 1: // MISSILE
                 this.hasMissile = true;
