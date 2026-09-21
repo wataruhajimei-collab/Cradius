@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>KONAMI風 本格BGM 試聴ツール</title>
+<style>
+  body {
+    background: #0d1117;
+    color: #c9d1d9;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    padding: 24px;
+    text-align: center;
+  }
+  h1 { color: #58a6ff; text-shadow: 0 0 10px rgba(88, 166, 255, 0.5); }
+  .card {
+    background: #161b22;
+    border: 1px solid #30363d;
+    border-radius: 12px;
+    padding: 20px;
+    margin: 20px auto;
+    max-width: 600px;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.4);
+  }
+  button {
+    font-size: 16px;
+    font-weight: bold;
+    padding: 12px 28px;
+    margin: 8px;
+    cursor: pointer;
+    background: linear-gradient(135deg, #1f6feb 0%, #1158c7 100%);
+    color: #fff;
+    border: none;
+    border-radius: 8px;
+    box-shadow: 0 0 12px rgba(31, 111, 235, 0.4);
+    transition: all 0.2s;
+  }
+  button:hover {
+    background: linear-gradient(135deg, #388bfd 0%, #1f6feb 100%);
+    transform: translateY(-1px);
+    box-shadow: 0 0 16px rgba(56, 139, 253, 0.6);
+  }
+  .stop-btn {
+    background: linear-gradient(135deg, #da3633 0%, #b62324 100%);
+    box-shadow: 0 0 12px rgba(218, 54, 51, 0.4);
+  }
+  .stop-btn:hover {
+    background: linear-gradient(135deg, #f85149 0%, #da3633 100%);
+  }
+  .status {
+    margin-top: 15px;
+    font-size: 14px;
+    color: #8b949e;
+  }
+</style>
+</head>
+<body>
+
+<h1>🎵 グラディウス 本格BGMコレクション 試聴</h1>
+<p>シーン展開に合わせた3曲のKONAMI矩形波倶楽部スタイルBGM</p>
+
+<div class="card">
+  <h2>1. 空中戦BGM: 『BEGINNING OF THE HISTORY』</h2>
+  <p>雑魚シーン用 / 130 BPM / 弦楽3声和音・金管ブラス・ティンパニ・大シンバルが鳴り響くフルオーケストラ荘厳大音量版！</p>
+  <button onclick="startAirBgm()">空中戦BGM 再生</button>
+</div>
+
+<div class="card">
+  <h2>2. メインBGM: 『SPACE BATTLE CRUISER (EXTENDED ROCK ORCHESTRA)』</h2>
+  <p>陸地シーン用 / 156 BPM / 宇宙戦艦ヤマト戦闘シーンの高揚感そのままにテンポアップ！熱狂のエレキギターソロ＆炸裂のドラムソロ搭載！</p>
+  <button onclick="startStageBgm()">メインBGM 再生</button>
+</div>
+
+<div class="card">
+  <h2>3. ボス戦BGM: 『AIRCRAFT CARRIER (HEAVY ORCHESTRA & METAL)』</h2>
+  <p>要塞ボス用 / 168 BPM / 楽器を容赦なく大量投入！高速ツーバス・大シンバル・ティンパニ・金管ヒット・ディストーションギターによるガツンと響く死闘テーマ！</p>
+  <button onclick="startBossBgm()">ボス戦BGM 再生</button>
+</div>
+
+<div class="card" style="margin-top: 10px;">
+  <button class="stop-btn" onclick="stopMusic()">再生停止</button>
+  <div id="status-text" class="status">停止中（ボタンを押して再生）</div>
+</div>
+
+<script src="js/sound.js"></script>
+<script>
+window.onerror = function(msg, url, line, col, err) {
+    const el = document.getElementById('status-text');
+    if (el) {
+        el.innerHTML = '<span style="color:red">ERROR: ' + msg + ' (Line: ' + line + ')</span>';
+    }
+    console.error('BGM Error:', msg, err);
+};
+
+function startAirBgm() {
+    try {
+        Sound.init();
+        if (Sound.ctx && Sound.ctx.state === 'suspended') Sound.ctx.resume();
+        Sound.playAirBgm();
+        document.getElementById('status-text').innerHTML = '<span style="color:#58a6ff">再生中: 空中戦BGM『BEGINNING OF THE HISTORY』(グラディウス正統)</span>';
+    } catch (e) {
+        document.getElementById('status-text').innerHTML = '<span style="color:red">例外発生: ' + e.message + '</span>';
+        console.error(e);
+    }
+}
+
+function startStageBgm() {
+    try {
+        Sound.init();
+        if (Sound.ctx && Sound.ctx.state === 'suspended') Sound.ctx.resume();
+        Sound.playStageBgm();
+        document.getElementById('status-text').innerHTML = '<span style="color:#58a6ff">再生中: メインBGM『SPACE BATTLE CRUISER』(ヤマト戦闘風・重厚勇壮)</span>';
+    } catch (e) {
+        document.getElementById('status-text').innerHTML = '<span style="color:red">例外発生: ' + e.message + '</span>';
+        console.error(e);
+    }
+}
+
+function startBossBgm() {
+    try {
+        Sound.init();
+        if (Sound.ctx && Sound.ctx.state === 'suspended') Sound.ctx.resume();
+        Sound.playBossBgm();
+        document.getElementById('status-text').innerHTML = '<span style="color:#58a6ff">再生中: ボス戦BGM『AIRCRAFT CARRIER』(緊迫)</span>';
+    } catch (e) {
+        document.getElementById('status-text').innerHTML = '<span style="color:red">例外発生: ' + e.message + '</span>';
+        console.error(e);
+    }
+}
+
+function stopMusic() {
+    Sound.stopBgm();
+    document.getElementById('status-text').innerText = '停止しました';
+}
+
+// 画面のどこをクリックしてもAudioContextアンロック
+window.addEventListener('click', () => {
+    if (Sound.ctx && Sound.ctx.state === 'suspended') {
+        Sound.ctx.resume();
+    }
+});
+</script>
+
+</body>
+</html>

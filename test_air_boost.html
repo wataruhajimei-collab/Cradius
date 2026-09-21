@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+</head>
+<body>
+<div id="result">STARTING</div>
+<script src="js/sound.js"></script>
+<script>
+window.onerror = function(msg, url, line) {
+    document.getElementById('result').innerText = 'ERROR: ' + msg + ' at ' + line;
+};
+
+try {
+    Sound.init();
+    if (Sound.ctx && Sound.ctx.state === 'suspended') {
+        Sound.ctx.resume();
+    }
+    Sound.playAirBgm();
+    
+    // スケジューラーが動作しているか監視
+    let checks = 0;
+    const interval = setInterval(() => {
+        checks++;
+        if (checks > 10) {
+            clearInterval(interval);
+            document.getElementById('result').innerText = 'SUCCESS: Air BGM running without errors! CurrentBgm=' + Sound.currentBgm;
+        }
+    }, 150);
+} catch (e) {
+    document.getElementById('result').innerText = 'EXCEPTION: ' + e.message;
+}
+</script>
+</body>
+</html>

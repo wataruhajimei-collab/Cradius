@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>グラディウス レーザー音 調整ツール</title>
+<style>
+  body {
+    background: #111;
+    color: #eee;
+    font-family: sans-serif;
+    padding: 20px;
+    text-align: center;
+  }
+  button {
+    font-size: 18px;
+    padding: 12px 24px;
+    margin: 10px;
+    cursor: pointer;
+    background: #0088cc;
+    color: #fff;
+    border: none;
+    border-radius: 6px;
+    box-shadow: 0 0 10px #00ffff88;
+  }
+  button:hover {
+    background: #00aaff;
+  }
+  .card {
+    background: #222;
+    border: 1px solid #444;
+    border-radius: 8px;
+    padding: 16px;
+    margin: 15px auto;
+    max-width: 500px;
+  }
+</style>
+</head>
+<body>
+<h1>グラディウス レーザー音 試聴・検証</h1>
+
+<div class="card">
+  <h3>タイプA: アーケード初代風（12.5%パルス波 + フォルマント強調「みーーん」）</h3>
+  <p>アタック15msで急降下、その後1280Hzでピンと張った持続音</p>
+  <button onclick="playLaserA()">タイプAを再生</button>
+</div>
+
+<div class="card">
+  <h3>タイプB: アーケード高音寄り（1360Hz金属パルス）</h3>
+  <p>より鋭く金属的な響き</p>
+  <button onclick="playLaserB()">タイプBを再生</button>
+</div>
+
+<div class="card">
+  <h3>タイプC: ファミコン版風（25%パルス波・短めパルス）</h3>
+  <p>ファミコン実機PSGに近い「ビィン」</p>
+  <button onclick="playLaserC()">タイプCを再生</button>
+</div>
+
+<div class="card">
+  <h3>タイプD: 従来の音（比較用：大きくピッチが下がる音）</h3>
+  <p>直前の実装（ミューーーーン）</p>
+  <button onclick="playLaserOld()">従来の音を再生</button>
+</div>
+
+<script>
+let ctx = null;
+function getCtx() {
+    if (!ctx) ctx = new (window.AudioContext || window.webkitAudioContext)();
+    if (ctx.state === 'suspended') ctx.resume();
+    return ctx;
+}
+
+function createPulseWave(audioCtx, duty = 0.125, harmonics = 48) {
+    const real = new Float32Array(harmonics);
+    const imag = new Float32Array(harmonics);
+    for (let n = 1; n < harmonics; n++) {
+        imag[n] = (2 / (n * Math.PI)) * Math.sin(n * Math.PI * duty);
+    }
+    return audioCtx.createPeriodicWave(real, imag, { disableNormalization: false });
+}
+
+// タイプA: アーケード初代「みーーーーん」完全再現
+function playLaserA() {
+    const c = getCtx();
+    const now = c.currentTime;
+    const duration = 0.20;
+
+    const osc = c.createOscillator();
+    const wave = createPulseWave(c, 0.125, 48); // 12.5% パルス波
+    osc.setPeriodicWave(wave);
+
+    // アタック: 0〜0.015s で 2600Hz から 1280Hz に急降下（「ッミ」というアタック）
+    // サステイン: その後は 1280Hz をピッチキープ！
+    osc.frequency.setValueAtTime(2600, now);
+    osc.frequency.exponentialRampToValueAtTime(1280, now + 0.018);
+    osc.frequency.setValueAtTime(1280, now + duration);
+
+    // フォルマントフィルター（「イ」「ミ」の母音・鼻音共鳴をブースト）
+    const filter = c.createBiquadFilter();
+    filter.type = 'peaking';
+    filter.frequency.setValueAtTime(2800, now);
+    filter.Q.setValueAtTime(4.0, now);
+    filter.gain.setValueAtTime(8, now);
+
+    const gain = c.createGain();
+    gain.gain.setValueAtTime(0.32, now);
+    gain.gain.setValueAtTime(0.30, now + duration - 0.04);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + duration);
+
+    osc.connect(filter);
+    filter.connect(gain);
+    gain.connect(c.destination);
+
+    osc.start(now);
+    osc.stop(now + duration);
+}
+
+// タイプB: アーケード高音寄り（1360Hz）
+function playLaserB() {
+    const c = getCtx();
+    const now = c.currentTime;
+    const duration = 0.21;
+
+    const osc = c.createOscillator();
+    const wave = createPulseWave(c, 0.15, 64);
+    osc.setPeriodicWave(wave);
+
+    osc.frequency.setValueAtTime(2900, now);
+    osc.frequency.exponentialRampToValueAtTime(1360, now + 0.015);
+    osc.frequency.setValueAtTime(1360, now + duration);
+
+    const filter = c.createBiquadFilter();
+    filter.type = 'peaking';
+    filter.frequency.setValueAtTime(3200, now);
+    filter.Q.setValueAtTime(4.5, now);
+    filter.gain.setValueAtTime(9, now);
+
+    const gain = c.createGain();
+    gain.gain.setValueAtTime(0.30, now);
+    gain.gain.setValueAtTime(0.28, now + duration - 0.04);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + duration);
+
+    osc.connect(filter);
+    filter.connect(gain);
+    gain.connect(c.destination);
+
+    osc.start(now);
+    osc.stop(now + duration);
+}
+
+// タイプC: ファミコン版風（25%パルス、少し短め）
+function playLaserC() {
+    const c = getCtx();
+    const now = c.currentTime;
+    const duration = 0.15;
+
+    const osc = c.createOscillator();
+    const wave = createPulseWave(c, 0.25, 32);
+    osc.setPeriodicWave(wave);
+
+    osc.frequency.setValueAtTime(2200, now);
+    osc.frequency.exponentialRampToValueAtTime(1175, now + 0.02);
+    osc.frequency.setValueAtTime(1175, now + duration);
+
+    const gain = c.createGain();
+    gain.gain.setValueAtTime(0.35, now);
+    gain.gain.setValueAtTime(0.30, now + duration - 0.02);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + duration);
+
+    osc.connect(gain);
+    gain.connect(c.destination);
+
+    osc.start(now);
+    osc.stop(now + duration);
+}
+
+// 従来の音（比較用）
+function playLaserOld() {
+    const c = getCtx();
+    const now = c.currentTime;
+    const duration = 0.22;
+
+    const osc = c.createOscillator();
+    osc.type = 'square';
+    osc.frequency.setValueAtTime(1480, now);
+    osc.frequency.exponentialRampToValueAtTime(680, now + duration);
+
+    const filter = c.createBiquadFilter();
+    filter.type = 'lowpass';
+    filter.Q.setValueAtTime(4.5, now);
+    filter.frequency.setValueAtTime(3200, now);
+    filter.frequency.exponentialRampToValueAtTime(1200, now + duration);
+
+    const gain = c.createGain();
+    gain.gain.setValueAtTime(0.24, now);
+    gain.gain.exponentialRampToValueAtTime(0.005, now + duration);
+
+    osc.connect(filter);
+    filter.connect(gain);
+    gain.connect(c.destination);
+
+    osc.start(now);
+    osc.stop(now + duration);
+}
+</script>
+</body>
+</html>

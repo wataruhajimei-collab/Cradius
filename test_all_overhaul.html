@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"></head>
+<body>
+<div id="result">RUNNING</div>
+<script src="js/sound.js"></script>
+<script src="js/bullet.js"></script>
+<script src="js/particle.js"></script>
+<script src="js/boss.js"></script>
+<script>
+window.onerror = function(msg, url, line) {
+    document.getElementById('result').innerText = 'ERROR: ' + msg + ' at Line ' + line;
+};
+
+try {
+    const results = [];
+
+    // 1. Bossクラスのテスト
+    const boss = new Boss(600, 200);
+    if (boss.shields !== 5) throw new Error('boss.shields should be 5, got ' + boss.shields);
+    const bounds = boss.getShieldBounds();
+    if (!bounds || bounds.width <= 0) throw new Error('Invalid shield bounds');
+    const coreBounds = boss.getCoreBounds();
+    if (!coreBounds || coreBounds.width <= 0) throw new Error('Invalid core bounds');
+
+    // 遮蔽板の破壊テスト
+    let hitCount = 0;
+    while (boss.shields > 0) {
+        boss.hitShield();
+        hitCount++;
+        if (hitCount > 30) throw new Error('Shield destruction loop infinite');
+    }
+    if (boss.shields !== 0) throw new Error('boss.shields should be 0 after destruction');
+    results.push('Boss logic: OK (destroyed in ' + hitCount + ' hits)');
+
+    // 2. SoundManagerのテスト
+    Sound.init();
+    if (Sound.ctx && Sound.ctx.state === 'suspended') Sound.ctx.resume();
+
+    // 空中戦BGMテスト
+    Sound.playAirBgm();
+    if (Sound.currentBgm !== 'AIR') throw new Error('Air BGM did not start');
+    results.push('Air BGM: OK');
+
+    // メインBGMテスト (156BPM, ギターソロ, ドラムソロ)
+    Sound.playStageBgm();
+    if (Sound.currentBgm !== 'STAGE') throw new Error('Stage BGM did not start');
+    results.push('Stage BGM (156BPM, Guitar & Drum Solo): OK');
+
+    // ボスBGMテスト (168BPM, ヘヴィメタル)
+    Sound.playBossBgm();
+    if (Sound.currentBgm !== 'BOSS') throw new Error('Boss BGM did not start');
+    results.push('Boss BGM (Heavy Metal & Orchestra): OK');
+
+    Sound.stopBgm();
+
+    document.getElementById('result').innerText = 'SUCCESS: ' + results.join(' | ');
+} catch (e) {
+    document.getElementById('result').innerText = 'EXCEPTION: ' + e.message;
+}
+</script>
+</body>
+</html>

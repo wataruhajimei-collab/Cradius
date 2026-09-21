@@ -1,0 +1,211 @@
+* {
+    box-sizing: border-box;
+    -webkit-touch-callout: none;
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-tap-highlight-color: transparent;
+}
+
+html, body {
+    margin: 0;
+    padding: 0;
+    width: 100%;
+    height: 100%;
+    height: 100dvh;
+    overflow: hidden;
+    background-color: #000000;
+    color: white;
+    font-family: 'Courier New', Courier, monospace;
+    touch-action: none;
+}
+
+#game-wrapper {
+    width: 100vw;
+    height: 100%;
+    height: 100dvh;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    position: relative;
+    background-color: #05060a;
+}
+
+/* ゲーム画面：画面の縦横比を活かして目一杯限界まで拡大 */
+#game-container {
+    position: relative;
+    /* 縦幅を100dvh限界まで使い、4:3比率(1.3333)で最大化 */
+    height: 100dvh;
+    width: min(100vw, calc(100dvh * 1.3333));
+    max-height: calc(100vw * 0.75);
+    aspect-ratio: 4 / 3;
+    overflow: hidden;
+    background-color: #000000;
+}
+
+#gameCanvas {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    background-color: #000;
+}
+
+/* 画面全体（余白含む全域）をカバーするタッチ操作レイヤー */
+#touch-layer {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100dvh;
+    pointer-events: none;
+    z-index: 100;
+}
+
+/* 画面左側全域（外側の余白〜画面中央）：どこでもスワイプ移動可能 */
+#touch-move-zone {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 60vw;
+    height: 100dvh;
+    pointer-events: auto;
+    touch-action: none;
+}
+
+#move-hint {
+    position: absolute;
+    bottom: 24px;
+    left: 24px;
+    font-size: 13px;
+    color: #00ffff;
+    opacity: 0.5;
+    pointer-events: none;
+    transition: opacity 0.3s;
+    text-shadow: 0 0 8px rgba(0, 255, 255, 0.6);
+    background: rgba(0, 15, 35, 0.6);
+    padding: 5px 12px;
+    border-radius: 14px;
+    border: 1px dashed rgba(0, 255, 255, 0.35);
+}
+
+/* 指の直下に現れるフローティングジョイスティック */
+#joystick-base {
+    position: fixed;
+    display: none;
+    width: 90px;
+    height: 90px;
+    margin-left: -45px;
+    margin-top: -45px;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(0, 200, 255, 0.18) 0%, rgba(0, 100, 200, 0.08) 70%, rgba(0, 255, 255, 0.35) 100%);
+    border: 2px solid rgba(0, 255, 255, 0.45);
+    box-shadow: 0 0 18px rgba(0, 200, 255, 0.35);
+    pointer-events: none;
+}
+
+#joystick-stick {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 44px;
+    height: 44px;
+    margin-left: -22px;
+    margin-top: -22px;
+    border-radius: 50%;
+    background: radial-gradient(circle at 35% 35%, #ffffff 0%, #00ccff 50%, #0066aa 100%);
+    box-shadow: 0 0 14px #00ffff;
+    pointer-events: none;
+    transition: transform 0.02s linear;
+}
+
+/* 画面右側：アクションボタン（外側の余白または右下隅） */
+#action-buttons {
+    position: absolute;
+    bottom: max(20px, env(safe-area-inset-bottom));
+    right: max(20px, env(safe-area-inset-right));
+    display: flex;
+    gap: 16px;
+    align-items: flex-end;
+    pointer-events: auto;
+}
+
+.action-btn {
+    border-radius: 50%;
+    color: #ffffff;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    cursor: pointer;
+    touch-action: none;
+    user-select: none;
+    transition: transform 0.06s, box-shadow 0.06s, background 0.06s;
+}
+
+.btn-power {
+    width: 68px;
+    height: 68px;
+    background: rgba(35, 25, 10, 0.8);
+    border: 2.5px solid #ffaa00;
+    box-shadow: 0 0 12px rgba(255, 170, 0, 0.35);
+}
+
+.btn-power:active, .btn-power.active {
+    background: #ffaa00;
+    color: #000;
+    box-shadow: 0 0 24px #ffaa00;
+    transform: scale(0.92);
+}
+
+.btn-shot {
+    width: 82px;
+    height: 82px;
+    background: rgba(45, 10, 20, 0.8);
+    border: 3px solid #ff2255;
+    box-shadow: 0 0 16px rgba(255, 34, 85, 0.45);
+}
+
+.btn-shot:active, .btn-shot.active {
+    background: #ff2255;
+    color: #fff;
+    box-shadow: 0 0 28px #ff2255;
+    transform: scale(0.92);
+}
+
+.btn-main {
+    font-size: 13px;
+    font-weight: bold;
+    letter-spacing: 1px;
+}
+
+.btn-sub {
+    font-size: 10px;
+    opacity: 0.75;
+}
+
+/* 小型画面・スマホ端末向けの自動最適化 */
+@media (max-width: 650px) {
+    .action-btn.btn-power { width: 56px; height: 56px; }
+    .action-btn.btn-shot { width: 68px; height: 68px; }
+    .btn-main { font-size: 11px; }
+    #move-hint { font-size: 11px; bottom: 12px; left: 12px; }
+}
+
+/* スマホ横向き（ランドスケープ）時の最適化 */
+@media (max-height: 500px) {
+    .btn-shot { width: 64px; height: 64px; }
+    .btn-power { width: 52px; height: 52px; }
+    .btn-main { font-size: 11px; }
+    .btn-sub { font-size: 9px; }
+    #action-buttons {
+        bottom: 12px;
+        right: max(16px, env(safe-area-inset-right));
+        gap: 12px;
+    }
+    #move-hint {
+        font-size: 10px;
+        bottom: 10px;
+        left: max(12px, env(safe-area-inset-left));
+        padding: 3px 8px;
+    }
+}
