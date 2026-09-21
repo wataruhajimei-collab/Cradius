@@ -261,12 +261,10 @@ html, body {
 }
 
 .arcade-title-logo {
-    width: min(86vw, 610px);
+    width: min(88vw, 640px);
     height: auto;
     object-fit: contain;
-    image-rendering: -webkit-optimize-contrast;
-    image-rendering: crisp-edges;
-    image-rendering: pixelated;
+    display: block;
 }
 
 /* 中央ブロック: コイン投入 & ボーナス規定 */

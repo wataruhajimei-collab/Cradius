@@ -1,0 +1,242 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 680 150" width="680" height="150">
+  <defs>
+    <!-- Sunset Chrome Gradient matching 1985 Arcade Gradius -->
+    <linearGradient id="chromeGrad" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%"   stop-color="#dc1a0e"/>
+      <stop offset="18%"  stop-color="#f92f19"/>
+      <stop offset="32%"  stop-color="#fe5e32"/>
+      <stop offset="44%"  stop-color="#fb9e46"/>
+      <stop offset="47%"  stop-color="#ffee66"/>
+      <stop offset="49%"  stop-color="#ffffff"/>
+      <stop offset="51%"  stop-color="#ffffff"/>
+      <stop offset="52%"  stop-color="#300408"/>
+      <stop offset="55%"  stop-color="#80062b"/>
+      <stop offset="70%"  stop-color="#c9104f"/>
+      <stop offset="85%"  stop-color="#fa2d75"/>
+      <stop offset="95%"  stop-color="#ff4785"/>
+      <stop offset="100%" stop-color="#4a021c"/>
+    </linearGradient>
+
+    <!-- Roof Canopy Bar Dark Maroon Gradient -->
+    <linearGradient id="roofGrad" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%"   stop-color="#3d0a10"/>
+      <stop offset="50%"  stop-color="#240407"/>
+      <stop offset="100%" stop-color="#180205"/>
+    </linearGradient>
+
+    <!-- 3D Bevel Shadow Gradient (Burgundy to dark wine) -->
+    <linearGradient id="bevelGrad" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%"   stop-color="#730528"/>
+      <stop offset="50%"  stop-color="#4a0219"/>
+      <stop offset="100%" stop-color="#24000b"/>
+    </linearGradient>
+
+    <!-- Wing Base Peach/Apricot Background Gradient -->
+    <linearGradient id="wingBaseGrad" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%"   stop-color="#f2caa8"/>
+      <stop offset="50%"  stop-color="#eabfa0"/>
+      <stop offset="100%" stop-color="#ddb090"/>
+    </linearGradient>
+
+    <!-- Subtle Glow for Neon Pink Outlines -->
+    <filter id="pinkGlow" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="0" stdDeviation="0.6" flood-color="#ff2266" flood-opacity="0.8"/>
+    </filter>
+  </defs>
+
+  <!-- ========================================================
+       1. WINGED EMBLEM FRAME (4-Tier Stepped Wings)
+       ======================================================== -->
+  <!-- Outer Wing Frame Base -->
+  <path d="
+    M 20,20
+    L 660,20
+    L 628,40
+    L 638,40
+    L 606,59
+    L 616,59
+    L 584,78
+    L 594,78
+    L 562,97
+    L 500,109
+    L 180,109
+    L 118,97
+    L 86,78
+    L 96,78
+    L 64,59
+    L 74,59
+    L 42,40
+    L 52,40
+    Z"
+    fill="url(#wingBaseGrad)"
+    stroke="#ff2266"
+    stroke-width="4"
+    stroke-linejoin="round"
+  />
+
+  <!-- Inner Double Pink Contour -->
+  <path d="
+    M 27,24
+    L 653,24
+    L 622,42
+    L 630,42
+    L 600,61
+    L 608,61
+    L 578,80
+    L 586,80
+    L 556,98
+    L 497,106
+    L 183,106
+    L 124,98
+    L 94,80
+    L 102,80
+    L 72,61
+    L 80,61
+    L 50,42
+    L 58,42
+    Z"
+    fill="none"
+    stroke="#ff3377"
+    stroke-width="1.6"
+    stroke-linejoin="round"
+  />
+
+  <!-- Horizontal Neon Slit Lines on Wings -->
+  <!-- Left Wing -->
+  <line x1="31" y1="30" x2="88"  y2="30" stroke="#ff2266" stroke-width="2.2" stroke-linecap="round"/>
+  <line x1="53" y1="49" x2="112" y2="49" stroke="#ff2266" stroke-width="2.2" stroke-linecap="round"/>
+  <line x1="75" y1="68" x2="136" y2="68" stroke="#ff2266" stroke-width="2.2" stroke-linecap="round"/>
+  <line x1="97" y1="87" x2="160" y2="87" stroke="#ff2266" stroke-width="2.2" stroke-linecap="round"/>
+  <!-- Right Wing -->
+  <line x1="649" y1="30" x2="592" y2="30" stroke="#ff2266" stroke-width="2.2" stroke-linecap="round"/>
+  <line x1="627" y1="49" x2="568" y2="49" stroke="#ff2266" stroke-width="2.2" stroke-linecap="round"/>
+  <line x1="605" y1="68" x2="544" y2="68" stroke="#ff2266" stroke-width="2.2" stroke-linecap="round"/>
+  <line x1="583" y1="87" x2="520" y2="87" stroke="#ff2266" stroke-width="2.2" stroke-linecap="round"/>
+
+  <!-- ========================================================
+       2. CANOPY ROOF BAR OVER ALL LETTERS
+       Extends to the left over the wing (X: 114..512)
+       ======================================================== -->
+  <polygon points="114,38 500,38 512,50 126,50" fill="url(#roofGrad)" stroke="#3a0810" stroke-width="2"/>
+  <line x1="114" y1="38" x2="500" y2="38" stroke="#ff3377" stroke-width="1.8"/>
+  <line x1="126" y1="50" x2="512" y2="50" stroke="#ff3377" stroke-width="1.8"/>
+  <line x1="114" y1="38" x2="126" y2="50" stroke="#ff3377" stroke-width="1.8"/>
+  <line x1="500" y1="38" x2="512" y2="50" stroke="#ff3377" stroke-width="1.8"/>
+
+  <!-- ========================================================
+       3. 3D BEVEL SHADOWS (Slanted 45 deg down-right)
+       ======================================================== -->
+  <g fill="url(#bevelGrad)" stroke="#2b000a" stroke-width="1.2">
+    <!-- C Bevel Shadows -->
+    <polygon points="172,96 224,96 229,101 177,101"/>
+    <polygon points="224,80 229,85 229,101 224,96"/>
+    <polygon points="224,50 229,55 229,65 224,65"/>
+
+    <!-- R Bevel Shadows -->
+    <polygon points="234,96 254,96 277,96 282,101 278,82 278,50 274,50 274,74 254,74 254,96"/>
+    <polygon points="254,96 277,96 282,101 259,101"/>
+
+    <!-- A Bevel Shadows -->
+    <polygon points="284,96 328,96 333,101 322,50 318,50 326,96"/>
+
+    <!-- D Bevel Shadows -->
+    <polygon points="338,96 380,96 385,101 385,50 380,50 380,96"/>
+
+    <!-- I Bevel Shadows -->
+    <polygon points="388,96 404,96 409,101 409,50 404,50 404,96"/>
+
+    <!-- U Bevel Shadows -->
+    <polygon points="412,96 454,96 459,101 459,50 454,50 454,96"/>
+
+    <!-- S Bevel Shadows -->
+    <polygon points="462,96 504,96 509,101 509,50 504,50 504,96"/>
+  </g>
+
+  <!-- ========================================================
+       4. MAIN TITLE LETTERS: C R A D I U S
+       ======================================================== -->
+  <g fill="url(#chromeGrad)" stroke="#300408" stroke-width="2.2" stroke-linejoin="miter">
+    <!-- ===== LETTER [C] ===== -->
+    <path d="
+      M 172,50
+      L 224,50
+      L 224,65
+      L 194,65
+      L 194,81
+      L 224,81
+      L 224,96
+      L 172,96
+      Z"
+    />
+
+    <!-- ===== LETTER [R] (X: 234..276) ===== -->
+    <path d="
+      M 234,50 L 274,50 L 274,75 L 255,75 L 276,96 L 258,96 L 246,77 L 252,77 L 252,65 L 248,65 L 248,96 L 234,96 Z
+      M 248,58 L 260,58 L 260,68 L 248,68 Z"
+      fill-rule="evenodd"
+    />
+
+    <!-- ===== LETTER [A] (X: 284..328) ===== -->
+    <path d="
+      M 300,50 L 314,50 L 328,96 L 314,96 L 310,82 L 302,82 L 298,96 L 284,96 Z
+      M 304,63 L 310,63 L 308,75 L 304,75 Z"
+      fill-rule="evenodd"
+    />
+
+    <!-- ===== LETTER [D] (X: 338..380) ===== -->
+    <path d="
+      M 338,50 L 372,50 C 380,50 380,56 380,64 L 380,82 C 380,90 380,96 372,96 L 338,96 Z
+      M 352,62 L 366,62 L 366,84 L 352,84 Z"
+      fill-rule="evenodd"
+    />
+
+    <!-- ===== LETTER [I] (X: 388..404) ===== -->
+    <rect x="388" y="50" width="16" height="46"/>
+
+    <!-- ===== LETTER [U] (X: 412..454) ===== -->
+    <path d="
+      M 412,50 L 426,50 L 426,82 L 440,82 L 440,50 L 454,50 L 454,84 C 454,92 450,96 442,96 L 424,96 C 416,96 412,92 412,84 Z"
+    />
+
+    <!-- ===== LETTER [S] (X: 462..504) ===== -->
+    <path d="
+      M 464,50 L 504,50 L 504,64 L 476,64 L 476,71 L 504,74 L 504,96 L 462,96 L 462,82 L 490,82 L 490,76 L 462,73 Z"
+    />
+  </g>
+
+  <!-- Specular White Slit Highlight Across All Letters (Y=71) -->
+  <g stroke="#ffffff" stroke-width="1.8" opacity="0.95" stroke-linecap="square">
+    <!-- C slit -->
+    <line x1="174" y1="71" x2="192" y2="71"/>
+    <!-- R slits -->
+    <line x1="236" y1="71" x2="246" y2="71"/>
+    <line x1="254" y1="71" x2="274" y2="71"/>
+    <!-- A slits -->
+    <line x1="293" y1="71" x2="303" y2="71"/>
+    <line x1="309" y1="71" x2="320" y2="71"/>
+    <!-- D slits -->
+    <line x1="340" y1="71" x2="350" y2="71"/>
+    <line x1="368" y1="71" x2="378" y2="71"/>
+    <!-- I slit -->
+    <line x1="390" y1="71" x2="402" y2="71"/>
+    <!-- U slits -->
+    <line x1="414" y1="71" x2="424" y2="71"/>
+    <line x1="442" y1="71" x2="452" y2="71"/>
+    <!-- S slit -->
+    <line x1="464" y1="71" x2="502" y2="71"/>
+  </g>
+
+  <!-- TM Trademark -->
+  <text x="514" y="55" font-family="'Press Start 2P', monospace" font-size="8" font-weight="bold" fill="#ff4411">TM</text>
+
+  <!-- ========================================================
+       5. SUBTEXT DIRECTLY UNDER EMBLEM: — CRADIUS —
+       ======================================================== -->
+  <!-- Left Dash -->
+  <line x1="220" y1="126" x2="258" y2="126" stroke="#ff2266" stroke-width="2.6" stroke-linecap="round"/>
+  <!-- Text CRADIUS -->
+  <text x="340" y="130" font-family="'Press Start 2P', monospace" font-size="11" font-weight="bold" fill="#ff2266" text-anchor="middle" letter-spacing="5">CRADIUS</text>
+  <!-- Right Dash -->
+  <line x1="422" y1="126" x2="460" y2="126" stroke="#ff2266" stroke-width="2.6" stroke-linecap="round"/>
+
+</svg>
