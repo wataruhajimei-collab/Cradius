@@ -312,12 +312,80 @@ class SoundManager {
         osc.stop(now + 0.04);
     }
 
-    // ボス大爆発音: ドガガガバーン！
+    // ボス大爆発音: グラディウス風 超ド級・重低音連続爆発（ズドドドド…ドッカーン！）
     playBossExplode() {
         if (!this.initialized || this.isMuted) return;
-        for (let i = 0; i < 6; i++) {
-            setTimeout(() => this.playExplosion(), i * 80);
+        this.stopBgm(); // ボスBGMをストップして静寂と爆発の余韻を作る
+
+        // 1. 連続連鎖爆発（8回）
+        for (let i = 0; i < 9; i++) {
+            setTimeout(() => {
+                if (!this.ctx) return;
+                const now = this.ctx.currentTime;
+                if (this.noiseBuffer) {
+                    const noise = this.ctx.createBufferSource();
+                    noise.buffer = this.noiseBuffer;
+                    const filter = this.ctx.createBiquadFilter();
+                    filter.type = 'lowpass';
+                    filter.frequency.setValueAtTime(450, now);
+                    filter.frequency.exponentialRampToValueAtTime(60, now + 0.35);
+
+                    const gain = this.ctx.createGain();
+                    gain.gain.setValueAtTime(0.4, now);
+                    gain.gain.exponentialRampToValueAtTime(0.01, now + 0.35);
+
+                    noise.connect(filter);
+                    filter.connect(gain);
+                    gain.connect(this.seGain);
+                    noise.start(now);
+                }
+                const sub = this.ctx.createOscillator();
+                const subGain = this.ctx.createGain();
+                sub.type = 'triangle';
+                sub.frequency.setValueAtTime(110 - i * 5, now);
+                sub.frequency.exponentialRampToValueAtTime(35, now + 0.3);
+                subGain.gain.setValueAtTime(0.35, now);
+                subGain.gain.linearRampToValueAtTime(0.001, now + 0.3);
+                sub.connect(subGain);
+                subGain.connect(this.seGain);
+                sub.start(now);
+                sub.stop(now + 0.3);
+            }, i * 90);
         }
+
+        // 2. 最後にトドメの超巨大爆発（ドカーーーーン！）
+        setTimeout(() => {
+            if (!this.ctx) return;
+            const now = this.ctx.currentTime;
+            if (this.noiseBuffer) {
+                const noise = this.ctx.createBufferSource();
+                noise.buffer = this.noiseBuffer;
+                const filter = this.ctx.createBiquadFilter();
+                filter.type = 'lowpass';
+                filter.frequency.setValueAtTime(600, now);
+                filter.frequency.exponentialRampToValueAtTime(40, now + 1.2);
+
+                const gain = this.ctx.createGain();
+                gain.gain.setValueAtTime(0.6, now);
+                gain.gain.exponentialRampToValueAtTime(0.001, now + 1.2);
+
+                noise.connect(filter);
+                filter.connect(gain);
+                gain.connect(this.seGain);
+                noise.start(now);
+            }
+            const boom = this.ctx.createOscillator();
+            const boomGain = this.ctx.createGain();
+            boom.type = 'sine';
+            boom.frequency.setValueAtTime(90, now);
+            boom.frequency.exponentialRampToValueAtTime(25, now + 1.0);
+            boomGain.gain.setValueAtTime(0.5, now);
+            boomGain.gain.linearRampToValueAtTime(0.001, now + 1.0);
+            boom.connect(boomGain);
+            boomGain.connect(this.seGain);
+            boom.start(now);
+            boom.stop(now + 1.0);
+        }, 850);
     }
 
     // --- BGM エンジン (本格 KONAMI 矩形波倶楽部スタイル) ---
@@ -1633,72 +1701,9 @@ class SoundManager {
         });
     }
 
-    // WARNING警報音 (ピロピロピロ…！)
-    playWarningSound() {
-        if (this.currentBgm === 'WARNING') return;
-        this.stopBgm();
-        this.currentBgm = 'WARNING';
-        this.init();
-
-        let toggle = false;
-        this.bgmTimer = setInterval(() => {
-            if (!this.initialized || this.isMuted) return;
-            const now = this.ctx.currentTime;
-            const osc = this.ctx.createOscillator();
-            const gain = this.ctx.createGain();
-
-            osc.type = 'square';
-            osc.frequency.setValueAtTime(toggle ? 960 : 720, now);
-            gain.gain.setValueAtTime(0.2, now);
-            gain.gain.linearRampToValueAtTime(0.01, now + 0.12);
-
-            osc.connect(gain);
-            gain.connect(this.bgmGain);
-
-            osc.start(now);
-            osc.stop(now + 0.12);
-
-            toggle = !toggle;
-        }, 130);
-    }
-
-    // ステージクリア ファンファーレ
-    playClearJingle() {
-        this.stopBgm();
-        this.currentBgm = 'CLEAR';
-        this.init();
-
-        const notes = [
-            { f: 523.25, d: 0.15 }, // C5
-            { f: 587.33, d: 0.15 }, // D5
-            { f: 659.25, d: 0.15 }, // E5
-            { f: 783.99, d: 0.3 },  // G5
-            { f: 659.25, d: 0.15 }, // E5
-            { f: 783.99, d: 0.6 }   // G5 (長音)
-        ];
-
-        let offset = 0;
-        notes.forEach(n => {
-            setTimeout(() => {
-                if (!this.initialized || this.isMuted) return;
-                const now = this.ctx.currentTime;
-                const osc = this.ctx.createOscillator();
-                const gain = this.ctx.createGain();
-
-                osc.type = 'square';
-                osc.frequency.setValueAtTime(n.f, now);
-                gain.gain.setValueAtTime(0.25, now);
-                gain.gain.linearRampToValueAtTime(0.01, now + n.d);
-
-                osc.connect(gain);
-                gain.connect(this.seGain);
-
-                osc.start(now);
-                osc.stop(now + n.d);
-            }, offset * 1000);
-            offset += n.d;
-        });
-    }
+    // 警告音・クリアジングルは演出の引き締めのため完全カット
+    playWarningSound() {}
+    playClearJingle() {}
 }
 
 // グローバルサウンドインスタンス

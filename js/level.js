@@ -255,17 +255,11 @@ class LevelManager {
                 this.terrain.stopGenerating();
             }
 
-            // 145秒経過（合計約2分25秒、従来の5倍）でボス警告へ突入
+            // 145秒経過（約2分25秒）でボス戦へ直結突入（安っぽいWARNINGや警告音はカットし、グラディウス本来の演出へ）
             if (this.time > 145000) {
-                this.state = 'BOSS_WARNING';
+                this.state = 'BOSS';
                 this.time = 0;
                 this.terrain.active = false;
-                if (typeof Sound !== 'undefined') Sound.playWarningSound();
-            }
-        } else if (this.state === 'BOSS_WARNING') {
-            this.time += dt;
-            if (this.time > 4500) {
-                this.state = 'BOSS';
                 if (typeof Sound !== 'undefined') Sound.playBossBgm();
                 if (typeof Boss !== 'undefined') {
                     this.boss = new Boss(this.starfield.width, this.starfield.height / 2 - 50);
@@ -276,7 +270,6 @@ class LevelManager {
                 this.boss.update();
                 if (!this.boss.active) {
                     this.state = 'CLEAR';
-                    if (typeof Sound !== 'undefined') Sound.playClearJingle();
                 }
             }
         }
@@ -286,22 +279,8 @@ class LevelManager {
         this.starfield.draw(ctx);
         this.terrain.draw(ctx);
         
-        if (this.state === 'BOSS_WARNING') {
-            ctx.fillStyle = (Math.floor(Date.now() / 200) % 2 === 0) ? '#ff0000' : '#ffffff';
-            ctx.font = 'bold 36px Courier New';
-            ctx.textAlign = 'center';
-            ctx.fillText('WARNING!!', this.starfield.width / 2, this.starfield.height / 2);
-        }
-        
         if (this.state === 'BOSS' && this.boss) {
             this.boss.draw(ctx);
-        }
-        
-        if (this.state === 'CLEAR') {
-            ctx.fillStyle = '#00ff00';
-            ctx.font = '40px Courier New';
-            ctx.textAlign = 'center';
-            ctx.fillText('STAGE CLEAR!', this.starfield.width / 2, this.starfield.height / 2);
         }
     }
 }

@@ -147,8 +147,8 @@ function update(dt) {
 
     particles.forEach(p => p.update());
     particles = particles.filter(p => p.active);
-    if (particles.length > 120) {
-        particles = particles.slice(particles.length - 120);
+    if (particles.length > 300) {
+        particles = particles.slice(particles.length - 300);
     }
 
     handleCollisions();
@@ -298,11 +298,7 @@ function handleCollisions() {
                     if (typeof Sound !== 'undefined') Sound.playBossHit();
 
                     if (boss.hp <= 0) {
-                        boss.active = false;
-                        if (typeof Sound !== 'undefined') Sound.playBossExplode();
-                        for (let i = 0; i < 16; i++) {
-                            setTimeout(() => createExplosion(boss.x + Math.random() * 80, boss.y + Math.random() * 100, '#ff4400'), i * 80);
-                        }
+                        triggerBossDefeatExplosion(boss);
                     }
                 }
                 // 3. 上下ハル（無敵装甲）への弾かれ判定
@@ -332,6 +328,51 @@ function createExplosion(x, y, color) {
     for (let i = 0; i < 18; i++) {
         particles.push(new Particle(x, y, color));
     }
+}
+
+// グラディウス風 ボス撃破時の超巨大連鎖爆発
+function triggerBossDefeatExplosion(boss) {
+    if (boss.isDying) return;
+    boss.isDying = true;
+
+    // サウンド再生（重低音連続大爆発）
+    if (typeof Sound !== 'undefined') Sound.playBossExplode();
+
+    // 1. ボス各部（遮蔽板、上下アーム、外装、コア）から次々と巨大火炎球が炸裂！（計28発）
+    for (let i = 0; i < 28; i++) {
+        setTimeout(() => {
+            if (!boss) return;
+            const offsetX = (Math.random() - 0.3) * (boss.width + 40);
+            const offsetY = (Math.random() - 0.2) * (boss.height + 40);
+            const explosionX = boss.x + offsetX;
+            const explosionY = boss.y + offsetY;
+            const radius = 35 + Math.random() * 30; // 半径35〜65pxの巨大火球
+            if (typeof BossExplosion !== 'undefined') {
+                particles.push(new BossExplosion(explosionX, explosionY, radius));
+            }
+            createExplosion(explosionX, explosionY, '#ffaa00');
+        }, i * 45);
+    }
+
+    // 2. 最後に中心で超特大のファイナル大爆発！（半径85〜100px）
+    setTimeout(() => {
+        if (!boss) return;
+        const centerX = boss.x + boss.width / 2;
+        const centerY = boss.y + boss.height / 2;
+        if (typeof BossExplosion !== 'undefined') {
+            particles.push(new BossExplosion(centerX, centerY, 90));
+            particles.push(new BossExplosion(centerX - 20, centerY, 75));
+            particles.push(new BossExplosion(centerX + 20, centerY, 75));
+        }
+        for (let j = 0; j < 30; j++) {
+            createExplosion(centerX, centerY, '#ffffff');
+        }
+    }, 1100);
+
+    // 3. 大爆発の後にボス本体が完全に消滅
+    setTimeout(() => {
+        boss.active = false;
+    }, 1400);
 }
 
 function addPlayerBullet(bullet) {

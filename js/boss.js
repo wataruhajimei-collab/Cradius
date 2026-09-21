@@ -23,9 +23,12 @@ class Boss {
         this.moveTimer = 0;
         this.rotationAngle = 0;
         this.bullets = [];
+        this.isDying = false; // 撃破演出中フラグ
     }
 
     update() {
+        if (this.isDying) return; // 撃破中は行動停止
+
         // 登場シーン
         if (this.x > this.targetX) {
             this.x -= 2;
@@ -96,6 +99,14 @@ class Boss {
 
     draw(ctx) {
         ctx.save();
+
+        // 撃破時の激しい振動（シェイク）と赤白フラッシュ
+        if (this.isDying) {
+            ctx.translate((Math.random() - 0.5) * 8, (Math.random() - 0.5) * 8);
+            if (Math.floor(Date.now() / 60) % 2 === 0) {
+                ctx.filter = 'brightness(2.2) saturate(2.0)';
+            }
+        }
 
         // 1. ボス本体の描画
         if (typeof images !== 'undefined' && images.boss && images.boss.complete) {
