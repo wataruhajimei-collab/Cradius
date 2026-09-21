@@ -61,11 +61,13 @@ class Player {
         // ショット（Zキー）
         if (Input.isDown('KeyZ')) {
             const now = Date.now();
-            // レーザーが途切れる前に次のレーザーを発射してシームレスに連射（150ms）
-            const currentDelay = this.weaponType === 'LASER' ? 150 : this.shotDelay;
+            // レーザー時は画面内のレーザーが出切るまで待機し、出切った瞬間に次弾発射可能（判定間隔50ms）
+            // 通常弾/DOUBLEは標準の shotDelay (200ms)
+            const currentDelay = this.weaponType === 'LASER' ? 50 : this.shotDelay;
             if (now - this.lastShotTime > currentDelay) {
-                this.shoot();
-                this.lastShotTime = now;
+                if (this.shoot()) {
+                    this.lastShotTime = now;
+                }
             }
         }
 
@@ -146,6 +148,16 @@ class Player {
     }
 
     shoot() {
+        // レーザー装備時：長いレーザーが出切るまでは次のショットが出来ない設定（小刻みな連射を防止）
+        if (this.weaponType === 'LASER') {
+            if (typeof playerBullets !== 'undefined') {
+                const hasActiveLaser = playerBullets.some(b => b instanceof Laser && b.active && b.owner === this);
+                if (hasActiveLaser) {
+                    return false;
+                }
+            }
+        }
+
         // 効果音の再生（自機の発射時に1回だけ鳴らす）
         if (typeof Sound !== 'undefined') {
             if (this.weaponType === 'LASER') {
@@ -171,6 +183,8 @@ class Player {
             const optBulletY = opt.y + optOffsetY;
             this.fireBulletFromOrigin(opt, optBulletX, optBulletY, optOffsetY);
         });
+
+        return true;
     }
 
     draw(ctx) {
