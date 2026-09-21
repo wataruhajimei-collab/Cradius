@@ -27,49 +27,43 @@
         <!-- アーケード・グラディウス忠実再現タイトル画面オーバーレイ -->
         <div id="start-screen" class="arcade-start-screen">
             <div class="arcade-cabinet-frame">
-                <!-- 上部スコアバー (1P / HI / 2P) -->
-                <div class="arcade-header-scores">
-                    <div class="score-col score-1p"><span class="lbl-1p">1P</span> <span class="score-val">000000</span></div>
-                    <div class="score-col score-hi"><span class="lbl-hi">HI-SCORE</span> <span class="score-val">050000</span></div>
-                    <div class="score-col score-2p"><span class="lbl-2p">2P</span> <span class="score-val">000000</span></div>
+                <!-- メインウイングエンブレムロゴ -->
+                <div class="arcade-title-block">
+                    <img src="assets/title_logo.png" alt="GRADIUS" class="arcade-title-logo">
                 </div>
 
-                <!-- メインロゴエリア: 3Dクローム押し出しロゴ ＆ 和文サブタイトル -->
-                <div class="arcade-title-block">
-                    <div class="gradius-logo-wrapper">
-                        <div class="gradius-logo-3d" aria-label="CRADIUS">
-                            <span class="logo-layer logo-extrusion ext-5">CRADIUS</span>
-                            <span class="logo-layer logo-extrusion ext-4">CRADIUS</span>
-                            <span class="logo-layer logo-extrusion ext-3">CRADIUS</span>
-                            <span class="logo-layer logo-extrusion ext-2">CRADIUS</span>
-                            <span class="logo-layer logo-extrusion ext-1">CRADIUS</span>
-                            <span class="logo-layer logo-front">CRADIUS</span>
+                <!-- 中央テキスト: コイン投入／スタート & ボーナススコア告知 -->
+                <div class="arcade-center-block">
+                    <div id="btn-start" class="arcade-coin-prompt" role="button" tabindex="0">PLEASE DEPOSIT COIN</div>
+                    
+                    <div class="arcade-bonus-info">
+                        <div class="bonus-row">
+                            <span class="bonus-col-left">1ST&nbsp;&nbsp;BONUS&nbsp;&nbsp;AT</span>
+                            <span class="bonus-col-right">30000PTS</span>
+                        </div>
+                        <div class="bonus-row">
+                            <span class="bonus-col-left">AND&nbsp;&nbsp;THEN&nbsp;&nbsp;&nbsp;EVERY</span>
+                            <span class="bonus-col-right">80000PTS</span>
                         </div>
                     </div>
-                    <div class="arcade-sub-kana">クラディウス</div>
                 </div>
 
-                <!-- 点滅する PUSH START BUTTON -->
-                <div class="arcade-prompt-block">
-                    <div class="arcade-push-start">PUSH START BUTTON</div>
-                    <div class="arcade-play-mode">1 PLAYER ONLY</div>
-                    <button id="btn-start" class="btn-arcade-start">START MISSION</button>
-                    <div class="arcade-tap-hint">TAP SCREEN OR PRESS [SPACE]</div>
+                <!-- 下部: コナミロゴ・著作権 & クレジット表示 -->
+                <div class="arcade-footer-block">
+                    <div class="konami-brand-row">
+                        <span class="konami-wordmark">Konami<span class="konami-reg">&reg;</span></span>
+                    </div>
+                    <div class="arcade-bottom-row">
+                        <div class="konami-copyright">&copy;&nbsp;KONAMI&nbsp;&nbsp;1985</div>
+                        <div class="arcade-credit-box">
+                            <span class="credit-lbl">CREDIT</span>
+                            <span class="credit-badge">01</span>
+                        </div>
+                    </div>
                 </div>
 
                 <!-- 操作ヒント -->
-                <div class="arcade-controls-hud">
-                    <div class="ctrl-row"><span class="ctrl-tag">MOVE</span> SWIPE / ARROW KEYS</div>
-                    <div class="ctrl-row"><span class="ctrl-tag">SHOT</span> [Z] / [SHOT] BTN</div>
-                    <div class="ctrl-row"><span class="ctrl-tag">POWER</span> [X] / [POWER] BTN</div>
-                </div>
-
-                <!-- クレジット＆コピーライト -->
-                <div class="arcade-footer">
-                    <div class="arcade-credit">CREDIT 01</div>
-                    <div class="arcade-copyright">© 1985 2026 KONAMI STYLE / AI GAMES</div>
-                    <div class="arcade-rights">ALL RIGHTS RESERVED</div>
-                </div>
+                <div class="arcade-tap-hint">TAP SCREEN OR PRESS [SPACE] TO START</div>
             </div>
         </div>
 

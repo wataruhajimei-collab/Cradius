@@ -211,7 +211,7 @@ html, body {
 }
 
 /* ==========================================
-   アーケード・グラディウス忠実再現タイトル画面
+   アーケード・グラディウス1985完全再現タイトル画面
    ========================================== */
 #start-screen {
     position: fixed;
@@ -219,16 +219,22 @@ html, body {
     left: 0;
     width: 100vw;
     height: 100dvh;
-    background:
-        linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.45) 50%),
-        radial-gradient(circle at 50% 45%, #081635 0%, #020713 65%, #000000 100%);
-    background-size: 100% 4px, 100% 100%;
+    background: #000000;
+    background-image: repeating-linear-gradient(
+        0deg,
+        rgba(0, 0, 0, 0.25),
+        rgba(0, 0, 0, 0.25) 1px,
+        transparent 1px,
+        transparent 2px
+    );
     display: flex;
     justify-content: center;
     align-items: center;
     z-index: 200;
     cursor: pointer;
     touch-action: manipulation;
+    user-select: none;
+    -webkit-user-select: none;
     transition: opacity 0.25s ease-out;
 }
 
@@ -238,205 +244,172 @@ html, body {
     justify-content: space-between;
     align-items: center;
     text-align: center;
-    width: 95vw;
-    max-width: 760px;
-    height: min(94dvh, 570px);
-    padding: 12px 16px;
+    width: min(96vw, 720px);
+    height: min(94dvh, 560px);
+    padding: 16px 12px;
     box-sizing: border-box;
-    font-family: 'Press Start 2P', 'Courier New', monospace;
+    font-family: 'Press Start 2P', monospace;
 }
 
-/* 上部スコアバー (1P / HI-SCORE / 2P) */
-.arcade-header-scores {
-    display: flex;
-    justify-content: space-between;
-    width: 100%;
-    max-width: 680px;
-    font-size: clamp(9px, 2.1vw, 13px);
-    letter-spacing: 1px;
-}
-
-.score-col {
-    display: flex;
-    gap: 8px;
-}
-
-.lbl-1p, .lbl-2p {
-    color: #ff2244;
-    text-shadow: 0 0 6px rgba(255, 34, 68, 0.6);
-}
-
-.lbl-hi {
-    color: #ffee00;
-    text-shadow: 0 0 6px rgba(255, 238, 0, 0.6);
-}
-
-.score-val {
-    color: #ffffff;
-}
-
-/* メインロゴエリア: 3Dクローム押し出しロゴ */
+/* メインウイングエンブレムロゴ */
 .arcade-title-block {
-    margin: 8px 0;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    width: 100%;
+    margin-top: clamp(6px, 1.8vh, 18px);
 }
 
-.gradius-logo-wrapper {
-    display: inline-block;
-    perspective: 800px;
+.arcade-title-logo {
+    width: min(86vw, 610px);
+    height: auto;
+    object-fit: contain;
+    image-rendering: -webkit-optimize-contrast;
+    image-rendering: crisp-edges;
+    image-rendering: pixelated;
 }
 
-.gradius-logo-3d {
-    position: relative;
-    display: inline-block;
-    font-family: 'Press Start 2P', 'Arial Black', Impact, sans-serif;
-    font-size: clamp(34px, 8.5vw, 68px);
-    letter-spacing: clamp(3px, 1.2vw, 8px);
-    font-weight: 900;
-    line-height: 1.1;
-    transform: skewX(-10deg);
-}
-
-.logo-layer {
-    display: block;
-    white-space: nowrap;
-}
-
-.logo-extrusion {
-    position: absolute;
-    top: 0;
-    left: 0;
-    user-select: none;
-    pointer-events: none;
-}
-
-/* コバルトブルーの深層3D押し出しシャドウ */
-.ext-5 { transform: translate(12px, 12px); color: #000922; text-shadow: 0 0 12px rgba(0, 0, 0, 0.95); }
-.ext-4 { transform: translate(9.5px, 9.5px); color: #00123b; }
-.ext-3 { transform: translate(7px, 7px); color: #001f5e; }
-.ext-2 { transform: translate(4.5px, 4.5px); color: #003399; }
-.ext-1 { transform: translate(2px, 2px); color: #004ecc; }
-
-/* 表面の美しいシルバーブルー・クローム光沢グラデーション */
-.logo-front {
-    position: relative;
-    z-index: 10;
-    background: linear-gradient(180deg, #ffffff 0%, #c6f2ff 28%, #0088ff 49%, #ffffff 51%, #0f5be8 80%, #002277 100%);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    filter: drop-shadow(0 0 2px rgba(255, 255, 255, 0.9));
-}
-
-/* 和文サブタイトル: クラディウス（夕焼けゴールド・レッドグラデーション） */
-.arcade-sub-kana {
-    font-family: 'Press Start 2P', 'Hiragino Kaku Gothic ProN', 'Meiryo', sans-serif;
-    font-size: clamp(14px, 3.6vw, 24px);
-    font-weight: 900;
-    letter-spacing: clamp(6px, 2vw, 14px);
-    margin-top: 6px;
-    transform: skewX(-10deg);
-    background: linear-gradient(180deg, #ffff44 0%, #ffaa00 50%, #e61a00 100%);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.9)) drop-shadow(0 0 8px rgba(255, 120, 0, 0.6));
-}
-
-/* 点滅プロンプト＆スタート */
-.arcade-prompt-block {
+/* 中央ブロック: コイン投入 & ボーナス規定 */
+.arcade-center-block {
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 8px;
+    gap: clamp(20px, 4.5vh, 36px);
+    width: 100%;
+    margin: clamp(12px, 3vh, 28px) 0;
 }
 
-.arcade-push-start {
-    font-size: clamp(13px, 3.2vw, 19px);
-    color: #ffee00;
-    letter-spacing: 3px;
-    animation: arcadeBlink 0.85s steps(2, start) infinite;
-    text-shadow: 0 0 10px rgba(255, 238, 0, 0.8);
+/* 点滅する PLEASE DEPOSIT COIN */
+.arcade-coin-prompt {
+    font-size: clamp(12px, 2.4vw, 17px);
+    color: #4ea8eb;
+    letter-spacing: clamp(1px, 0.3vw, 2px);
+    text-shadow: 2px 2px 0px #0b2247;
+    animation: arcadeCoinBlink 0.9s steps(2, start) infinite;
+    cursor: pointer;
+    outline: none;
+    margin-bottom: clamp(6px, 1.2vh, 12px);
 }
 
-@keyframes arcadeBlink {
+@keyframes arcadeCoinBlink {
     0%, 49% { opacity: 1; visibility: visible; }
     50%, 100% { opacity: 0; visibility: hidden; }
 }
 
-.arcade-play-mode {
-    font-size: clamp(10px, 2.3vw, 13px);
-    color: #00e5ff;
-    letter-spacing: 2px;
-    text-shadow: 0 0 6px rgba(0, 229, 255, 0.6);
+/* ボーナス情報 (1ST BONUS AT 30000PTS / AND THEN EVERY 80000PTS) */
+.arcade-bonus-info {
+    display: flex;
+    flex-direction: column;
+    gap: clamp(10px, 1.8vh, 16px);
+    width: min(84vw, 590px);
+    font-size: clamp(12px, 2.4vw, 17px);
+    color: #4ea8eb;
+    text-shadow: 2px 2px 0px #0b2247;
+    letter-spacing: clamp(1px, 0.3vw, 2px);
 }
 
-.btn-arcade-start {
-    background: linear-gradient(180deg, #ff2255 0%, #b3002d 100%);
-    border: 2px solid #ff88aa;
-    color: #ffffff;
-    font-family: 'Press Start 2P', monospace;
-    font-size: clamp(11px, 2.6vw, 14px);
-    letter-spacing: 2px;
-    padding: 10px 28px;
-    border-radius: 24px;
-    cursor: pointer;
-    box-shadow: 0 0 16px rgba(255, 34, 85, 0.6), inset 0 2px 4px rgba(255, 255, 255, 0.5);
-    animation: arcadeBtnGlow 1.2s infinite alternate;
-    margin-top: 4px;
+.bonus-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    width: 100%;
 }
 
-@keyframes arcadeBtnGlow {
-    0% {
-        transform: scale(0.97);
-        box-shadow: 0 0 12px rgba(255, 34, 85, 0.4);
-    }
-    100% {
-        transform: scale(1.03);
-        box-shadow: 0 0 25px rgba(255, 34, 85, 0.9), 0 0 8px #ffffff;
-    }
+.bonus-col-left {
+    text-align: left;
+    white-space: nowrap;
 }
 
-.arcade-tap-hint {
-    font-size: clamp(8px, 1.7vw, 10px);
-    color: #99bbdd;
-    opacity: 0.8;
-    letter-spacing: 1px;
+.bonus-col-right {
+    text-align: right;
+    white-space: nowrap;
 }
 
-/* 操作ガイドHUD */
-.arcade-controls-hud {
+/* 下部ブロック: Konamiロゴ & 著作権 & クレジット */
+.arcade-footer-block {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: clamp(12px, 2vh, 18px);
+    width: min(84vw, 590px);
+    margin-top: auto;
+}
+
+.konami-brand-row {
     display: flex;
     justify-content: center;
-    gap: 12px;
-    flex-wrap: wrap;
-    font-size: clamp(8px, 1.8vw, 10px);
-    color: #7dd3fc;
-    border-top: 1px dashed rgba(0, 229, 255, 0.25);
-    border-bottom: 1px dashed rgba(0, 229, 255, 0.25);
-    padding: 8px 12px;
-    width: 100%;
-    max-width: 600px;
+    align-items: center;
 }
 
-.ctrl-row {
+.konami-wordmark {
+    font-family: 'Press Start 2P', sans-serif;
+    font-size: clamp(16px, 3.2vw, 22px);
+    color: #61bcfc;
+    letter-spacing: 2px;
+    text-shadow: 2px 2px 0px #0c2b5c;
+    position: relative;
+    display: inline-block;
+}
+
+.konami-reg {
+    font-size: 0.55em;
+    vertical-align: super;
+    margin-left: 2px;
+}
+
+.arcade-bottom-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    width: 100%;
+    font-size: clamp(11px, 2.2vw, 16px);
+}
+
+.konami-copyright {
+    color: #ffffff;
+    letter-spacing: clamp(1px, 0.3vw, 2px);
+    text-shadow: 1px 1px 0px #333333;
+    white-space: nowrap;
+}
+
+.arcade-credit-box {
     display: flex;
     align-items: center;
-    gap: 6px;
+    gap: 8px;
+    white-space: nowrap;
 }
 
-.ctrl-tag {
-    background: #0369a1;
-    color: #ffffff;
-    padding: 2px 5px;
-    border-radius: 3px;
-    font-size: 8px;
+.credit-lbl {
+    color: #4ea8eb;
     letter-spacing: 1px;
+    text-shadow: 2px 2px 0px #0b2247;
 }
 
-/* フッター・クレジット・著作権 */
-.arcade-footer {
+.credit-badge {
+    background: #d85c7f;
+    color: #000000;
+    font-size: clamp(10px, 2.1vw, 15px);
+    font-weight: 900;
+    padding: 1px 4px;
+    border-radius: 2px;
+    box-shadow: inset 0 0 2px rgba(0, 0, 0, 0.8);
+    display: inline-block;
+    line-height: 1.1;
+}
+
+/* 操作ヒント（最下部） */
+.arcade-tap-hint {
     font-size: clamp(8px, 1.6vw, 10px);
-    color: #64748b;
-    line-height: 1.7;
+    color: #557799;
     letter-spacing: 1px;
+    margin-top: clamp(8px, 1.5vh, 14px);
+    opacity: 0.75;
+    animation: arcadePulse 2s ease-in-out infinite alternate;
+}
+
+@keyframes arcadePulse {
+    0% { opacity: 0.4; }
+    100% { opacity: 0.85; }
 }
 
 .arcade-credit {
