@@ -127,10 +127,10 @@
        3. 3D BEVEL SHADOWS (Slanted 45 deg down-right)
        ======================================================== -->
   <g fill="url(#bevelGrad)" stroke="#2b000a" stroke-width="1.2">
-    <!-- C Bevel Shadows -->
-    <polygon points="172,96 224,96 229,101 177,101"/>
-    <polygon points="224,80 229,85 229,101 224,96"/>
-    <polygon points="224,50 229,55 229,65 224,65"/>
+    <!-- C Bevel Shadows (Chamfered octagonal profile) -->
+    <polygon points="174,96 222,96 226,92 231,97 227,101 179,101 173,95"/>
+    <polygon points="222,50 226,54 231,59 231,69 226,69 222,65"/>
+    <polygon points="222,77 226,81 231,86 231,97 226,92 222,96"/>
 
     <!-- R Bevel Shadows -->
     <polygon points="234,96 254,96 277,96 282,101 278,82 278,50 274,50 274,74 254,74 254,96"/>
@@ -156,16 +156,24 @@
        4. MAIN TITLE LETTERS: C R A D I U S
        ======================================================== -->
   <g fill="url(#chromeGrad)" stroke="#300408" stroke-width="2.2" stroke-linejoin="miter">
-    <!-- ===== LETTER [C] ===== -->
+    <!-- ===== LETTER [C] (Flawless Arcade Octagonal with Inward Chamfers) ===== -->
     <path d="
-      M 172,50
-      L 224,50
-      L 224,65
-      L 194,65
-      L 194,81
-      L 224,81
-      L 224,96
-      L 172,96
+      M 178,50
+      L 222,50
+      L 226,54
+      L 226,67
+      L 214,67
+      L 214,62
+      L 194,62
+      L 194,84
+      L 214,84
+      L 214,79
+      L 226,79
+      L 226,92
+      L 222,96
+      L 178,96
+      L 172,90
+      L 172,56
       Z"
     />
 
