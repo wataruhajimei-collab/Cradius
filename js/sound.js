@@ -25,19 +25,30 @@ class SoundManager {
 
         // iOS Safari等のユーザーインタラクション解除
         const unlock = () => {
-            this.init();
-            if (this.ctx && this.ctx.state === 'suspended') {
-                this.ctx.resume();
-            }
-            window.removeEventListener('touchstart', unlock);
-            window.removeEventListener('touchend', unlock);
-            window.removeEventListener('click', unlock);
-            window.removeEventListener('keydown', unlock);
+            this.unlockAudio();
+            ['touchstart', 'touchend', 'click', 'keydown', 'pointerdown'].forEach(evt => {
+                window.removeEventListener(evt, unlock, { capture: true });
+            });
         };
-        window.addEventListener('touchstart', unlock, { passive: true });
-        window.addEventListener('touchend', unlock, { passive: true });
-        window.addEventListener('click', unlock, { passive: true });
-        window.addEventListener('keydown', unlock, { passive: true });
+        ['touchstart', 'touchend', 'click', 'keydown', 'pointerdown'].forEach(evt => {
+            window.addEventListener(evt, unlock, { passive: true, capture: true });
+        });
+    }
+
+    unlockAudio() {
+        this.init();
+        if (!this.ctx) return;
+        if (this.ctx.state === 'suspended') {
+            this.ctx.resume().catch(() => {});
+        }
+        // iOS Safari用Web Audioアンロックダミーバッファ
+        try {
+            const buf = this.ctx.createBuffer(1, 1, 22050);
+            const src = this.ctx.createBufferSource();
+            src.buffer = buf;
+            src.connect(this.ctx.destination);
+            src.start(0);
+        } catch (e) {}
     }
 
     init() {
@@ -411,24 +422,45 @@ class SoundManager {
         }
         this.init();
 
-        if (this.ctx && this.ctx.state === 'suspended') {
-            this.ctx.resume();
-        }
-
         const stepDuration = (60 / bpm) / 4; // 16分音符の長さ(秒)
         let currentStep = 0;
-        let nextStepTime = this.ctx.currentTime + 0.05;
+        let nextStepTime = 0;
+        let isStarted = false;
+
+        const startFromZero = () => {
+            if (!this.ctx) return;
+            currentStep = 0;
+            // 最初の瞬間（わずか0.01秒後）から即座に発音開始！
+            nextStepTime = this.ctx.currentTime + 0.01;
+            isStarted = true;
+        };
+
+        if (this.ctx && this.ctx.state === 'running') {
+            startFromZero();
+        }
 
         this.bgmTimer = setInterval(() => {
-            if (!this.initialized || this.isMuted) return;
+            if (!this.initialized || this.isMuted || !this.ctx) return;
 
-            // アンダーラン（音飛び・途切れ）防止リカバリー:
-            // 描画やパーティクル処理でタイマーが遅延した場合、nextStepTimeが過去になっていたら安全に現在時刻直後に補正
-            if (nextStepTime < this.ctx.currentTime) {
-                nextStepTime = this.ctx.currentTime + 0.015;
+            // コンテキストがsuspended（ブラウザの自動再生ブロック中）の間は
+            // ステップを進めず一時停止して待機（Step 0が空振りするのを完全に防止！）
+            if (this.ctx.state === 'suspended') {
+                isStarted = false;
+                return;
             }
 
-            // 先読みウィンドウを 120ms から 260ms に拡大（ゲームループの負荷に左右されず途切れない高安定再生）
+            // アンロックされた最初のTickで必ずStep 0から開始！
+            if (!isStarted) {
+                startFromZero();
+            }
+
+            // アンダーラン（音飛び・途切れ）防止リカバリー:
+            // 描画やパーティクル処理でタイマーが遅延した場合、nextStepTimeが過去になっていたら現在時刻直後に補正
+            if (nextStepTime < this.ctx.currentTime) {
+                nextStepTime = this.ctx.currentTime + 0.01;
+            }
+
+            // 先読みウィンドウ（260ms）
             while (nextStepTime < this.ctx.currentTime + 0.26) {
                 try {
                     scheduleCallback(currentStep, nextStepTime, stepDuration);
@@ -438,7 +470,7 @@ class SoundManager {
                 currentStep = (currentStep + 1) % totalSteps;
                 nextStepTime += stepDuration;
             }
-        }, 25);
+        }, 20);
     }
 
     // --- シンセサイズ発音系 ---
@@ -882,8 +914,8 @@ class SoundManager {
     }
 
     // 空中戦BGM: 『BEGINNING OF THE HISTORY』(グラディウス伝統・宇宙出撃空中戦テーマ フルオーケストラ荘厳大音量版！)
-    playAirBgm() {
-        if (this.currentBgm === 'AIR') return;
+    playAirBgm(forceRestart = false) {
+        if (!forceRestart && this.currentBgm === 'AIR') return;
         this.currentBgm = 'AIR';
 
         // テンポ 130 BPM (宇宙への出撃感あふれるシャープで勇壮な戦闘テンポ)

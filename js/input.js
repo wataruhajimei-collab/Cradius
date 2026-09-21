@@ -65,9 +65,10 @@ class InputManager {
         moveZone.addEventListener('touchstart', (e) => {
             e.preventDefault();
             if (typeof Sound !== 'undefined') {
-                Sound.init();
-                if (Sound.ctx && Sound.ctx.state === 'suspended') Sound.ctx.resume();
-                if (!Sound.currentBgm) Sound.playAirBgm();
+                Sound.unlockAudio();
+            }
+            if (typeof startGame === 'function') {
+                startGame();
             }
             if (activeTouchId !== null) return;
 
@@ -156,7 +157,12 @@ class InputManager {
             if (!btn) return;
             const press = (e) => {
                 e.preventDefault();
-                e.stopPropagation();
+                if (typeof Sound !== 'undefined') {
+                    Sound.unlockAudio();
+                }
+                if (typeof startGame === 'function') {
+                    startGame();
+                }
                 this.keys[keyCode] = true;
                 btn.classList.add('active');
             };

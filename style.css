@@ -209,3 +209,99 @@ html, body {
         padding: 3px 8px;
     }
 }
+
+/* ゲームスタート画面オーバーレイ */
+#start-screen {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100dvh;
+    background: radial-gradient(circle at center, rgba(5, 15, 35, 0.72) 0%, rgba(0, 0, 5, 0.90) 80%);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 200;
+    backdrop-filter: blur(3px);
+    -webkit-backdrop-filter: blur(3px);
+    cursor: pointer;
+    touch-action: manipulation;
+    transition: opacity 0.25s ease-out;
+}
+
+.start-box {
+    text-align: center;
+    padding: 24px 32px;
+    background: rgba(0, 20, 50, 0.65);
+    border: 2px solid rgba(0, 255, 255, 0.5);
+    border-radius: 18px;
+    box-shadow: 0 0 35px rgba(0, 200, 255, 0.35), inset 0 0 20px rgba(0, 150, 255, 0.15);
+    max-width: 90vw;
+}
+
+.start-title {
+    margin: 0;
+    font-size: clamp(32px, 8vw, 54px);
+    font-weight: 900;
+    letter-spacing: 4px;
+    color: #ffffff;
+    text-shadow: 0 0 10px #00ffff, 0 0 25px #00aaff, 0 0 45px #0055ff;
+    font-family: 'Hiragino Kaku Gothic ProN', 'Meiryo', sans-serif;
+}
+
+.start-sub {
+    font-size: clamp(14px, 3.5vw, 20px);
+    letter-spacing: 8px;
+    color: #00ffff;
+    margin-top: 4px;
+    margin-bottom: 24px;
+    text-shadow: 0 0 8px rgba(0, 255, 255, 0.7);
+    font-weight: bold;
+}
+
+.start-btn-wrap {
+    margin: 18px 0;
+}
+
+.btn-game-start {
+    background: linear-gradient(180deg, #ff4466 0%, #cc0033 100%);
+    border: 2px solid #ff99aa;
+    color: #ffffff;
+    font-size: clamp(16px, 4.5vw, 24px);
+    font-weight: bold;
+    letter-spacing: 3px;
+    padding: 14px 38px;
+    border-radius: 30px;
+    cursor: pointer;
+    box-shadow: 0 0 20px rgba(255, 50, 100, 0.6), 0 4px 12px rgba(0, 0, 0, 0.5);
+    animation: startBtnPulse 1.4s infinite alternate;
+}
+
+@keyframes startBtnPulse {
+    0% {
+        transform: scale(0.98);
+        box-shadow: 0 0 15px rgba(255, 50, 100, 0.5);
+    }
+    100% {
+        transform: scale(1.04);
+        box-shadow: 0 0 30px rgba(255, 50, 100, 0.9), 0 0 10px #ffffff;
+    }
+}
+
+.start-guide {
+    font-size: clamp(12px, 3vw, 15px);
+    color: #ffff88;
+    letter-spacing: 1px;
+    margin-top: 10px;
+    text-shadow: 0 0 8px rgba(255, 255, 100, 0.6);
+}
+
+.start-controls-hint {
+    margin-top: 18px;
+    font-size: 11px;
+    color: #88ccff;
+    opacity: 0.85;
+    line-height: 1.6;
+    border-top: 1px dashed rgba(0, 255, 255, 0.25);
+    padding-top: 12px;
+}

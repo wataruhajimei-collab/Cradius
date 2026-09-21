@@ -23,38 +23,88 @@ images.boss.src = 'img/boss.png';
 images.terrain.src = 'img/terrain.jpg';
 images.capsule.src = 'img/capsule.png';
 
+let gameStarted = false;
+
+function startGame() {
+    if (gameStarted) return;
+    gameStarted = true;
+
+    const startScreen = document.getElementById('start-screen');
+    if (startScreen) {
+        startScreen.style.opacity = '0';
+        setTimeout(() => {
+            startScreen.style.display = 'none';
+        }, 250);
+    }
+
+    // Web Audioを確実にアンロック＆最初の瞬間(Step 0)からBGMを大音量再生！
+    if (typeof Sound !== 'undefined') {
+        Sound.unlockAudio();
+        Sound.playAirBgm(true);
+    }
+
+    if (levelManager) {
+        levelManager.time = 0;
+    }
+    enemySpawnTimer = 0;
+}
+
 function init() {
     player = new Player(100, canvas.height / 2 - 10);
     levelManager = new LevelManager(canvas.width, canvas.height);
 
-    // ロード時に直ちにBGMを開始（ブラウザが許可していれば即座に自動再生！）
-    if (typeof Sound !== 'undefined') {
-        Sound.init();
-        Sound.playAirBgm();
+    // スタート画面操作のバインド
+    const startScreen = document.getElementById('start-screen');
+    const btnStart = document.getElementById('btn-start');
+
+    if (startScreen) {
+        startScreen.addEventListener('pointerdown', (e) => {
+            e.preventDefault();
+            startGame();
+        });
+        startScreen.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            startGame();
+        }, { passive: false });
+    }
+    if (btnStart) {
+        btnStart.addEventListener('click', (e) => {
+            e.preventDefault();
+            startGame();
+        });
     }
 
-    // ブラウザのAutoplay Policy制限解除用: 画面タッチ、スワイプ、キー押し等あらゆる操作で即座に音声をレジューム
-    const resumeAudio = () => {
-        if (typeof Sound !== 'undefined') {
-            Sound.init();
-            if (Sound.ctx && Sound.ctx.state === 'suspended') {
-                Sound.ctx.resume();
-            }
-            if (!Sound.currentBgm) {
-                Sound.playAirBgm();
+    // 画面全体のどこをタップ・クリック・キー押ししても即座にゲーム開始＆BGM発音
+    const globalTrigger = () => {
+        if (!gameStarted) {
+            startGame();
+        } else {
+            if (typeof Sound !== 'undefined') {
+                Sound.unlockAudio();
+                if (Sound.ctx && Sound.ctx.state === 'suspended') {
+                    Sound.ctx.resume().catch(() => {});
+                }
             }
         }
     };
 
-    ['touchstart', 'touchend', 'touchmove', 'keydown', 'mousedown', 'pointerdown', 'click'].forEach(evt => {
-        window.addEventListener(evt, resumeAudio, { passive: true });
-        document.addEventListener(evt, resumeAudio, { passive: true });
+    ['touchstart', 'touchend', 'mousedown', 'pointerdown', 'keydown'].forEach(evt => {
+        window.addEventListener(evt, globalTrigger, { capture: true, passive: true });
+        document.addEventListener(evt, globalTrigger, { capture: true, passive: true });
     });
 
     requestAnimationFrame(gameLoop);
 }
 
 function update(dt) {
+    // スタート前は星空スクロールのみ行い、敵スポーンやタイマーは停止
+    if (!gameStarted) {
+        if (levelManager && levelManager.starfield) {
+            levelManager.starfield.update();
+        }
+        return;
+    }
+
     player.update(canvas.width, canvas.height);
 
     playerBullets.forEach(b => b.update(canvas.height));
@@ -385,11 +435,13 @@ function draw() {
 
     levelManager.draw(ctx);
 
-    capsules.forEach(c => c.draw(ctx));
-    particles.forEach(p => p.draw(ctx));
-    enemies.forEach(e => e.draw(ctx));
-    enemyBullets.forEach(b => b.draw(ctx));
-    playerBullets.forEach(b => b.draw(ctx));
+    if (gameStarted) {
+        capsules.forEach(c => c.draw(ctx));
+        particles.forEach(p => p.draw(ctx));
+        enemies.forEach(e => e.draw(ctx));
+        enemyBullets.forEach(b => b.draw(ctx));
+        playerBullets.forEach(b => b.draw(ctx));
+    }
     player.draw(ctx);
 
     if (typeof ui !== 'undefined') {
