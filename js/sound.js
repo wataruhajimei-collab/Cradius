@@ -267,6 +267,94 @@ class SoundManager {
         });
     }
 
+    // ゲームスタート音: グラディウス開始時の象徴的な「タララララン！」サウンド
+    // (12.5% & 25% パルス波 + 軽快なアルペジオファンファーレ + 空間残響)
+    playGameStart() {
+        this.unlockAudio();
+        if (!this.initialized || this.isMuted) return;
+        const now = this.ctx.currentTime;
+
+        // グラディウス伝統のオープニング・アルペジオフレーズ (E minor: E5 -> B4 -> E5 -> Fs5 -> B5 -> E6)
+        // 軽快かつ歯切れの良い「タ・ラ・ラ・ラ・ラ〜ン！」
+        const notes = [
+            { freq: 659.25, time: 0.000, dur: 0.055 }, // E5 (タ)
+            { freq: 493.88, time: 0.055, dur: 0.055 }, // B4 (ラ)
+            { freq: 659.25, time: 0.110, dur: 0.055 }, // E5 (ラ)
+            { freq: 739.99, time: 0.165, dur: 0.055 }, // F#5 (ラ)
+            { freq: 987.77, time: 0.220, dur: 0.075 }, // B5 (ラ)
+            { freq: 1318.51, time: 0.295, dur: 0.450 } // E6 (ラン〜！)
+        ];
+
+        // 各音をコナミ特有のパルス波オシレーターで発音
+        notes.forEach(({ freq, time, dur }) => {
+            const noteStart = now + time;
+
+            // 主音: 12.5%デューティ比の金属的なクリスプパルス波
+            const osc1 = this.ctx.createOscillator();
+            if (this.pulseWave125) {
+                osc1.setPeriodicWave(this.pulseWave125);
+            } else {
+                osc1.type = 'square';
+            }
+            osc1.frequency.setValueAtTime(freq, noteStart);
+
+            // 副音: 25%デューティ比、わずか+2.5Hzの微細デチューンでアーケード特有の艶やかなコーラス感
+            const osc2 = this.ctx.createOscillator();
+            if (this.pulseWave25) {
+                osc2.setPeriodicWave(this.pulseWave25);
+            } else {
+                osc2.type = 'square';
+            }
+            osc2.frequency.setValueAtTime(freq + 2.5, noteStart);
+
+            const gainNode = this.ctx.createGain();
+            const vol = (freq > 1200) ? 0.75 : 0.65;
+            gainNode.gain.setValueAtTime(vol, noteStart);
+
+            if (freq > 1200) {
+                // 最後の「ラン〜！」は豊かな余韻を持って響き渡る
+                gainNode.gain.setValueAtTime(vol, noteStart + 0.15);
+                gainNode.gain.exponentialRampToValueAtTime(0.001, noteStart + dur);
+            } else {
+                // 前半は歯切れの良いスタッカート
+                gainNode.gain.setValueAtTime(vol, noteStart + dur * 0.7);
+                gainNode.gain.exponentialRampToValueAtTime(0.001, noteStart + dur);
+            }
+
+            osc1.connect(gainNode);
+            osc2.connect(gainNode);
+            gainNode.connect(this.seGain);
+
+            // 空間系ディレイへセンドして宇宙空間の広がりを付加
+            if (this.delaySend) {
+                gainNode.connect(this.delaySend);
+            }
+
+            osc1.start(noteStart);
+            osc1.stop(noteStart + dur);
+            osc2.start(noteStart);
+            osc2.stop(noteStart + dur);
+        });
+
+        // 最後のハイノート (E6) にキラキラした高域ベルチャイムの倍音 (B6 & E7) を付加
+        const chimeStart = now + 0.295;
+        const chimeOsc = this.ctx.createOscillator();
+        const chimeGain = this.ctx.createGain();
+        chimeOsc.type = 'sine';
+        chimeOsc.frequency.setValueAtTime(1975.53, chimeStart); // B6
+        chimeOsc.frequency.exponentialRampToValueAtTime(2637.02, chimeStart + 0.06); // E7
+
+        chimeGain.gain.setValueAtTime(0.35, chimeStart);
+        chimeGain.gain.exponentialRampToValueAtTime(0.001, chimeStart + 0.40);
+
+        chimeOsc.connect(chimeGain);
+        chimeGain.connect(this.seGain);
+        if (this.delaySend) chimeGain.connect(this.delaySend);
+
+        chimeOsc.start(chimeStart);
+        chimeOsc.stop(chimeStart + 0.40);
+    }
+
     // 敵爆発音: ドカーン！ (ホワイトノイズ + 低域ピッチダウン)
     playExplosion() {
         if (!this.initialized || this.isMuted || !this.noiseBuffer) return;

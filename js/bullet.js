@@ -115,7 +115,7 @@ class Laser {
         this.offsetY = offsetY;
         this.x = x;
         this.y = owner.y + offsetY;
-        this.width = 1000; // 長大な本格グラディウスレーザー (2倍に延長)
+        this.width = 2500; // 今の2.5倍の超長大本格グラディウスレーザー (1000 -> 2500)
         this.height = 3; // 極細シャープなグラディウスレーザー
         this.speedX = speedX;
         this.color = color;

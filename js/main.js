@@ -29,19 +29,26 @@ function startGame() {
     if (gameStarted) return;
     gameStarted = true;
 
+    // Web Audioを確実にアンロック＆即座に「タララララン！」グラディウス開始音を再生！
+    if (typeof Sound !== 'undefined') {
+        Sound.unlockAudio();
+        Sound.playGameStart();
+    }
+
     const startScreen = document.getElementById('start-screen');
     if (startScreen) {
         startScreen.style.opacity = '0';
         setTimeout(() => {
             startScreen.style.display = 'none';
-        }, 250);
+        }, 320);
     }
 
-    // Web Audioを確実にアンロック＆最初の瞬間(Step 0)からBGMを大音量再生！
-    if (typeof Sound !== 'undefined') {
-        Sound.unlockAudio();
-        Sound.playAirBgm(true);
-    }
+    // スタートジングル（約0.35秒）が響き渡った瞬間、空中戦BGMが爆音でスタート！
+    setTimeout(() => {
+        if (typeof Sound !== 'undefined') {
+            Sound.playAirBgm(true);
+        }
+    }, 360);
 
     if (levelManager) {
         levelManager.time = 0;
