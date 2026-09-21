@@ -61,8 +61,8 @@ class Player {
         // ショット（Zキー）
         if (Input.isDown('KeyZ')) {
             const now = Date.now();
-            // レーザーの時は長大なビーム（2500px）が途切れず美しく連射できるようにスムーズな発射間隔（480ms）に最適化
-            const currentDelay = this.weaponType === 'LASER' ? 480 : this.shotDelay;
+            // レーザーが途切れる前に次のレーザーを発射してシームレスに連射（150ms）
+            const currentDelay = this.weaponType === 'LASER' ? 150 : this.shotDelay;
             if (now - this.lastShotTime > currentDelay) {
                 this.shoot();
                 this.lastShotTime = now;
