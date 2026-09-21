@@ -452,7 +452,7 @@ function draw() {
     player.draw(ctx);
 
     if (typeof ui !== 'undefined') {
-        ui.draw(ctx, canvas.width, player.powerUpIndex);
+        ui.draw(ctx, canvas.width, player);
     }
 }
 

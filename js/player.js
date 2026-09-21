@@ -23,6 +23,8 @@ class Player {
         this.maxShieldHp = 3;
 
         this.hasMissile = false; // ミサイルを持っているか
+        this.usedDouble = false; // 一度選んだ武器（DOUBLE）
+        this.usedLaser = false;  // 一度選んだ武器（LASER）
     }
 
     update(canvasWidth, canvasHeight) {
@@ -86,6 +88,26 @@ class Player {
         }
     }
 
+    // 指定のパワーアップスロットが選択（発動）可能かどうかを判定
+    canActivatePowerUp(index) {
+        switch (index) {
+            case 0: // SPEED (スピードアップは何回でも選択可能)
+                return this.speed < 8;
+            case 1: // MISSILE (一度選んだら選べない)
+                return !this.hasMissile;
+            case 2: // DOUBLE (一度選んだ武器は選べない)
+                return !this.usedDouble && this.weaponType !== 'DOUBLE';
+            case 3: // LASER (一度選んだ武器は選べない)
+                return !this.usedLaser && this.weaponType !== 'LASER';
+            case 4: // OPTION (上限4個に達したら選べない)
+                return this.options.length < this.maxOptions;
+            case 5: // ? (SHIELD: シールド展開中は選べない)
+                return !this.shieldActive;
+            default:
+                return false;
+        }
+    }
+
     advancePowerUp() {
         this.powerUpIndex++;
         if (this.powerUpIndex > 5) {
@@ -96,6 +118,11 @@ class Player {
     activatePowerUp() {
         if (this.powerUpIndex === -1) return;
 
+        // 一度選んだ武器や上限到達済みのパワーアップは選択不可（ゲージは保持）
+        if (!this.canActivatePowerUp(this.powerUpIndex)) {
+            return;
+        }
+
         switch (this.powerUpIndex) {
             case 0: // SPEED
                 if (this.speed < 8) this.speed += 1; // スピードアップ率を2から1（半分）に調整
@@ -105,9 +132,11 @@ class Player {
                 break;
             case 2: // DOUBLE
                 this.weaponType = 'DOUBLE';
+                this.usedDouble = true;
                 break;
             case 3: // LASER
                 this.weaponType = 'LASER';
+                this.usedLaser = true;
                 break;
             case 4: // OPTION
                 if (this.options.length < this.maxOptions) {
@@ -122,7 +151,7 @@ class Player {
                 break;
         }
         
-        // ゲージをリセット
+        // 発動成功時のみゲージをリセットして効果音を鳴らす
         this.powerUpIndex = -1;
         if (typeof Sound !== 'undefined') Sound.playPowerUp();
     }

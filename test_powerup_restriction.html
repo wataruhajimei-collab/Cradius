@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <title>PowerUp Restriction Test</title>
+</head>
+<body>
+    <h1>PowerUp Restriction Test</h1>
+    <div id="results">Running...</div>
+
+    <script src="js/bullet.js"></script>
+    <script src="js/laser.js"></script>
+    <script src="js/missile.js"></script>
+    <script src="js/option.js"></script>
+    <script src="js/sound.js"></script>
+    <script src="js/input.js"></script>
+    <script src="js/ui.js"></script>
+    <script src="js/player.js"></script>
+
+    <script>
+        const log = [];
+        function assert(condition, msg) {
+            if (!condition) {
+                log.push('FAIL: ' + msg);
+                console.error('FAIL: ' + msg);
+                throw new Error(msg);
+            } else {
+                log.push('PASS: ' + msg);
+            }
+        }
+
+        try {
+            const p = new Player(100, 100);
+
+            // 初期状態テスト
+            assert(p.canActivatePowerUp(0) === true, "Speed should be available initially");
+            assert(p.canActivatePowerUp(1) === true, "Missile should be available initially");
+            assert(p.canActivatePowerUp(2) === true, "Double should be available initially");
+            assert(p.canActivatePowerUp(3) === true, "Laser should be available initially");
+            assert(p.canActivatePowerUp(4) === true, "Option should be available initially");
+            assert(p.canActivatePowerUp(5) === true, "Shield should be available initially");
+
+            // 1. MISSILE 取得
+            p.powerUpIndex = 1;
+            p.activatePowerUp();
+            assert(p.hasMissile === true, "Player has missile after activation");
+            assert(p.powerUpIndex === -1, "Gauge reset after activation");
+            assert(p.canActivatePowerUp(1) === false, "Missile cannot be selected again");
+
+            // MISSILE 再選択の防止確認
+            p.powerUpIndex = 1;
+            p.activatePowerUp();
+            assert(p.powerUpIndex === 1, "Gauge should NOT be consumed when activating unavailable Missile");
+
+            // 2. DOUBLE 取得
+            p.powerUpIndex = 2;
+            p.activatePowerUp();
+            assert(p.weaponType === 'DOUBLE', "Weapon is DOUBLE");
+            assert(p.usedDouble === true, "usedDouble is true");
+            assert(p.powerUpIndex === -1, "Gauge reset after activation");
+            assert(p.canActivatePowerUp(2) === false, "Double cannot be selected again");
+
+            // DOUBLE 再選択の防止確認
+            p.powerUpIndex = 2;
+            p.activatePowerUp();
+            assert(p.powerUpIndex === 2, "Gauge should NOT be consumed when activating unavailable Double");
+
+            // 3. LASER 取得
+            p.powerUpIndex = 3;
+            p.activatePowerUp();
+            assert(p.weaponType === 'LASER', "Weapon is LASER");
+            assert(p.usedLaser === true, "usedLaser is true");
+            assert(p.powerUpIndex === -1, "Gauge reset after activation");
+            assert(p.canActivatePowerUp(3) === false, "Laser cannot be selected again");
+            assert(p.canActivatePowerUp(2) === false, "Previously used Double still cannot be selected");
+
+            // LASER 再選択の防止確認
+            p.powerUpIndex = 3;
+            p.activatePowerUp();
+            assert(p.powerUpIndex === 3, "Gauge should NOT be consumed when activating unavailable Laser");
+
+            // 4. SPEED 取得（スピードアップ以外は一度選んだ武器は選べない → スピードアップは何回でも選べる）
+            const initialSpeed = p.speed;
+            p.powerUpIndex = 0;
+            p.activatePowerUp();
+            assert(p.speed === initialSpeed + 1, "Speed increased by 1");
+            assert(p.canActivatePowerUp(0) === true, "Speed is still available for selection");
+
+            p.powerUpIndex = 0;
+            p.activatePowerUp();
+            assert(p.speed === initialSpeed + 2, "Speed increased by 2 (selected multiple times)");
+            assert(p.canActivatePowerUp(0) === true, "Speed is still available");
+
+            // 5. OPTION 取得
+            for (let i = 0; i < p.maxOptions; i++) {
+                assert(p.canActivatePowerUp(4) === true, "Option is available when count < max");
+                p.powerUpIndex = 4;
+                p.activatePowerUp();
+            }
+            assert(p.options.length === 4, "Option count is 4 (max)");
+            assert(p.canActivatePowerUp(4) === false, "Option cannot be selected when maxed out");
+            p.powerUpIndex = 4;
+            p.activatePowerUp();
+            assert(p.powerUpIndex === 4, "Gauge preserved when attempting to exceed max options");
+
+            // 6. SHIELD 取得
+            assert(p.canActivatePowerUp(5) === true, "Shield is available initially");
+            p.powerUpIndex = 5;
+            p.activatePowerUp();
+            assert(p.shieldActive === true, "Shield is active");
+            assert(p.canActivatePowerUp(5) === false, "Shield cannot be selected while active");
+            p.powerUpIndex = 5;
+            p.activatePowerUp();
+            assert(p.powerUpIndex === 5, "Gauge preserved when shield is active");
+
+            // シールド破壊後
+            p.shieldActive = false;
+            assert(p.canActivatePowerUp(5) === true, "Shield can be selected again after broken");
+
+            // UI 描画テスト（エラーなくレンダリングできるか確認）
+            const canvas = document.createElement('canvas');
+            canvas.width = 800;
+            canvas.height = 600;
+            const ctx = canvas.getContext('2d');
+            ui.draw(ctx, canvas.width, p);
+            log.push('PASS: UI.draw completed successfully');
+
+            document.getElementById('results').innerHTML = '<pre>' + log.join('\n') + '\n\nALL TESTS PASSED SUCCESSFULLY!</pre>';
+        } catch (e) {
+            document.getElementById('results').innerHTML = '<pre style="color:red;">' + log.join('\n') + '\nERROR: ' + e.message + '</pre>';
+        }
+    </script>
+</body>
+</html>
