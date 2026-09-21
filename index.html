@@ -13,6 +13,9 @@
     <link rel="apple-touch-icon" href="apple-touch-icon.png">
     <link rel="icon" type="image/png" href="favicon.png">
     <link rel="manifest" href="manifest.json">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -21,19 +24,51 @@
         <div id="game-container">
             <canvas id="gameCanvas" width="800" height="600"></canvas>
         </div>
-        <!-- ゲームスタート画面オーバーレイ -->
-        <div id="start-screen">
-            <div class="start-box">
-                <h1 class="start-title">クラディウス</h1>
-                <div class="start-sub">CRADIUS</div>
-                <div class="start-btn-wrap">
-                    <button id="btn-start" class="btn-game-start">GAME START</button>
+        <!-- アーケード・グラディウス忠実再現タイトル画面オーバーレイ -->
+        <div id="start-screen" class="arcade-start-screen">
+            <div class="arcade-cabinet-frame">
+                <!-- 上部スコアバー (1P / HI / 2P) -->
+                <div class="arcade-header-scores">
+                    <div class="score-col score-1p"><span class="lbl-1p">1P</span> <span class="score-val">000000</span></div>
+                    <div class="score-col score-hi"><span class="lbl-hi">HI-SCORE</span> <span class="score-val">050000</span></div>
+                    <div class="score-col score-2p"><span class="lbl-2p">2P</span> <span class="score-val">000000</span></div>
                 </div>
-                <div class="start-guide">画面をタップ または [SPACE] で発進</div>
-                <div class="start-controls-hint">
-                    <div>移動: スワイプ / 矢印キー</div>
-                    <div>ショット: [SHOT] / [Z]</div>
-                    <div>パワーアップ: [POWER] / [X]</div>
+
+                <!-- メインロゴエリア: 3Dクローム押し出しロゴ ＆ 和文サブタイトル -->
+                <div class="arcade-title-block">
+                    <div class="gradius-logo-wrapper">
+                        <div class="gradius-logo-3d" aria-label="CRADIUS">
+                            <span class="logo-layer logo-extrusion ext-5">CRADIUS</span>
+                            <span class="logo-layer logo-extrusion ext-4">CRADIUS</span>
+                            <span class="logo-layer logo-extrusion ext-3">CRADIUS</span>
+                            <span class="logo-layer logo-extrusion ext-2">CRADIUS</span>
+                            <span class="logo-layer logo-extrusion ext-1">CRADIUS</span>
+                            <span class="logo-layer logo-front">CRADIUS</span>
+                        </div>
+                    </div>
+                    <div class="arcade-sub-kana">クラディウス</div>
+                </div>
+
+                <!-- 点滅する PUSH START BUTTON -->
+                <div class="arcade-prompt-block">
+                    <div class="arcade-push-start">PUSH START BUTTON</div>
+                    <div class="arcade-play-mode">1 PLAYER ONLY</div>
+                    <button id="btn-start" class="btn-arcade-start">START MISSION</button>
+                    <div class="arcade-tap-hint">TAP SCREEN OR PRESS [SPACE]</div>
+                </div>
+
+                <!-- 操作ヒント -->
+                <div class="arcade-controls-hud">
+                    <div class="ctrl-row"><span class="ctrl-tag">MOVE</span> SWIPE / ARROW KEYS</div>
+                    <div class="ctrl-row"><span class="ctrl-tag">SHOT</span> [Z] / [SHOT] BTN</div>
+                    <div class="ctrl-row"><span class="ctrl-tag">POWER</span> [X] / [POWER] BTN</div>
+                </div>
+
+                <!-- クレジット＆コピーライト -->
+                <div class="arcade-footer">
+                    <div class="arcade-credit">CREDIT 01</div>
+                    <div class="arcade-copyright">© 1985 2026 KONAMI STYLE / AI GAMES</div>
+                    <div class="arcade-rights">ALL RIGHTS RESERVED</div>
                 </div>
             </div>
         </div>

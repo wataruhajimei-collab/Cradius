@@ -1,13 +1,14 @@
 class Bullet {
-    constructor(x, y, speedX, speedY, color = '#ffffff') {
+    constructor(x, y, speedX, speedY, color = '#ffffff', isEnemy = false) {
         this.x = x;
         this.y = y;
-        this.width = 15;
-        this.height = 4;
+        this.width = isEnemy ? 10 : 15;
+        this.height = isEnemy ? 10 : 4;
         this.speedX = speedX;
         this.speedY = speedY;
         this.color = color;
         this.active = true;
+        this.isEnemy = isEnemy;
     }
 
     update(canvasHeight = 600) {
@@ -19,8 +20,48 @@ class Bullet {
     }
 
     draw(ctx) {
-        ctx.fillStyle = this.color;
-        ctx.fillRect(this.x, this.y, this.width, this.height);
+        if (this.isEnemy) {
+            ctx.save();
+            const r = this.width / 2;
+            const cx = this.x + r;
+            const cy = this.y + r;
+
+            ctx.shadowColor = 'rgba(255, 255, 255, 0.45)';
+            ctx.shadowBlur = 4;
+
+            const grad = ctx.createRadialGradient(cx - 1.5, cy - 1.5, 0.5, cx, cy, r);
+            grad.addColorStop(0.0, '#ffffff'); // 超高輝度ハイライト
+            grad.addColorStop(0.35, '#f4f6f9'); // 艶やかな白
+            grad.addColorStop(0.65, '#cbd5e1'); // 陰影・スチールグレー
+            grad.addColorStop(0.92, '#475569'); // 球体の立体影
+            grad.addColorStop(1.0, '#1e293b');  // 輪郭のエッジリム
+
+            ctx.fillStyle = grad;
+            ctx.beginPath();
+            ctx.arc(cx, cy, r, 0, Math.PI * 2);
+            ctx.fill();
+
+            ctx.shadowBlur = 0;
+            ctx.fillStyle = '#ffffff';
+            ctx.beginPath();
+            ctx.arc(cx - 1.6, cy - 1.6, 1.2, 0, Math.PI * 2);
+            ctx.fill();
+
+            ctx.restore();
+        } else {
+            ctx.fillStyle = this.color;
+            ctx.fillRect(this.x, this.y, this.width, this.height);
+        }
+    }
+}
+
+// グラディウス伝統の陰影のある白い球体弾
+class EnemyBullet extends Bullet {
+    constructor(x, y, speedX, speedY) {
+        super(x - 5, y - 5, speedX, speedY, '#ffffff', true);
+        this.radius = 5;
+        this.width = 10;
+        this.height = 10;
     }
 }
 

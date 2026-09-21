@@ -30,43 +30,113 @@ class Enemy {
         ctx.save();
         ctx.translate(this.x + this.width / 2, this.y + this.height / 2);
 
-        ctx.shadowColor = 'rgba(0, 0, 0, 0.6)';
-        ctx.shadowBlur = 5;
-        ctx.shadowOffsetX = -2;
-        ctx.shadowOffsetY = 2;
+        // 機体下面の立体シャドウ
+        ctx.shadowColor = 'rgba(0, 0, 0, 0.65)';
+        ctx.shadowBlur = 6;
+        ctx.shadowOffsetX = -3;
+        ctx.shadowOffsetY = 3;
 
-        // 大きめの鋭角戦闘機
-        ctx.fillStyle = this.bodyColor;
+        // 上半身 (光を受けるメタリックシルバー)
+        const gradTop = ctx.createLinearGradient(0, -13, 0, 0);
+        gradTop.addColorStop(0.0, '#f8fafc'); // 先端ハイライト
+        gradTop.addColorStop(0.3, '#cbd5e1'); // 金属光沢
+        gradTop.addColorStop(0.7, '#64748b'); // スレートグレー
+        gradTop.addColorStop(1.0, '#475569'); // センター稜線
+
+        ctx.fillStyle = gradTop;
         ctx.beginPath();
-        ctx.moveTo(20, 0);
+        ctx.moveTo(22, 0);
         ctx.lineTo(-8, -13);
         ctx.lineTo(-16, -5);
+        ctx.lineTo(-18, 0);
+        ctx.lineTo(22, 0);
+        ctx.closePath();
+        ctx.fill();
+
+        // 下半身 (深い影のガンメタル)
+        const gradBottom = ctx.createLinearGradient(0, 0, 0, 13);
+        gradBottom.addColorStop(0.0, '#334155');
+        gradBottom.addColorStop(0.5, '#1e293b');
+        gradBottom.addColorStop(1.0, '#0f172a');
+
+        ctx.fillStyle = gradBottom;
+        ctx.beginPath();
+        ctx.moveTo(22, 0);
         ctx.lineTo(-18, 0);
         ctx.lineTo(-16, 5);
         ctx.lineTo(-8, 13);
         ctx.closePath();
         ctx.fill();
 
-        ctx.fillStyle = this.trimColor;
+        ctx.shadowColor = 'transparent';
+
+        // 前縁ベベルエッジ (鋭い光沢ハイライトライン)
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.75)';
+        ctx.lineWidth = 1;
         ctx.beginPath();
-        ctx.moveTo(14, 0);
+        ctx.moveTo(22, 0);
+        ctx.lineTo(-8, -13);
+        ctx.stroke();
+
+        ctx.strokeStyle = '#0f172a';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(22, 0);
+        ctx.lineTo(-8, 13);
+        ctx.stroke();
+
+        // 中央胴体装甲隆起
+        const spineGrad = ctx.createLinearGradient(-6, -4, 14, 4);
+        spineGrad.addColorStop(0.0, '#e2e8f0');
+        spineGrad.addColorStop(0.5, '#94a3b8');
+        spineGrad.addColorStop(1.0, '#334155');
+        ctx.fillStyle = spineGrad;
+        ctx.beginPath();
+        ctx.moveTo(16, 0);
         ctx.lineTo(2, -4);
-        ctx.lineTo(-6, 0);
+        ctx.lineTo(-8, 0);
         ctx.lineTo(2, 4);
         ctx.closePath();
         ctx.fill();
 
-        ctx.fillStyle = '#00ffff';
-        ctx.fillRect(0, -3, 8, 6);
+        // パネルライン
+        ctx.strokeStyle = 'rgba(15, 23, 42, 0.75)';
+        ctx.lineWidth = 0.8;
+        ctx.beginPath();
+        ctx.moveTo(2, -4);
+        ctx.lineTo(2, 4);
+        ctx.stroke();
 
-        // バーニア
-        ctx.shadowBlur = 0;
-        const flame = 8 + Math.sin(this.animTimer * 2) * 4;
-        ctx.fillStyle = '#00aaff';
+        // キャノピー (曲面ガラス光沢シアン)
+        const canopyGrad = ctx.createLinearGradient(0, -3, 8, 3);
+        canopyGrad.addColorStop(0.0, '#ffffff');
+        canopyGrad.addColorStop(0.3, '#38bdf8');
+        canopyGrad.addColorStop(0.8, '#0284c7');
+        canopyGrad.addColorStop(1.0, '#0369a1');
+        ctx.fillStyle = canopyGrad;
+        ctx.beginPath();
+        ctx.ellipse(3, 0, 5, 2.5, 0, 0, Math.PI * 2);
+        ctx.fill();
+
+        // キャノピーハイライト
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(2, -1.5, 2.5, 1);
+
+        // バーニア / プラズマアフターバーナー
+        const flame = 9 + Math.sin(this.animTimer * 2) * 4;
+        ctx.fillStyle = 'rgba(0, 220, 255, 0.85)';
         ctx.beginPath();
         ctx.moveTo(-18, -4);
         ctx.lineTo(-18 - flame, 0);
         ctx.lineTo(-18, 4);
+        ctx.closePath();
+        ctx.fill();
+
+        ctx.fillStyle = '#ffffff';
+        ctx.beginPath();
+        ctx.moveTo(-18, -2);
+        ctx.lineTo(-18 - flame * 0.55, 0);
+        ctx.lineTo(-18, 2);
         ctx.closePath();
         ctx.fill();
 
@@ -146,33 +216,80 @@ class FanEnemy extends Enemy {
         ctx.translate(this.x + this.width / 2, this.y + this.height / 2);
         ctx.rotate(this.tilt);
 
-        ctx.shadowColor = 'rgba(0, 0, 0, 0.6)';
-        ctx.shadowBlur = 5;
+        // 立体ドロップシャドウ
+        ctx.shadowColor = 'rgba(0, 0, 0, 0.65)';
+        ctx.shadowBlur = 6;
+        ctx.shadowOffsetX = -2;
+        ctx.shadowOffsetY = 3;
 
-        // 大きめの円盤扇型機
-        ctx.fillStyle = this.bodyColor;
+        // 3D球面メタリック・アウターソーサー (金属円盤)
+        const outerGrad = ctx.createRadialGradient(-5, -5, 2, 0, 0, 19);
+        outerGrad.addColorStop(0.0, '#ffffff'); // 左上ハイライト
+        outerGrad.addColorStop(0.2, '#e2e8f0'); // シルバークローム
+        outerGrad.addColorStop(0.55, '#64748b'); // 金属スレート
+        outerGrad.addColorStop(0.85, '#334155'); // 影
+        outerGrad.addColorStop(1.0, '#0f172a');  // エッジリム
+        ctx.fillStyle = outerGrad;
         ctx.beginPath();
-        ctx.arc(0, 0, 18, 0, Math.PI * 2);
+        ctx.arc(0, 0, 19, 0, Math.PI * 2);
         ctx.fill();
 
-        ctx.fillStyle = this.trimColor;
+        ctx.shadowColor = 'transparent';
+
+        // ベベルエッジ (金属光沢リング)
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.65)';
+        ctx.lineWidth = 1;
         ctx.beginPath();
-        ctx.arc(0, 0, 11, 0, Math.PI * 2);
+        ctx.arc(-1, -1, 18, Math.PI * 0.7, Math.PI * 1.8);
+        ctx.stroke();
+
+        // 中層ローター・タービンリング
+        const midGrad = ctx.createRadialGradient(0, 0, 4, 0, 0, 12);
+        midGrad.addColorStop(0.0, '#0284c7');
+        midGrad.addColorStop(0.6, '#0f172a');
+        midGrad.addColorStop(1.0, '#475569');
+        ctx.fillStyle = midGrad;
+        ctx.beginPath();
+        ctx.arc(0, 0, 12, 0, Math.PI * 2);
         ctx.fill();
 
-        ctx.fillStyle = '#00ddff';
+        // 回転スリット (メカニカルなタービンファン)
+        ctx.strokeStyle = 'rgba(56, 189, 248, 0.75)';
+        ctx.lineWidth = 1.2;
+        const fanRot = this.animTimer * 1.5;
+        for (let a = 0; a < 4; a++) {
+            const angle = fanRot + (a * Math.PI / 2);
+            ctx.beginPath();
+            ctx.moveTo(Math.cos(angle) * 5, Math.sin(angle) * 5);
+            ctx.lineTo(Math.cos(angle) * 11, Math.sin(angle) * 11);
+            ctx.stroke();
+        }
+
+        // 中心高輝度エネルギープラズマコア
+        const coreGrad = ctx.createRadialGradient(2, 0, 1, 2, 0, 5);
+        coreGrad.addColorStop(0.0, '#ffffff');
+        coreGrad.addColorStop(0.4, '#38bdf8');
+        coreGrad.addColorStop(1.0, '#0369a1');
+        ctx.fillStyle = coreGrad;
         ctx.beginPath();
-        ctx.arc(3, 0, 6, 0, Math.PI * 2);
+        ctx.arc(2, 0, 5, 0, Math.PI * 2);
         ctx.fill();
 
-        // バーニア
-        ctx.shadowBlur = 0;
+        // バーニア噴射炎
         const flame = 8 + Math.sin(this.animTimer * 2) * 4;
-        ctx.fillStyle = '#00ffff';
+        ctx.fillStyle = 'rgba(0, 220, 255, 0.85)';
         ctx.beginPath();
         ctx.moveTo(-16, -4);
         ctx.lineTo(-16 - flame, 0);
         ctx.lineTo(-16, 4);
+        ctx.closePath();
+        ctx.fill();
+
+        ctx.fillStyle = '#ffffff';
+        ctx.beginPath();
+        ctx.moveTo(-16, -2);
+        ctx.lineTo(-16 - flame * 0.5, 0);
+        ctx.lineTo(-16, 2);
         ctx.closePath();
         ctx.fill();
 
@@ -241,17 +358,94 @@ class GarunEnemy extends Enemy {
         ctx.translate(this.x + this.width / 2, this.y + this.height / 2);
         ctx.rotate(Math.atan2(this.speedY, this.speedX) + Math.PI);
 
-        ctx.fillStyle = this.bodyColor;
+        // 立体シャドウ
+        ctx.shadowColor = 'rgba(0, 0, 0, 0.6)';
+        ctx.shadowBlur = 6;
+        ctx.shadowOffsetX = -2;
+        ctx.shadowOffsetY = 2;
+
+        // 上部主翼 (光面デルタ: シルバー〜スレート)
+        const wingTopGrad = ctx.createLinearGradient(0, -11, 0, 0);
+        wingTopGrad.addColorStop(0.0, '#f8fafc'); // 先端ハイライト
+        wingTopGrad.addColorStop(0.3, '#cbd5e1'); // シルバー
+        wingTopGrad.addColorStop(0.8, '#64748b'); // スレート
+        wingTopGrad.addColorStop(1.0, '#475569');
+        ctx.fillStyle = wingTopGrad;
         ctx.beginPath();
-        ctx.moveTo(18, 0);
-        ctx.lineTo(-14, -11);
-        ctx.lineTo(-8, 0);
-        ctx.lineTo(-14, 11);
+        ctx.moveTo(19, 0);
+        ctx.lineTo(-15, -12);
+        ctx.lineTo(-9, 0);
         ctx.closePath();
         ctx.fill();
 
-        ctx.fillStyle = '#44ddff';
-        ctx.fillRect(-4, -3, 9, 6);
+        // 下部主翼 (影面デルタ: ガンメタル)
+        const wingBtmGrad = ctx.createLinearGradient(0, 0, 0, 11);
+        wingBtmGrad.addColorStop(0.0, '#334155');
+        wingBtmGrad.addColorStop(0.6, '#1e293b');
+        wingBtmGrad.addColorStop(1.0, '#0f172a');
+        ctx.fillStyle = wingBtmGrad;
+        ctx.beginPath();
+        ctx.moveTo(19, 0);
+        ctx.lineTo(-9, 0);
+        ctx.lineTo(-15, 12);
+        ctx.closePath();
+        ctx.fill();
+
+        ctx.shadowColor = 'transparent';
+
+        // 前縁ベベルエッジハイライト
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.75)';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(19, 0);
+        ctx.lineTo(-15, -12);
+        ctx.stroke();
+
+        // 中央胴体メタリックカウル
+        const cowlGrad = ctx.createLinearGradient(-4, -4, 12, 4);
+        cowlGrad.addColorStop(0.0, '#e2e8f0');
+        cowlGrad.addColorStop(0.5, '#94a3b8');
+        cowlGrad.addColorStop(1.0, '#1e293b');
+        ctx.fillStyle = cowlGrad;
+        ctx.beginPath();
+        ctx.moveTo(14, 0);
+        ctx.lineTo(2, -4);
+        ctx.lineTo(-8, -2);
+        ctx.lineTo(-8, 2);
+        ctx.lineTo(2, 4);
+        ctx.closePath();
+        ctx.fill();
+
+        // センサーアイ・キャノピー (シアン反射ガラス)
+        const sensorGrad = ctx.createLinearGradient(-3, -2, 6, 2);
+        sensorGrad.addColorStop(0.0, '#ffffff');
+        sensorGrad.addColorStop(0.3, '#38bdf8');
+        sensorGrad.addColorStop(1.0, '#0284c7');
+        ctx.fillStyle = sensorGrad;
+        ctx.beginPath();
+        ctx.fillRect(-3, -2.5, 9, 5);
+
+        // キャノピーハイライト
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(-1, -1.5, 3, 1.2);
+
+        // アフターバーナー (旋回中の推力炎)
+        const flame = 10 + Math.sin(this.animTimer * 2.5) * 4;
+        ctx.fillStyle = 'rgba(0, 220, 255, 0.85)';
+        ctx.beginPath();
+        ctx.moveTo(-9, -3);
+        ctx.lineTo(-9 - flame, 0);
+        ctx.lineTo(-9, 3);
+        ctx.closePath();
+        ctx.fill();
+
+        ctx.fillStyle = '#ffffff';
+        ctx.beginPath();
+        ctx.moveTo(-9, -1.5);
+        ctx.lineTo(-9 - flame * 0.5, 0);
+        ctx.lineTo(-9, 1.5);
+        ctx.closePath();
+        ctx.fill();
 
         ctx.restore();
     }
@@ -320,24 +514,112 @@ class ZabEnemy extends Enemy {
         ctx.translate(this.x + this.width / 2, this.y + this.height / 2);
 
         if (this.state === 'WARP_IN') {
+            // 高エネルギー空間歪曲リング
+            const radius = Math.max(1, 38 - this.warpTimer);
             ctx.strokeStyle = '#00ffff';
             ctx.lineWidth = 2.5;
+            ctx.shadowColor = '#00ffff';
+            ctx.shadowBlur = 8;
             ctx.beginPath();
-            ctx.arc(0, 0, (40 - this.warpTimer), 0, Math.PI * 2);
+            ctx.arc(0, 0, radius, 0, Math.PI * 2);
+            ctx.stroke();
+
+            ctx.strokeStyle = '#ffffff';
+            ctx.lineWidth = 1.2;
+            ctx.beginPath();
+            ctx.arc(0, 0, radius * 0.55, 0, Math.PI * 2);
             ctx.stroke();
         } else {
             ctx.rotate(this.rot);
-            // 大きめの結晶体
-            ctx.fillStyle = this.bodyColor;
-            ctx.fillRect(-12, -12, 24, 24);
 
-            ctx.fillStyle = this.trimColor;
-            ctx.fillRect(-6, -6, 12, 12);
+            // 立体シャドウ
+            ctx.shadowColor = 'rgba(0, 0, 0, 0.7)';
+            ctx.shadowBlur = 7;
+            ctx.shadowOffsetX = 3;
+            ctx.shadowOffsetY = 3;
 
-            ctx.fillStyle = '#ffffff';
+            // 3D多面体メタリック結晶 (4つの独立した陰影ファセット)
+            // 1. 上ファセット (強いハイライト光: シルバーホワイト)
+            const facetTop = ctx.createLinearGradient(0, -15, 0, 0);
+            facetTop.addColorStop(0.0, '#ffffff');
+            facetTop.addColorStop(0.5, '#cbd5e1');
+            facetTop.addColorStop(1.0, '#94a3b8');
+            ctx.fillStyle = facetTop;
             ctx.beginPath();
-            ctx.arc(0, 0, 4, 0, Math.PI * 2);
+            ctx.moveTo(0, -15);
+            ctx.lineTo(15, 0);
+            ctx.lineTo(0, 0);
+            ctx.closePath();
             ctx.fill();
+
+            // 2. 左ファセット (反射光: スレートブルー)
+            const facetLeft = ctx.createLinearGradient(-15, 0, 0, 0);
+            facetLeft.addColorStop(0.0, '#e2e8f0');
+            facetLeft.addColorStop(0.6, '#64748b');
+            facetLeft.addColorStop(1.0, '#475569');
+            ctx.fillStyle = facetLeft;
+            ctx.beginPath();
+            ctx.moveTo(-15, 0);
+            ctx.lineTo(0, -15);
+            ctx.lineTo(0, 0);
+            ctx.closePath();
+            ctx.fill();
+
+            // 3. 右ファセット (斜光・影: ディープスレート)
+            const facetRight = ctx.createLinearGradient(0, 0, 15, 0);
+            facetRight.addColorStop(0.0, '#475569');
+            facetRight.addColorStop(0.7, '#334155');
+            facetRight.addColorStop(1.0, '#1e293b');
+            ctx.fillStyle = facetRight;
+            ctx.beginPath();
+            ctx.moveTo(0, 0);
+            ctx.lineTo(15, 0);
+            ctx.lineTo(0, 15);
+            ctx.closePath();
+            ctx.fill();
+
+            // 4. 下ファセット (最深影: ガンメタルブラック)
+            const facetBottom = ctx.createLinearGradient(0, 0, 0, 15);
+            facetBottom.addColorStop(0.0, '#334155');
+            facetBottom.addColorStop(0.6, '#1e293b');
+            facetBottom.addColorStop(1.0, '#0f172a');
+            ctx.fillStyle = facetBottom;
+            ctx.beginPath();
+            ctx.moveTo(-15, 0);
+            ctx.lineTo(0, 0);
+            ctx.lineTo(0, 15);
+            ctx.closePath();
+            ctx.fill();
+
+            ctx.shadowColor = 'transparent';
+
+            // 金属ファセット稜線 (シャープなベベルライン)
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.8)';
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            ctx.moveTo(0, -15);
+            ctx.lineTo(0, 15);
+            ctx.moveTo(-15, 0);
+            ctx.lineTo(15, 0);
+            ctx.stroke();
+
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.6)';
+            ctx.strokeRect(-10, -10, 20, 20);
+
+            // 中心エネルギーコア (高輝度プラズマジェム)
+            const gemGrad = ctx.createRadialGradient(0, 0, 1, 0, 0, 5);
+            gemGrad.addColorStop(0.0, '#ffffff');
+            gemGrad.addColorStop(0.4, '#38bdf8');
+            gemGrad.addColorStop(1.0, '#0284c7');
+            ctx.fillStyle = gemGrad;
+            ctx.beginPath();
+            ctx.arc(0, 0, 4.5, 0, Math.PI * 2);
+            ctx.fill();
+
+            // 頂点の光彩スパークル
+            ctx.fillStyle = '#ffffff';
+            ctx.fillRect(-1, -16, 2, 2);
+            ctx.fillRect(15, -1, 2, 2);
         }
         ctx.restore();
     }
@@ -414,10 +696,8 @@ class DuckerEnemy extends Enemy {
         const dist = Math.sqrt(dx * dx + dy * dy) || 1;
 
         if (dist < 600) {
-            const spd = 3.6; // 弾も少しゆっくり見やすく
-            const bullet = new Bullet(centerX, centerY, (dx / dist) * spd, (dy / dist) * spd, '#ff44aa');
-            bullet.width = 7;
-            bullet.height = 7;
+            const spd = 3.6;
+            const bullet = new EnemyBullet(centerX, centerY, (dx / dist) * spd, (dy / dist) * spd);
             enemyBullets.push(bullet);
         }
     }
@@ -432,26 +712,102 @@ class DuckerEnemy extends Enemy {
         const leg1 = Math.sin(this.walkCycle) * 8;
         const leg2 = -leg1;
 
-        ctx.strokeStyle = this.darkColor;
+        // --- メタリック油圧シリンダー脚部 ---
+        // 後ろ脚 (影側)
+        ctx.strokeStyle = '#1e293b';
         ctx.lineWidth = 4;
         ctx.beginPath();
-        ctx.moveTo(-9, -12);
+        ctx.moveTo(8, -12);
+        ctx.lineTo(11 + leg2, -2);
+        ctx.lineTo(13 + leg2, 0);
+        ctx.stroke();
+        // 後ろ足パッド
+        ctx.fillStyle = '#0f172a';
+        ctx.fillRect(8 + leg2, -3, 9, 3);
+
+        // 前脚 (光側・クロームシリンダー)
+        ctx.strokeStyle = '#334155';
+        ctx.lineWidth = 4.5;
+        ctx.beginPath();
+        ctx.moveTo(-8, -12);
+        ctx.lineTo(-10 + leg1, -2);
         ctx.lineTo(-12 + leg1, 0);
         ctx.stroke();
-
+        // 油圧ピストンハイライト
+        ctx.strokeStyle = '#cbd5e1';
+        ctx.lineWidth = 1.5;
         ctx.beginPath();
-        ctx.moveTo(9, -12);
-        ctx.lineTo(12 + leg2, 0);
+        ctx.moveTo(-8, -10);
+        ctx.lineTo(-10 + leg1, -3);
         ctx.stroke();
+        // 前足パッド
+        ctx.fillStyle = '#1e293b';
+        ctx.fillRect(-16 + leg1, -3, 9, 3);
 
-        // 大きめのポッド胴体
-        ctx.fillStyle = this.bodyColor;
+        // 脚部ピボット関節
+        ctx.fillStyle = '#64748b';
         ctx.beginPath();
-        ctx.arc(0, -18, 13, 0, Math.PI * 2);
+        ctx.arc(-8, -12, 3, 0, Math.PI * 2);
+        ctx.arc(8, -12, 3, 0, Math.PI * 2);
         ctx.fill();
 
-        ctx.fillStyle = '#ff0055';
+        // --- 3D球面装甲ポッド胴体 ---
+        ctx.shadowColor = 'rgba(0, 0, 0, 0.65)';
+        ctx.shadowBlur = 6;
+        ctx.shadowOffsetX = -2;
+        ctx.shadowOffsetY = 3;
+
+        const bodyGrad = ctx.createRadialGradient(-4, -23, 2, 0, -18, 14);
+        bodyGrad.addColorStop(0.0, '#ffffff'); // 球面ハイライト
+        bodyGrad.addColorStop(0.25, '#cbd5e1'); // シルバー装甲
+        bodyGrad.addColorStop(0.65, '#64748b'); // スレート
+        bodyGrad.addColorStop(0.92, '#334155'); // 影
+        bodyGrad.addColorStop(1.0, '#0f172a');  // エッジリム
+        ctx.fillStyle = bodyGrad;
+        ctx.beginPath();
+        ctx.arc(0, -18, 14, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.shadowColor = 'transparent';
+
+        // 装甲分割シーム＆リベット
+        ctx.strokeStyle = 'rgba(15, 23, 42, 0.85)';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.arc(0, -18, 14, Math.PI * 0.15, Math.PI * 0.85);
+        ctx.stroke();
+
+        ctx.fillStyle = '#f1f5f9';
+        ctx.fillRect(-10, -14, 1.5, 1.5);
+        ctx.fillRect(8, -14, 1.5, 1.5);
+
+        // 頭頂部小型アンテナ
+        ctx.strokeStyle = '#64748b';
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.moveTo(0, -32);
+        ctx.lineTo(0, -37);
+        ctx.stroke();
+        ctx.fillStyle = '#00ffff';
+        ctx.fillRect(-1, -38, 2, 2);
+
+        // --- グラディウス伝統の深紅スキャナーバイザーアイ ---
+        // バイザーフレーム (暗色ベゼル)
+        ctx.fillStyle = '#05070e';
+        ctx.fillRect(-10, -22, 20, 7);
+
+        // 発光ルビースキャナー
+        const eyeGrad = ctx.createLinearGradient(-9, -21, 9, -21);
+        eyeGrad.addColorStop(0.0, '#990022');
+        eyeGrad.addColorStop(0.4, '#ff1155');
+        eyeGrad.addColorStop(0.7, '#ff4477');
+        eyeGrad.addColorStop(1.0, '#990022');
+        ctx.fillStyle = eyeGrad;
         ctx.fillRect(-9, -21, 18, 5);
+
+        // 水平レーザーフレアスリット
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(-4, -19.5, 9, 1.5);
 
         ctx.restore();
     }
@@ -509,21 +865,105 @@ class HatcherEnemy extends Enemy {
         ctx.translate(this.x + this.width / 2, this.groundY);
         if (this.isCeiling) ctx.scale(1, -1);
 
-        ctx.fillStyle = this.bodyColor;
+        // 重装甲バンカー外郭シャドウ
+        ctx.shadowColor = 'rgba(0, 0, 0, 0.7)';
+        ctx.shadowBlur = 8;
+        ctx.shadowOffsetX = 0;
+        ctx.shadowOffsetY = -2;
+
+        // メイン装甲傾斜プレート (メタリックグラデーション)
+        const bunkerGrad = ctx.createLinearGradient(0, -32, 0, 0);
+        bunkerGrad.addColorStop(0.0, '#94a3b8'); // 天面エッジ
+        bunkerGrad.addColorStop(0.2, '#64748b'); // 上部装甲
+        bunkerGrad.addColorStop(0.65, '#334155'); // 中間スレート
+        bunkerGrad.addColorStop(1.0, '#1e293b');  // 基礎部
+        ctx.fillStyle = bunkerGrad;
         ctx.beginPath();
-        ctx.moveTo(-25, 0);
-        ctx.lineTo(-18, -30);
-        ctx.lineTo(18, -30);
-        ctx.lineTo(25, 0);
+        ctx.moveTo(-27, 0);
+        ctx.lineTo(-19, -32);
+        ctx.lineTo(19, -32);
+        ctx.lineTo(27, 0);
         ctx.closePath();
         ctx.fill();
 
-        ctx.fillStyle = this.hatchOpen ? '#00ffff' : this.darkColor;
-        ctx.fillRect(-11, -28, 22, 11);
+        ctx.shadowColor = 'transparent';
 
+        // 傾斜装甲のハイライトエッジ
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.7)';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(-27, 0);
+        ctx.lineTo(-19, -32);
+        ctx.lineTo(19, -32);
+        ctx.stroke();
+
+        ctx.strokeStyle = '#0f172a';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(19, -32);
+        ctx.lineTo(27, 0);
+        ctx.stroke();
+
+        // 左右の強化リブ・スリット
+        ctx.fillStyle = '#1e293b';
+        ctx.fillRect(-22, -18, 4, 12);
+        ctx.fillRect(18, -18, 4, 12);
+
+        // 基部インダストリアル・ハザードライン (黄＆黒の警告帯)
+        ctx.fillStyle = '#0f172a';
+        ctx.fillRect(-25, -4, 50, 4);
+        ctx.fillStyle = '#eab308';
+        ctx.fillRect(-21, -4, 6, 4);
+        ctx.fillRect(-9, -4, 6, 4);
+        ctx.fillRect(3, -4, 6, 4);
+        ctx.fillRect(15, -4, 6, 4);
+
+        // --- 中央ハッチ（格納庫・開閉ゲート） ---
+        // ハッチ開口部ピット (暗黒内部)
+        ctx.fillStyle = '#020617';
+        ctx.fillRect(-13, -30, 26, 14);
+
+        if (this.hatchOpen) {
+            // 格納庫内部の高輝度プラズマサージ (敵生成のシアン発光)
+            const plasmaGrad = ctx.createRadialGradient(0, -22, 1, 0, -22, 12);
+            plasmaGrad.addColorStop(0.0, '#ffffff');
+            plasmaGrad.addColorStop(0.4, '#38bdf8');
+            plasmaGrad.addColorStop(0.85, '#0284c7');
+            plasmaGrad.addColorStop(1.0, 'transparent');
+            ctx.fillStyle = plasmaGrad;
+            ctx.fillRect(-13, -30, 26, 14);
+
+            // 左右にスライド展開したブラストシールド扉
+            ctx.fillStyle = '#475569';
+            ctx.fillRect(-16, -31, 5, 15);
+            ctx.fillRect(11, -31, 5, 15);
+        } else {
+            // 閉鎖時の重金属ブラスト扉 (中央シール＆油圧シリンダー)
+            const doorGrad = ctx.createLinearGradient(-12, 0, 12, 0);
+            doorGrad.addColorStop(0.0, '#334155');
+            doorGrad.addColorStop(0.48, '#64748b');
+            doorGrad.addColorStop(0.5, '#0f172a');
+            doorGrad.addColorStop(0.52, '#64748b');
+            doorGrad.addColorStop(1.0, '#334155');
+            ctx.fillStyle = doorGrad;
+            ctx.fillRect(-12, -29, 24, 12);
+
+            // ロックバー
+            ctx.strokeStyle = '#94a3b8';
+            ctx.lineWidth = 1.2;
+            ctx.strokeRect(-12, -29, 24, 12);
+        }
+
+        // 左右タクティカルセンサー・ビーコン (エメラルド・レッド)
         ctx.fillStyle = '#00ffcc';
-        ctx.fillRect(-16, -14, 8, 5);
-        ctx.fillRect(8, -14, 8, 5);
+        ctx.fillRect(-15, -12, 6, 4);
+        ctx.fillStyle = '#ff2244';
+        ctx.fillRect(9, -12, 6, 4);
+
+        // 天面ボルトリベット
+        ctx.fillStyle = '#cbd5e1';
+        ctx.fillRect(-17, -31, 1.5, 1.5);
+        ctx.fillRect(15, -31, 1.5, 1.5);
 
         ctx.restore();
     }
@@ -551,15 +991,49 @@ class BlasterEnemy extends Enemy {
     draw(ctx) {
         ctx.save();
         ctx.translate(this.x + this.width / 2, this.y + this.height / 2);
-        ctx.fillStyle = this.bodyColor;
+
+        // 立体シャドウ
+        ctx.shadowColor = 'rgba(0, 0, 0, 0.6)';
+        ctx.shadowBlur = 5;
+        ctx.shadowOffsetX = -1;
+        ctx.shadowOffsetY = 2;
+
+        // 3D球面メタリックドローン本体
+        const sphereGrad = ctx.createRadialGradient(-3, -3, 1, 0, 0, 11);
+        sphereGrad.addColorStop(0.0, '#ffffff'); // 球面ハイライト
+        sphereGrad.addColorStop(0.25, '#cbd5e1'); // シルバー
+        sphereGrad.addColorStop(0.65, '#64748b'); // 金属スレート
+        sphereGrad.addColorStop(0.9, '#334155');  // 影
+        sphereGrad.addColorStop(1.0, '#0f172a');  // エッジリム
+        ctx.fillStyle = sphereGrad;
         ctx.beginPath();
-        ctx.arc(0, 0, 10, 0, Math.PI * 2);
+        ctx.arc(0, 0, 11, 0, Math.PI * 2);
         ctx.fill();
 
-        ctx.fillStyle = '#00ffff';
+        ctx.shadowColor = 'transparent';
+
+        // 赤道メカニカルグルーブ (スリット溝)
+        ctx.strokeStyle = '#0f172a';
+        ctx.lineWidth = 1;
         ctx.beginPath();
-        ctx.arc(0, 0, 4, 0, Math.PI * 2);
+        ctx.ellipse(0, 0, 11, 3, 0, 0, Math.PI * 2);
+        ctx.stroke();
+
+        // 中央高精度光学カメラアイ (シアンレンズ)
+        const eyeGrad = ctx.createRadialGradient(1, -1, 0.5, 0, 0, 5);
+        eyeGrad.addColorStop(0.0, '#ffffff');
+        eyeGrad.addColorStop(0.3, '#38bdf8');
+        eyeGrad.addColorStop(0.75, '#0284c7');
+        eyeGrad.addColorStop(1.0, '#0c4a6e');
+        ctx.fillStyle = eyeGrad;
+        ctx.beginPath();
+        ctx.arc(0, 0, 4.5, 0, Math.PI * 2);
         ctx.fill();
+
+        // レンズ反射ハイライト
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(-1, -2, 1.8, 1.8);
+
         ctx.restore();
     }
 }
@@ -595,25 +1069,106 @@ class RugraEnemy extends Enemy {
         ctx.save();
         ctx.translate(this.x + this.width / 2, this.y + this.height / 2);
 
-        ctx.fillStyle = this.bodyColor;
+        // 立体シャドウ
+        ctx.shadowColor = 'rgba(0, 0, 0, 0.65)';
+        ctx.shadowBlur = 6;
+        ctx.shadowOffsetX = -2;
+        ctx.shadowOffsetY = 2;
+
+        // 上半面 (光を受けるシルバー主翼)
+        const topGrad = ctx.createLinearGradient(0, -12, 0, 0);
+        topGrad.addColorStop(0.0, '#ffffff');
+        topGrad.addColorStop(0.3, '#cbd5e1');
+        topGrad.addColorStop(0.75, '#64748b');
+        topGrad.addColorStop(1.0, '#475569');
+        ctx.fillStyle = topGrad;
         ctx.beginPath();
-        ctx.moveTo(22, 0);
+        ctx.moveTo(24, 0);
         ctx.lineTo(-18, -12);
+        ctx.lineTo(-10, 0);
+        ctx.closePath();
+        ctx.fill();
+
+        // 下半面 (深い影のガンメタル主翼)
+        const btmGrad = ctx.createLinearGradient(0, 0, 0, 12);
+        btmGrad.addColorStop(0.0, '#334155');
+        btmGrad.addColorStop(0.65, '#1e293b');
+        btmGrad.addColorStop(1.0, '#0f172a');
+        ctx.fillStyle = btmGrad;
+        ctx.beginPath();
+        ctx.moveTo(24, 0);
         ctx.lineTo(-10, 0);
         ctx.lineTo(-18, 12);
         ctx.closePath();
         ctx.fill();
 
-        ctx.fillStyle = this.trimColor;
-        ctx.fillRect(-4, -4, 12, 8);
+        ctx.shadowColor = 'transparent';
 
+        // 前縁ベベルエッジハイライト
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.75)';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(24, 0);
+        ctx.lineTo(-18, -12);
+        ctx.stroke();
+
+        ctx.strokeStyle = '#0f172a';
+        ctx.beginPath();
+        ctx.moveTo(24, 0);
+        ctx.lineTo(-18, 12);
+        ctx.stroke();
+
+        // 中央胴体装甲ブロック
+        const bodyGrad = ctx.createLinearGradient(-4, -4, 10, 4);
+        bodyGrad.addColorStop(0.0, '#e2e8f0');
+        bodyGrad.addColorStop(0.5, '#94a3b8');
+        bodyGrad.addColorStop(1.0, '#334155');
+        ctx.fillStyle = bodyGrad;
+        ctx.beginPath();
+        ctx.moveTo(14, 0);
+        ctx.lineTo(2, -4);
+        ctx.lineTo(-8, 0);
+        ctx.lineTo(2, 4);
+        ctx.closePath();
+        ctx.fill();
+
+        // キャノピー (シアン反射ガラス)
+        const canopyGrad = ctx.createLinearGradient(0, -2, 6, 2);
+        canopyGrad.addColorStop(0.0, '#ffffff');
+        canopyGrad.addColorStop(0.3, '#38bdf8');
+        canopyGrad.addColorStop(1.0, '#0284c7');
+        ctx.fillStyle = canopyGrad;
+        ctx.beginPath();
+        ctx.ellipse(3, 0, 5, 2, 0, 0, Math.PI * 2);
+        ctx.fill();
+
+        // アフターバーナー (突撃時は巨大超音速プラズマ噴射)
         if (this.rushing) {
-            const flame = 16 + Math.sin(this.animTimer * 2) * 6;
-            ctx.fillStyle = '#00ddff';
+            const flame = 18 + Math.sin(this.animTimer * 2) * 6;
+            // 外層オーラ
+            ctx.fillStyle = 'rgba(0, 220, 255, 0.85)';
             ctx.beginPath();
-            ctx.moveTo(-14, -5);
-            ctx.lineTo(-14 - flame, 0);
-            ctx.lineTo(-14, 5);
+            ctx.moveTo(-10, -5);
+            ctx.lineTo(-10 - flame, 0);
+            ctx.lineTo(-10, 5);
+            ctx.closePath();
+            ctx.fill();
+            // 内層超高温コア
+            ctx.fillStyle = '#ffffff';
+            ctx.beginPath();
+            ctx.moveTo(-10, -2);
+            ctx.lineTo(-10 - flame * 0.6, 0);
+            ctx.lineTo(-10, 2);
+            ctx.closePath();
+            ctx.fill();
+        } else {
+            // 待機時の小型バーニア
+            const flame = 6 + Math.sin(this.animTimer * 1.5) * 3;
+            ctx.fillStyle = 'rgba(0, 220, 255, 0.7)';
+            ctx.beginPath();
+            ctx.moveTo(-10, -3);
+            ctx.lineTo(-10 - flame, 0);
+            ctx.lineTo(-10, 3);
             ctx.closePath();
             ctx.fill();
         }
@@ -707,15 +1262,45 @@ class VolcanoRock extends Enemy {
         ctx.translate(this.x + this.width / 2, this.y + this.height / 2);
         ctx.rotate(this.rot);
 
-        ctx.fillStyle = '#cc5522';
+        // 火山弾の外郭グロー
+        ctx.shadowColor = 'rgba(255, 80, 0, 0.7)';
+        ctx.shadowBlur = 8;
+
+        // 白熱溶岩ボール (中心の超高温コアから外側の冷却玄武岩まで)
+        const magmaGrad = ctx.createRadialGradient(2, -2, 1, 0, 0, 14);
+        magmaGrad.addColorStop(0.0, '#ffffff'); // 超高温白熱コア
+        magmaGrad.addColorStop(0.25, '#ffe555'); // 灼熱イエロー
+        magmaGrad.addColorStop(0.55, '#ea580c'); // 溶融オレンジ
+        magmaGrad.addColorStop(0.85, '#991b1b'); // 深紅マグマ
+        magmaGrad.addColorStop(1.0, '#1c1917');  // 冷却黒玄武岩
+
+        ctx.fillStyle = magmaGrad;
         ctx.beginPath();
-        ctx.arc(0, 0, 13, 0, Math.PI * 2);
+        // 凹凸のあるリアルな火砕流岩石形状
+        const points = 8;
+        for (let i = 0; i < points; i++) {
+            const angle = (i / points) * Math.PI * 2;
+            const r = 12 + ((i % 2 === 0) ? 2.5 : -1.5);
+            const px = Math.cos(angle) * r;
+            const py = Math.sin(angle) * r;
+            if (i === 0) ctx.moveTo(px, py);
+            else ctx.lineTo(px, py);
+        }
+        ctx.closePath();
         ctx.fill();
 
-        ctx.fillStyle = '#ffff66';
+        ctx.shadowBlur = 0;
+
+        // 表面の溶岩亀裂ライン (輝くマグマの筋)
+        ctx.strokeStyle = '#ffe555';
+        ctx.lineWidth = 1.2;
         ctx.beginPath();
-        ctx.arc(3, -3, 6, 0, Math.PI * 2);
-        ctx.fill();
+        ctx.moveTo(-4, -6);
+        ctx.lineTo(2, -2);
+        ctx.lineTo(7, 3);
+        ctx.moveTo(1, -2);
+        ctx.lineTo(-3, 6);
+        ctx.stroke();
 
         ctx.restore();
     }
@@ -734,7 +1319,7 @@ class TurretEnemy extends Enemy {
         this.hp = 2;
         this.slopeAngle = 0;
         this.groundY = y;
-        this.barrelAngle = 0;
+        this.barrelAngle = Math.PI; // デフォルトは左向き
     }
 
     update() {
@@ -762,6 +1347,14 @@ class TurretEnemy extends Enemy {
             this.x -= this.speed;
         }
 
+        // 自機方向への砲身トラッキング
+        if (typeof player !== 'undefined') {
+            const centerX = this.x + this.width / 2;
+            const centerY = this.isCeiling ? this.groundY + 12 : this.groundY - 12;
+            const targetAngle = Math.atan2(player.y - centerY, player.x - centerX);
+            this.barrelAngle = targetAngle;
+        }
+
         this.shootTimer++;
         if (this.shootTimer > 160) {
             this.shootTimer = 0;
@@ -780,14 +1373,13 @@ class TurretEnemy extends Enemy {
 
         if (dist > 0 && dist < 650) {
             const speed = 3.5;
-            const bullet = new Bullet(centerX, centerY, (dx / dist) * speed, (dy / dist) * speed, '#ff3388');
-            bullet.width = 8;
-            bullet.height = 8;
+            // グラディウス伝統の陰影のある白い球体弾
+            const bullet = new EnemyBullet(centerX, centerY, (dx / dist) * speed, (dy / dist) * speed);
             enemyBullets.push(bullet);
 
             if (typeof particles !== 'undefined') {
                 for (let i = 0; i < 4; i++) {
-                    particles.push(new Particle(centerX, centerY, '#ffaaee'));
+                    particles.push(new Particle(centerX, centerY, '#ffffff'));
                 }
             }
         }
@@ -800,23 +1392,98 @@ class TurretEnemy extends Enemy {
         ctx.rotate(this.slopeAngle);
         if (this.isCeiling) ctx.scale(1, -1);
 
-        ctx.fillStyle = '#222833';
+        // --- 強化基礎マウント (重金属ベースプレート) ---
+        const baseGrad = ctx.createLinearGradient(-23, 0, 23, 0);
+        baseGrad.addColorStop(0.0, '#1e293b');
+        baseGrad.addColorStop(0.25, '#475569');
+        baseGrad.addColorStop(0.5, '#64748b');
+        baseGrad.addColorStop(0.75, '#475569');
+        baseGrad.addColorStop(1.0, '#0f172a');
+        ctx.fillStyle = baseGrad;
         ctx.beginPath();
-        ctx.ellipse(0, 0, 22, 6, 0, 0, Math.PI * 2);
+        ctx.ellipse(0, 0, 23, 6, 0, 0, Math.PI * 2);
         ctx.fill();
 
-        ctx.fillStyle = this.bodyColor;
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.6)';
+        ctx.lineWidth = 1;
+        ctx.stroke();
+
+        // ベースボルト
+        ctx.fillStyle = '#cbd5e1';
+        ctx.fillRect(-18, -2, 2, 2);
+        ctx.fillRect(16, -2, 2, 2);
+
+        // --- メタリック旋回重砲身 ---
+        // 砲台ドーム中心 (-12px) から自機方向へ砲身を描画
+        ctx.save();
+        ctx.translate(0, -12);
+        // 天井設置時は上下反転しているため角度を調整
+        const effectiveAngle = this.isCeiling ? -this.barrelAngle : this.barrelAngle;
+        ctx.rotate(effectiveAngle);
+
+        // 砲身シリンダーグラデーション (円筒メタリック光沢)
+        const barrelGrad = ctx.createLinearGradient(0, -5, 0, 5);
+        barrelGrad.addColorStop(0.0, '#0f172a');
+        barrelGrad.addColorStop(0.3, '#94a3b8');
+        barrelGrad.addColorStop(0.6, '#cbd5e1');
+        barrelGrad.addColorStop(1.0, '#1e293b');
+        ctx.fillStyle = barrelGrad;
+        ctx.fillRect(4, -4.5, 24, 9);
+
+        // マズルブレーキ (先端リングカラー)
+        ctx.fillStyle = '#475569';
+        ctx.fillRect(23, -6, 5, 12);
+        ctx.strokeStyle = '#cbd5e1';
+        ctx.lineWidth = 1;
+        ctx.strokeRect(23, -6, 5, 12);
+
+        // 砲口 (黒穴)
+        ctx.fillStyle = '#020617';
+        ctx.fillRect(27, -3.5, 2, 7);
+
+        ctx.restore();
+
+        // --- 3D球面装甲砲塔ドーム ---
+        ctx.shadowColor = 'rgba(0, 0, 0, 0.7)';
+        ctx.shadowBlur = 6;
+        ctx.shadowOffsetX = 0;
+        ctx.shadowOffsetY = -2;
+
+        const domeGrad = ctx.createRadialGradient(-4, -20, 2, 0, -12, 16);
+        domeGrad.addColorStop(0.0, '#ffffff'); // 球面ハイライト
+        domeGrad.addColorStop(0.25, '#cbd5e1'); // シルバー合金
+        domeGrad.addColorStop(0.65, '#64748b'); // 金属スレート
+        domeGrad.addColorStop(0.9, '#334155');  // 影
+        domeGrad.addColorStop(1.0, '#0f172a');  // エッジリム
+        ctx.fillStyle = domeGrad;
         ctx.beginPath();
         ctx.arc(0, -12, 16, Math.PI, 0);
+        ctx.closePath();
         ctx.fill();
 
-        ctx.fillStyle = this.darkColor;
-        ctx.fillRect(-20, -17, 12, 8);
+        ctx.shadowColor = 'transparent';
 
-        ctx.fillStyle = '#00ffcc';
+        // 装甲分割ライン
+        ctx.strokeStyle = 'rgba(15, 23, 42, 0.85)';
+        ctx.lineWidth = 1;
         ctx.beginPath();
-        ctx.arc(3, -12, 5, 0, Math.PI * 2);
+        ctx.arc(0, -12, 16, Math.PI, 0);
+        ctx.stroke();
+
+        // 光学照準センサーアイ (エメラルド・シアン)
+        const sensorGrad = ctx.createRadialGradient(4, -12, 0.5, 3, -12, 5);
+        sensorGrad.addColorStop(0.0, '#ffffff');
+        sensorGrad.addColorStop(0.3, '#34d399');
+        sensorGrad.addColorStop(0.8, '#059669');
+        sensorGrad.addColorStop(1.0, '#064e3b');
+        ctx.fillStyle = sensorGrad;
+        ctx.beginPath();
+        ctx.arc(3, -12, 4.5, 0, Math.PI * 2);
         ctx.fill();
+
+        // センサー反射スポット
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(2, -14, 1.5, 1.5);
 
         ctx.restore();
     }
