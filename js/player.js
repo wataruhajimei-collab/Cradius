@@ -23,8 +23,6 @@ class Player {
         this.maxShieldHp = 3;
 
         this.hasMissile = false; // ミサイルを持っているか
-        this.usedDouble = false; // 一度選んだ武器（DOUBLE）
-        this.usedLaser = false;  // 一度選んだ武器（LASER）
     }
 
     update(canvasWidth, canvasHeight) {
@@ -93,12 +91,12 @@ class Player {
         switch (index) {
             case 0: // SPEED (スピードアップは何回でも選択可能)
                 return this.speed < 8;
-            case 1: // MISSILE (一度選んだら選べない)
+            case 1: // MISSILE (すでにミサイルを所持している場合は選択不可)
                 return !this.hasMissile;
-            case 2: // DOUBLE (一度選んだ武器は選べない)
-                return !this.usedDouble && this.weaponType !== 'DOUBLE';
-            case 3: // LASER (一度選んだ武器は選べない)
-                return !this.usedLaser && this.weaponType !== 'LASER';
+            case 2: // DOUBLE (現在ダブル装備中は選択不可、レーザー装備中または初期状態時は選択可能)
+                return this.weaponType !== 'DOUBLE';
+            case 3: // LASER (現在レーザー装備中は選択不可、ダブル装備中または初期状態時は選択可能)
+                return this.weaponType !== 'LASER';
             case 4: // OPTION (上限4個に達したら選べない)
                 return this.options.length < this.maxOptions;
             case 5: // ? (SHIELD: シールド展開中は選べない)
@@ -118,7 +116,7 @@ class Player {
     activatePowerUp() {
         if (this.powerUpIndex === -1) return;
 
-        // 一度選んだ武器や上限到達済みのパワーアップは選択不可（ゲージは保持）
+        // 装備中の武器や上限到達済みのパワーアップは選択不可（ゲージは保持）
         if (!this.canActivatePowerUp(this.powerUpIndex)) {
             return;
         }
@@ -132,11 +130,9 @@ class Player {
                 break;
             case 2: // DOUBLE
                 this.weaponType = 'DOUBLE';
-                this.usedDouble = true;
                 break;
             case 3: // LASER
                 this.weaponType = 'LASER';
-                this.usedLaser = true;
                 break;
             case 4: // OPTION
                 if (this.options.length < this.maxOptions) {

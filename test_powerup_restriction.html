@@ -2,10 +2,10 @@
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
-    <title>PowerUp Restriction Test</title>
+    <title>PowerUp Weapon Switch Test</title>
 </head>
 <body>
-    <h1>PowerUp Restriction Test</h1>
+    <h1>PowerUp Weapon Switch Test</h1>
     <div id="results">Running...</div>
 
     <script src="js/bullet.js"></script>
@@ -32,7 +32,8 @@
         try {
             const p = new Player(100, 100);
 
-            // 初期状態テスト
+            // 1. 初期状態テスト（NORMALショット）
+            assert(p.weaponType === 'NORMAL', "Initial weapon is NORMAL");
             assert(p.canActivatePowerUp(0) === true, "Speed should be available initially");
             assert(p.canActivatePowerUp(1) === true, "Missile should be available initially");
             assert(p.canActivatePowerUp(2) === true, "Double should be available initially");
@@ -40,84 +41,77 @@
             assert(p.canActivatePowerUp(4) === true, "Option should be available initially");
             assert(p.canActivatePowerUp(5) === true, "Shield should be available initially");
 
-            // 1. MISSILE 取得
-            p.powerUpIndex = 1;
-            p.activatePowerUp();
-            assert(p.hasMissile === true, "Player has missile after activation");
-            assert(p.powerUpIndex === -1, "Gauge reset after activation");
-            assert(p.canActivatePowerUp(1) === false, "Missile cannot be selected again");
-
-            // MISSILE 再選択の防止確認
-            p.powerUpIndex = 1;
-            p.activatePowerUp();
-            assert(p.powerUpIndex === 1, "Gauge should NOT be consumed when activating unavailable Missile");
-
-            // 2. DOUBLE 取得
+            // 2. DOUBLE 選択テスト
             p.powerUpIndex = 2;
             p.activatePowerUp();
             assert(p.weaponType === 'DOUBLE', "Weapon is DOUBLE");
-            assert(p.usedDouble === true, "usedDouble is true");
-            assert(p.powerUpIndex === -1, "Gauge reset after activation");
-            assert(p.canActivatePowerUp(2) === false, "Double cannot be selected again");
+            assert(p.powerUpIndex === -1, "Gauge reset after activating DOUBLE");
+            assert(p.canActivatePowerUp(2) === false, "Double cannot be selected while equipped");
+            assert(p.canActivatePowerUp(3) === true, "Laser is available when Double is equipped");
 
-            // DOUBLE 再選択の防止確認
+            // DOUBLE 装備中にDOUBLEを再選択しようとしてもゲージ保護
             p.powerUpIndex = 2;
             p.activatePowerUp();
-            assert(p.powerUpIndex === 2, "Gauge should NOT be consumed when activating unavailable Double");
+            assert(p.powerUpIndex === 2, "Gauge NOT consumed when selecting already equipped Double");
 
-            // 3. LASER 取得
+            // 3. LASER 選択テスト（DOUBLEからLASERへの切り替え）
             p.powerUpIndex = 3;
             p.activatePowerUp();
-            assert(p.weaponType === 'LASER', "Weapon is LASER");
-            assert(p.usedLaser === true, "usedLaser is true");
-            assert(p.powerUpIndex === -1, "Gauge reset after activation");
-            assert(p.canActivatePowerUp(3) === false, "Laser cannot be selected again");
-            assert(p.canActivatePowerUp(2) === false, "Previously used Double still cannot be selected");
+            assert(p.weaponType === 'LASER', "Weapon switched to LASER");
+            assert(p.powerUpIndex === -1, "Gauge reset after activating LASER");
+            assert(p.canActivatePowerUp(3) === false, "Laser cannot be selected while equipped");
+            assert(p.canActivatePowerUp(2) === true, "Double is available when Laser is equipped");
 
-            // LASER 再選択の防止確認
+            // LASER 装備中にLASERを再選択しようとしてもゲージ保護
             p.powerUpIndex = 3;
             p.activatePowerUp();
-            assert(p.powerUpIndex === 3, "Gauge should NOT be consumed when activating unavailable Laser");
+            assert(p.powerUpIndex === 3, "Gauge NOT consumed when selecting already equipped Laser");
 
-            // 4. SPEED 取得（スピードアップ以外は一度選んだ武器は選べない → スピードアップは何回でも選べる）
-            const initialSpeed = p.speed;
+            // 4. 再度 DOUBLE への切り替えテスト（LASERからDOUBLEへの切り替え）
+            p.powerUpIndex = 2;
+            p.activatePowerUp();
+            assert(p.weaponType === 'DOUBLE', "Weapon switched back to DOUBLE");
+            assert(p.powerUpIndex === -1, "Gauge reset after switching back to DOUBLE");
+            assert(p.canActivatePowerUp(2) === false, "Double cannot be selected while equipped");
+            assert(p.canActivatePowerUp(3) === true, "Laser is available again when Double is equipped");
+
+            // 5. MISSILE 取得テスト（一度取得したら再選択不可）
+            p.powerUpIndex = 1;
+            p.activatePowerUp();
+            assert(p.hasMissile === true, "Player has missile");
+            assert(p.powerUpIndex === -1, "Gauge reset after missile activation");
+            assert(p.canActivatePowerUp(1) === false, "Missile cannot be selected again");
+
+            p.powerUpIndex = 1;
+            p.activatePowerUp();
+            assert(p.powerUpIndex === 1, "Gauge NOT consumed for unavailable Missile");
+
+            // 6. SPEED（何回でも選択可能）
+            const s0 = p.speed;
             p.powerUpIndex = 0;
             p.activatePowerUp();
-            assert(p.speed === initialSpeed + 1, "Speed increased by 1");
-            assert(p.canActivatePowerUp(0) === true, "Speed is still available for selection");
+            assert(p.speed === s0 + 1, "Speed increased");
+            assert(p.canActivatePowerUp(0) === true, "Speed still available");
 
-            p.powerUpIndex = 0;
-            p.activatePowerUp();
-            assert(p.speed === initialSpeed + 2, "Speed increased by 2 (selected multiple times)");
-            assert(p.canActivatePowerUp(0) === true, "Speed is still available");
-
-            // 5. OPTION 取得
+            // 7. OPTION（4個まで選択可能）
             for (let i = 0; i < p.maxOptions; i++) {
-                assert(p.canActivatePowerUp(4) === true, "Option is available when count < max");
+                assert(p.canActivatePowerUp(4) === true, "Option available under max");
                 p.powerUpIndex = 4;
                 p.activatePowerUp();
             }
-            assert(p.options.length === 4, "Option count is 4 (max)");
-            assert(p.canActivatePowerUp(4) === false, "Option cannot be selected when maxed out");
-            p.powerUpIndex = 4;
-            p.activatePowerUp();
-            assert(p.powerUpIndex === 4, "Gauge preserved when attempting to exceed max options");
+            assert(p.options.length === 4, "Option count maxed");
+            assert(p.canActivatePowerUp(4) === false, "Option unavailable at max");
 
-            // 6. SHIELD 取得
-            assert(p.canActivatePowerUp(5) === true, "Shield is available initially");
+            // 8. SHIELD（展開中は選択不可、破壊後は選択可能）
+            assert(p.canActivatePowerUp(5) === true, "Shield available initially");
             p.powerUpIndex = 5;
             p.activatePowerUp();
-            assert(p.shieldActive === true, "Shield is active");
-            assert(p.canActivatePowerUp(5) === false, "Shield cannot be selected while active");
-            p.powerUpIndex = 5;
-            p.activatePowerUp();
-            assert(p.powerUpIndex === 5, "Gauge preserved when shield is active");
-
-            // シールド破壊後
+            assert(p.shieldActive === true, "Shield active");
+            assert(p.canActivatePowerUp(5) === false, "Shield unavailable while active");
             p.shieldActive = false;
-            assert(p.canActivatePowerUp(5) === true, "Shield can be selected again after broken");
+            assert(p.canActivatePowerUp(5) === true, "Shield available after broken");
 
-            // UI 描画テスト（エラーなくレンダリングできるか確認）
+            // UI 描画テスト
             const canvas = document.createElement('canvas');
             canvas.width = 800;
             canvas.height = 600;
