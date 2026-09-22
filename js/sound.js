@@ -1841,6 +1841,219 @@ class SoundManager {
     // 警告音・クリアジングルは演出の引き締めのため完全カット
     playWarningSound() {}
     playClearJingle() {}
+
+    // =========================================================================
+    // 1面 火山大噴火サバイバルBGM: 『VOLCANO INFERNO : SURVIVAL COUNTDOWN』
+    // 170 BPM！脈拍が跳ね上がる超アップテンポ・激しいソワソワ感と緊迫のパニック新曲！
+    // =========================================================================
+    playVolcanoSurvivalBgm() {
+        if (this.currentBgm === 'VOLCANO_SURVIVAL') return;
+        this.currentBgm = 'VOLCANO_SURVIVAL';
+
+        const bpm = 170;
+        const totalSteps = 128; // 全8小節ループ
+
+        // 1. 激しいドラムビート (高速4つ打ちキック + 裏拍オープンハット + 連打スネア)
+        const dSurv1 = [
+            1,3,1,4, 1,2,1,3, 1,3,1,4, 1,2,2,4
+        ];
+        const dSurv2 = [
+            1,3,1,4, 1,2,1,3, 1,3,1,4, 2,2,2,2 // スネア4連打！
+        ];
+        const dSurvRoll = [
+            1,1,2,2, 6,6,7,7, 8,8,2,2, 5,2,5,2 // 怒涛のクラッシュ乱打！
+        ];
+
+        const drums = [
+            dSurv1, dSurv2, dSurv1, dSurvRoll,
+            dSurv1, dSurv2, dSurv1, dSurvRoll
+        ].flat();
+
+        // 2. 高速マシンガン・パニックベース (焦燥感あふれる半音上昇・急降下スリルリフ)
+        const bSurv1 = [D2,D2,D3,D2, Eb2,Eb2,Eb3,Eb2, E2,E2,E3,E2, F2,F2,F3,F2];
+        const bSurv2 = [Fs2,Fs2,Fs3,Fs2, G2,G2,G3,G2, Ab2,Ab2,Ab3,Ab2, A2,A2,A3,A2];
+        const bSurv3 = [D2,D2,F2,F2, Ab2,Ab2,B2,B2, D3,D3,B2,B2, Ab2,Ab2,F2,F2];
+        const bSurv4 = [D2,D2,D2,D2, Eb2,Eb2,Eb2,Eb2, E2,E2,E2,E2, F2,F2,F2,F2];
+
+        const bass = [
+            bSurv1, bSurv2, bSurv3, bSurv4,
+            bSurv1, bSurv2, bSurv3, bSurv4
+        ].flat();
+
+        // 3. ソワソワする緊迫のディミニッシュ・パニックアルペジオ (16分音符クリスタルパルス)
+        const aSurv1 = [D4,F4,Ab4,B4, D5,B4,Ab4,F4, D4,F4,Ab4,B4, D5,B4,Ab4,F4];
+        const aSurv2 = [Eb4,Fs4,A4,C5, Eb5,C5,A4,Fs4, Eb4,Fs4,A4,C5, Eb5,C5,A4,Fs4];
+        const aSurv3 = [E4,G4,Bb4,Cs5, E5,Cs5,Bb4,G4, E4,G4,Bb4,Cs5, E5,Cs5,Bb4,G4];
+        const aSurv4 = [F4,Ab4,B4,D5, F5,D5,B4,Ab4, F4,Ab4,B4,D5, F5,D5,B4,Ab4];
+
+        const arpeggio = [
+            aSurv1, aSurv2, aSurv3, aSurv4,
+            aSurv1, aSurv2, aSurv3, aSurv4
+        ].flat();
+
+        // 4. 緊迫ストリングス・オスティナート (息詰まるパニック刻み)
+        const sSurv1 = [D4,D4,D4,D4, Eb4,Eb4,Eb4,Eb4, E4,E4,E4,E4, F4,F4,F4,F4];
+        const sSurv2 = [Fs4,Fs4,Fs4,Fs4, G4,G4,G4,G4, Ab4,Ab4,Ab4,Ab4, A4,A4,A4,A4];
+        const sSurv3 = [Ab4,Ab4,Ab4,Ab4, B4,B4,B4,B4, D5,D5,D5,D5, B4,B4,B4,B4];
+        const sSurv4 = [D5,D5,Eb5,Eb5, E5,E5,F5,F5, Fs5,Fs5,G5,G5, Ab5,Ab5,A5,A5];
+
+        const strings = [
+            sSurv1, sSurv2, sSurv3, sSurv4,
+            sSurv1, sSurv2, sSurv3, sSurv4
+        ].flat();
+
+        // 5. 緊急事態サイレン主旋律 (PSGリード + ブラスによる超緊迫パニックメロディ！)
+        const lead = [
+            // 0-3: 警報サイレン・激動のサバイバルリフ
+            D5,_,D5,_, Ab5,_,_,_, G5,_,F5,_, D5,_,_,_,
+            Eb5,_,Eb5,_, A5,_,_,_, Ab5,_,Fs5,_, Eb5,_,_,_,
+            E5,_,E5,_, Bb5,_,_,_, A5,_,G5,_, E5,_,_,_,
+            F5,_,F5,_, B5,_,_,_, D6,_,B5,_, Ab5,_,F5,_,
+
+            // 4-7: クライマックス・死線脱出の咆哮
+            D6,_,_,D6, C6,_,A5,_, Ab5,_,_,Ab5, G5,_,F5,_,
+            D6,_,_,D6, Eb6,_,D6,_, C6,_,_,C6, B5,_,A5,_,
+            D6,_,_,D6, F6,_,D6,_, B5,_,_,B5, Ab5,_,F5,_,
+            D5,_,F5,_, Ab5,_,B5,_, D6,_,_,_, _,_,_,_
+        ];
+
+        this.startScheduler(bpm, totalSteps, (step, time, stepDur) => {
+            // ドラム
+            const d = drums[step];
+            if (d === 1) this.triggerKick(time);
+            else if (d === 2) this.triggerSnare(time);
+            else if (d === 3) this.triggerHiHat(time, false);
+            else if (d === 4) this.triggerHiHat(time, true);
+            else if (d === 5) this.triggerCymbal(time);
+            else if (d === 6) this.triggerTom(A3, time, stepDur * 0.95);
+            else if (d === 7) this.triggerTom(F3, time, stepDur * 0.95);
+            else if (d === 8) this.triggerTom(D3, time, stepDur * 0.95);
+
+            // ベース
+            const b = bass[step];
+            if (b > 0) this.triggerBass(b, time, stepDur * 1.35, 0.40);
+
+            // ソワソワするパニックアルペジオ
+            const a = arpeggio[step];
+            if (a > 0) this.triggerArp(a, time, stepDur * 0.85, 0.18);
+
+            // 緊迫ストリングス
+            const str = strings[step];
+            if (str > 0) this.triggerStrings(str, time, stepDur * 0.9, 0.16);
+
+            // 主旋律リード
+            const l = lead[step];
+            if (l > 0) {
+                let lLen = 1;
+                for (let k = 1; k < 6; k++) {
+                    if (lead[(step + k) % totalSteps] === 0) lLen++;
+                    else break;
+                }
+                const dur = stepDur * lLen * 0.92;
+                this.triggerLead(l, time, dur, 0.35);
+                this.triggerBrass(l, time, dur, 0.22);
+            }
+        });
+    }
+
+    // =========================================================================
+    // 2面 メインBGM: 『STONEHENGE RUINS (MYSTIC PROG-ROCK)』
+    // 142 BPM！古代巨石遺跡の神秘と石堀りの疾走感を併せ持った完全新規オリジナル楽曲！
+    // =========================================================================
+    playStage2Bgm() {
+        if (this.currentBgm === 'STAGE2') return;
+        this.currentBgm = 'STAGE2';
+
+        const bpm = 142;
+        const totalSteps = 128; // 全8小節ループ
+
+        // 1. ダンサブルな16ビート・エレクトロドラム
+        const dStg2_A = [
+            1,3,3,3, 2,3,1,3, 3,3,1,3, 2,3,3,4
+        ];
+        const dStg2_B = [
+            1,3,3,3, 2,3,1,3, 3,3,1,3, 2,2,4,4
+        ];
+        const dStg2_Fill = [
+            1,1,2,3, 6,6,2,3, 7,7,2,3, 8,8,5,2
+        ];
+
+        const drums = [
+            dStg2_A, dStg2_A, dStg2_B, dStg2_Fill,
+            dStg2_A, dStg2_A, dStg2_B, dStg2_Fill
+        ].flat();
+
+        // 2. うねるシンセファンク・スラップベース (Eマイナー・ドリアン旋法)
+        const bStg2_1 = [E2,E2,_,E2, G2,_,E2,_, A2,A2,_,A2, B2,_,D3,_];
+        const bStg2_2 = [E2,E2,_,E2, G2,_,E2,_, D3,D3,_,D3, Cs3,_,B2,_];
+        const bStg2_3 = [C2,C2,_,C2, D2,_,D2,_, E2,E2,_,E2, G2,_,A2,_];
+        const bStg2_4 = [B1,B1,_,B1, D2,_,D2,_, E2,E2,E2,E2, E3,E3,D3,D3];
+
+        const bass = [
+            bStg2_1, bStg2_2, bStg2_3, bStg2_4,
+            bStg2_1, bStg2_2, bStg2_3, bStg2_4
+        ].flat();
+
+        // 3. 水晶巨石ベル・アルペジオ (きらびやかな古代遺跡の響き)
+        const aStg2_1 = [E4,B4,E5,G5, B5,G5,E5,B4, E4,B4,E5,G5, B5,G5,E5,B4];
+        const aStg2_2 = [D4,A4,D5,Fs5, A5,Fs5,D5,A4, D4,A4,D5,Fs5, A5,Fs5,D5,A4];
+        const aStg2_3 = [C4,G4,C5,E5, G5,E5,C5,G4, D4,A4,D5,Fs5, A5,Fs5,D5,A4];
+        const aStg2_4 = [B3,Fs4,B4,D5, Fs5,D5,B4,Fs4, E4,B4,E5,G5, B5,G5,E5,B4];
+
+        const arpeggio = [
+            aStg2_1, aStg2_2, aStg2_3, aStg2_4,
+            aStg2_1, aStg2_2, aStg2_3, aStg2_4
+        ].flat();
+
+        // 4. 古代遺跡主旋律 (PSGリード + ブラスによるエキゾチックで雄大なプログレッシブメロディ！)
+        const lead = [
+            // 0-3: Aメロ (巨石群を縫って飛ぶ疾走フレーズ)
+            E5,_,_,E5, G5,_,A5,_, B5,_,_,D6, B5,_,A5,_,
+            G5,_,E5,_, D5,_,E5,_, G5,_,A5,_, G5,_,F5,_,
+            E5,_,_,E5, G5,_,A5,_, B5,_,_,D6, E6,_,D6,_,
+            B5,_,A5,_, G5,_,A5,_, B5,_,_,_, _,_,_,_,
+
+            // 4-7: Bメロ (ストーンヘンジの神秘と高揚感あふれる展開)
+            C6,_,_,C6, B5,_,A5,_, G5,_,_,G5, Fs5,_,E5,_,
+            D5,_,Fs5,_, A5,_,C6,_, B5,_,_,B5, A5,_,G5,_,
+            A5,_,_,A5, B5,_,C6,_, D6,_,_,D6, E6,_,D6,_,
+            E6,_,_,_, B5,_,G5,_, E5,_,_,_, _,_,_,_
+        ];
+
+        this.startScheduler(bpm, totalSteps, (step, time, stepDur) => {
+            // ドラム
+            const d = drums[step];
+            if (d === 1) this.triggerKick(time);
+            else if (d === 2) this.triggerSnare(time);
+            else if (d === 3) this.triggerHiHat(time, false);
+            else if (d === 4) this.triggerHiHat(time, true);
+            else if (d === 5) this.triggerCymbal(time);
+            else if (d === 6) this.triggerTom(A3, time, stepDur * 0.95);
+            else if (d === 7) this.triggerTom(F3, time, stepDur * 0.95);
+            else if (d === 8) this.triggerTom(D3, time, stepDur * 0.95);
+
+            // ベース
+            const b = bass[step];
+            if (b > 0) this.triggerBass(b, time, stepDur * 1.4, 0.36);
+
+            // 水晶ベルアルペジオ
+            const a = arpeggio[step];
+            if (a > 0) this.triggerArp(a, time, stepDur * 0.85, 0.16);
+
+            // メロディリード
+            const l = lead[step];
+            if (l > 0) {
+                let lLen = 1;
+                for (let k = 1; k < 6; k++) {
+                    if (lead[(step + k) % totalSteps] === 0) lLen++;
+                    else break;
+                }
+                const dur = stepDur * lLen * 0.92;
+                this.triggerLead(l, time, dur, 0.32);
+                this.triggerBrass(l, time, dur, 0.20);
+            }
+        });
+    }
 }
 
 // グローバルサウンドインスタンス

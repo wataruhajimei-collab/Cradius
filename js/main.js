@@ -66,6 +66,8 @@ function init() {
     window.getPlayer = () => player;
     window.playerBullets = playerBullets;
     window.enemyBullets = enemyBullets;
+    window.capsules = capsules;
+    window.getCapsules = () => capsules;
 
     // スタート画面操作のバインド
     const startScreen = document.getElementById('start-screen');
@@ -256,9 +258,14 @@ function handleCollisions() {
                     // 爆発音
                     if (typeof Sound !== 'undefined') Sound.playExplosion();
 
+                    // 赤い敵（isRed）を倒した場合、確定でパワーアップカプセルをドロップ！
+                    if (enemy.isRed && typeof capsules !== 'undefined') {
+                        capsules.push(new PowerUpCapsule(enemy.x + enemy.width / 2, enemy.y + enemy.height / 2));
+                    }
+
                     // 群れ（編隊・小隊）に所属している敵の場合、群れ全滅時にカプセル確定ドロップ！
                     if (enemy.formation) {
-                        enemy.formation.notifyDestroyed(enemy.x, enemy.y);
+                        enemy.formation.notifyDestroyed(enemy.x + enemy.width / 2, enemy.y + enemy.height / 2);
                     }
                 }
             }
@@ -269,6 +276,7 @@ function handleCollisions() {
     enemies.forEach(enemy => {
         if (enemy instanceof FanEnemy && !enemy.visible) return;
         if (typeof WarpSphereEnemy !== 'undefined' && enemy instanceof WarpSphereEnemy && enemy.state === 'WARPING') return;
+        if (typeof SuperVolcano !== 'undefined' && enemy instanceof SuperVolcano) return; // 火山山体はシールドで消滅させない
 
         if (enemy.active && checkCollision(player, enemy)) {
             if (player.shieldActive) {
@@ -277,6 +285,9 @@ function handleCollisions() {
                     enemy.active = false;
                     createExplosion(enemy.x, enemy.y, '#ffffff');
                     if (typeof Sound !== 'undefined') Sound.playExplosion();
+                    if (enemy.isRed && typeof capsules !== 'undefined') {
+                        capsules.push(new PowerUpCapsule(enemy.x, enemy.y));
+                    }
                     if (enemy.formation) enemy.formation.notifyDestroyed(enemy.x, enemy.y);
                     if (player.shieldHp <= 0) player.shieldActive = false;
                     return;

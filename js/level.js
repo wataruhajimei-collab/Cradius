@@ -388,7 +388,7 @@ class LevelManager {
         this.stage = 1;
         this.boss = null;
         this.floatingIslands = [];
-        this.islandSpawnTimes = [26000, 41000, 56000]; // 途中に3つ浮遊大陸を設置
+        this.islandSpawnTimes = [22000, 32000, 42000]; // 途中に3つ浮遊大陸をテンポ良く設置
         this.islandSpawnedCount = 0;
         this.volcanoSpawned = false; // 超巨大火山のスポーンフラグ
         this.superVolcano = null;
@@ -436,10 +436,10 @@ class LevelManager {
                     this.islandSpawnedCount++;
                 }
 
-                // 64秒経過で「超巨大火山 (SuperVolcano)」が画面右から進入！
-                if (this.time > 64000 && !this.volcanoSpawned && typeof SuperVolcano !== 'undefined') {
+                // 52秒経過（浮遊大陸3基直後）で「超巨大火山 (SuperVolcano)」が堂々と進入！
+                if (this.time > 52000 && !this.volcanoSpawned && typeof SuperVolcano !== 'undefined') {
                     this.volcanoSpawned = true;
-                    const spawnX = this.starfield.width + 40;
+                    const spawnX = this.starfield.width + 30;
                     const groundY = this.terrain.getBottomY(spawnX + 105);
                     this.superVolcano = new SuperVolcano(spawnX, groundY);
                     if (typeof enemies !== 'undefined') {
@@ -454,8 +454,9 @@ class LevelManager {
                     this.volcanoSurvivalTimer = 30000; // 30秒間耐える！
                     this.terrain.scrollSpeed = 0; // 地形スクロールをピタリと停止！
                     this.superVolcano.startMajorEruption(); // 大噴火開始！
-                    if (typeof Sound !== 'undefined' && typeof Sound.playWarning === 'function') {
-                        Sound.playWarning();
+                    // ソワソワする超アップテンポ緊迫サバイバルBGMを爆音で再生！
+                    if (typeof Sound !== 'undefined') {
+                        Sound.playVolcanoSurvivalBgm();
                     }
                 }
             } else if (this.state === 'VOLCANO_SURVIVAL') {
@@ -532,7 +533,7 @@ class LevelManager {
             stonehengeStage.start();
         }
         if (typeof Sound !== 'undefined') {
-            Sound.playAirBgm(true); // ステージ2専用の疾走感あふれる楽曲へ
+            Sound.playStage2Bgm(); // ステージ2専用の完全オリジナル古代テクノBGMへ！
         }
     }
 

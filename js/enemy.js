@@ -6,7 +6,7 @@
 // ==========================================
 
 class Enemy {
-    constructor(x, y) {
+    constructor(x, y, isRed = false) {
         this.x = x;
         this.y = y;
         this.width = 44;
@@ -15,9 +15,16 @@ class Enemy {
         this.active = true;
         this.hp = 1;
         this.animTimer = Math.random() * 100;
-        this.bodyColor = '#8fa8c8';
-        this.trimColor = '#d2e4ff';
-        this.darkColor = '#4a6080';
+        this.isRed = isRed;
+        if (isRed) {
+            this.bodyColor = '#ff2244';
+            this.trimColor = '#ffaacc';
+            this.darkColor = '#880011';
+        } else {
+            this.bodyColor = '#8fa8c8';
+            this.trimColor = '#d2e4ff';
+            this.darkColor = '#4a6080';
+        }
         this.formation = null;
     }
 
@@ -629,8 +636,8 @@ class ZabEnemy extends Enemy {
 // ダッカー (DuckerEnemy: 大きくカタカタ歩行)
 // ------------------------------------------
 class DuckerEnemy extends Enemy {
-    constructor(x, y, isCeiling) {
-        super(x, y);
+    constructor(x, y, isCeiling, isRed = false) {
+        super(x, y, isRed);
         this.width = 38;
         this.height = 34;
         this.isCeiling = isCeiling;
@@ -639,7 +646,7 @@ class DuckerEnemy extends Enemy {
         this.groundY = y;
         this.moveDir = -1;
         this.stopTimer = 0;
-        this.hp = 2;
+        this.hp = 1; // 軽快に撃破してカプセル獲得
         this.shootCooldown = 0;
     }
 
@@ -758,11 +765,19 @@ class DuckerEnemy extends Enemy {
         ctx.shadowOffsetY = 3;
 
         const bodyGrad = ctx.createRadialGradient(-4, -23, 2, 0, -18, 14);
-        bodyGrad.addColorStop(0.0, '#ffffff'); // 球面ハイライト
-        bodyGrad.addColorStop(0.25, '#cbd5e1'); // シルバー装甲
-        bodyGrad.addColorStop(0.65, '#64748b'); // スレート
-        bodyGrad.addColorStop(0.92, '#334155'); // 影
-        bodyGrad.addColorStop(1.0, '#0f172a');  // エッジリム
+        if (this.isRed) {
+            bodyGrad.addColorStop(0.0, '#ffffff');
+            bodyGrad.addColorStop(0.25, '#ff6b81');
+            bodyGrad.addColorStop(0.65, '#ee0033');
+            bodyGrad.addColorStop(0.92, '#88001b');
+            bodyGrad.addColorStop(1.0, '#3a000c');
+        } else {
+            bodyGrad.addColorStop(0.0, '#ffffff'); // 球面ハイライト
+            bodyGrad.addColorStop(0.25, '#cbd5e1'); // シルバー装甲
+            bodyGrad.addColorStop(0.65, '#64748b'); // スレート
+            bodyGrad.addColorStop(0.92, '#334155'); // 影
+            bodyGrad.addColorStop(1.0, '#0f172a');  // エッジリム
+        }
         ctx.fillStyle = bodyGrad;
         ctx.beginPath();
         ctx.arc(0, -18, 14, 0, Math.PI * 2);
@@ -1333,17 +1348,18 @@ class SuperVolcano extends Enemy {
                 this.burstTimer = 0;
                 if (typeof enemies !== 'undefined') {
                     const count = Math.floor(Math.random() * 4) + 3; // 3〜6個
+                    const craterY = this.groundY - this.height + 6;
                     for (let i = 0; i < count; i++) {
                         const sizes = [18, 28, 40];
                         const s = sizes[Math.floor(Math.random() * sizes.length)];
                         const vx = (Math.random() - 0.72) * 6.5 - 1.2; // 画面左〜中央へ広く降り注ぐ
                         const vy = - (Math.random() * 6.2 + 6.8); // 画面上端をはるかに超える大噴煙弾
                         const spawnX = this.x + this.width / 2 + (Math.random() - 0.5) * 45;
-                        enemies.push(new VolcanoRock(spawnX, this.groundY - 25, vx, vy, s));
+                        enemies.push(new VolcanoRock(spawnX, craterY, vx, vy, s));
                     }
                     if (typeof particles !== 'undefined') {
                         for (let p = 0; p < 8; p++) {
-                            particles.push(new Particle(this.x + this.width / 2, this.groundY - 25, Math.random() < 0.6 ? '#ff3300' : '#333333'));
+                            particles.push(new Particle(this.x + this.width / 2, craterY, Math.random() < 0.6 ? '#ff3300' : '#333333'));
                         }
                     }
                 }
@@ -1503,13 +1519,13 @@ class VolcanoRock extends Enemy {
 // 砲台 (TurretEnemy: 大きく堂々とした重砲台)
 // ------------------------------------------
 class TurretEnemy extends Enemy {
-    constructor(x, y, isCeiling) {
-        super(x, y);
+    constructor(x, y, isCeiling, isRed = false) {
+        super(x, y, isRed);
         this.width = 38;
         this.height = 32;
         this.isCeiling = isCeiling;
         this.shootTimer = Math.floor(Math.random() * 60);
-        this.hp = 2;
+        this.hp = 1; // 軽快に撃破してカプセル獲得
         this.slopeAngle = 0;
         this.groundY = y;
         this.barrelAngle = Math.PI; // デフォルトは左向き
@@ -1643,11 +1659,19 @@ class TurretEnemy extends Enemy {
         ctx.shadowOffsetY = -2;
 
         const domeGrad = ctx.createRadialGradient(-4, -20, 2, 0, -12, 16);
-        domeGrad.addColorStop(0.0, '#ffffff'); // 球面ハイライト
-        domeGrad.addColorStop(0.25, '#cbd5e1'); // シルバー合金
-        domeGrad.addColorStop(0.65, '#64748b'); // 金属スレート
-        domeGrad.addColorStop(0.9, '#334155');  // 影
-        domeGrad.addColorStop(1.0, '#0f172a');  // エッジリム
+        if (this.isRed) {
+            domeGrad.addColorStop(0.0, '#ffffff'); // ハイライト
+            domeGrad.addColorStop(0.25, '#ff6b81'); // 鮮烈なルビーレッド
+            domeGrad.addColorStop(0.65, '#ee0033'); // 深紅
+            domeGrad.addColorStop(0.9, '#88001b');  // 影
+            domeGrad.addColorStop(1.0, '#3a000c');  // エッジリム
+        } else {
+            domeGrad.addColorStop(0.0, '#ffffff'); // 球面ハイライト
+            domeGrad.addColorStop(0.25, '#cbd5e1'); // シルバー合金
+            domeGrad.addColorStop(0.65, '#64748b'); // 金属スレート
+            domeGrad.addColorStop(0.9, '#334155');  // 影
+            domeGrad.addColorStop(1.0, '#0f172a');  // エッジリム
+        }
         ctx.fillStyle = domeGrad;
         ctx.beginPath();
         ctx.arc(0, -12, 16, Math.PI, 0);
@@ -1657,18 +1681,25 @@ class TurretEnemy extends Enemy {
         ctx.shadowColor = 'transparent';
 
         // 装甲分割ライン
-        ctx.strokeStyle = 'rgba(15, 23, 42, 0.85)';
+        ctx.strokeStyle = this.isRed ? 'rgba(80, 0, 10, 0.85)' : 'rgba(15, 23, 42, 0.85)';
         ctx.lineWidth = 1;
         ctx.beginPath();
         ctx.arc(0, -12, 16, Math.PI, 0);
         ctx.stroke();
 
-        // 光学照準センサーアイ (エメラルド・シアン)
+        // 光学照準センサーアイ (通常はエメラルド・赤敵は黄金ゴールド)
         const sensorGrad = ctx.createRadialGradient(4, -12, 0.5, 3, -12, 5);
-        sensorGrad.addColorStop(0.0, '#ffffff');
-        sensorGrad.addColorStop(0.3, '#34d399');
-        sensorGrad.addColorStop(0.8, '#059669');
-        sensorGrad.addColorStop(1.0, '#064e3b');
+        if (this.isRed) {
+            sensorGrad.addColorStop(0.0, '#ffffff');
+            sensorGrad.addColorStop(0.3, '#fde047');
+            sensorGrad.addColorStop(0.8, '#eab308');
+            sensorGrad.addColorStop(1.0, '#854d0e');
+        } else {
+            sensorGrad.addColorStop(0.0, '#ffffff');
+            sensorGrad.addColorStop(0.3, '#34d399');
+            sensorGrad.addColorStop(0.8, '#059669');
+            sensorGrad.addColorStop(1.0, '#064e3b');
+        }
         ctx.fillStyle = sensorGrad;
         ctx.beginPath();
         ctx.arc(3, -12, 4.5, 0, Math.PI * 2);
@@ -1868,13 +1899,13 @@ const LaserCannonTurret = LaserTurretEnemy;
 // 壊れない石の上に鎮座する古代遺跡の防衛装置
 // ==========================================
 class RuneTurret extends Enemy {
-    constructor(x, y, isCeiling = false) {
-        super(x, y);
+    constructor(x, y, isCeiling = false, isRed = false) {
+        super(x, y, isRed);
         this.width = 38;
         this.height = 32;
         this.isCeiling = isCeiling;
         this.shootTimer = Math.floor(Math.random() * 60);
-        this.hp = 3;
+        this.hp = 1; // 軽快に撃破してカプセル獲得
         this.groundY = y;
         this.barrelAngle = isCeiling ? Math.PI / 2 : -Math.PI / 2;
     }
@@ -1913,11 +1944,12 @@ class RuneTurret extends Enemy {
 
         if (dist > 0 && dist < 650) {
             const speed = 4.2;
-            // 紫色の古代ルーン光弾
-            enemyBullets.push(new Bullet(centerX, centerY, (dx / dist) * speed, (dy / dist) * speed, '#c084fc', true));
+            // 赤敵は真紅の光弾、通常は紫色の古代ルーン光弾
+            const bulletColor = this.isRed ? '#ff3366' : '#c084fc';
+            enemyBullets.push(new Bullet(centerX, centerY, (dx / dist) * speed, (dy / dist) * speed, bulletColor, true));
             if (typeof particles !== 'undefined') {
                 for (let i = 0; i < 4; i++) {
-                    particles.push(new Particle(centerX, centerY, '#c084fc'));
+                    particles.push(new Particle(centerX, centerY, bulletColor));
                 }
             }
         }
@@ -1932,12 +1964,18 @@ class RuneTurret extends Enemy {
 
         // 古代石柱マウント
         const baseGrad = ctx.createLinearGradient(-18, 0, 18, 0);
-        baseGrad.addColorStop(0.0, '#1e1b4b');
-        baseGrad.addColorStop(0.5, '#4338ca');
-        baseGrad.addColorStop(1.0, '#0f172a');
+        if (this.isRed) {
+            baseGrad.addColorStop(0.0, '#4a0410');
+            baseGrad.addColorStop(0.5, '#9f1239');
+            baseGrad.addColorStop(1.0, '#1e0208');
+        } else {
+            baseGrad.addColorStop(0.0, '#1e1b4b');
+            baseGrad.addColorStop(0.5, '#4338ca');
+            baseGrad.addColorStop(1.0, '#0f172a');
+        }
         ctx.fillStyle = baseGrad;
         ctx.fillRect(-18, -8, 36, 8);
-        ctx.strokeStyle = '#818cf8';
+        ctx.strokeStyle = this.isRed ? '#fb7185' : '#818cf8';
         ctx.lineWidth = 1;
         ctx.strokeRect(-18, -8, 36, 8);
 
@@ -1948,16 +1986,16 @@ class RuneTurret extends Enemy {
         ctx.rotate(drawAngle);
 
         // 砲身
-        ctx.fillStyle = '#6366f1';
+        ctx.fillStyle = this.isRed ? '#e11d48' : '#6366f1';
         ctx.fillRect(0, -4, 20, 8);
-        ctx.fillStyle = '#a855f7';
+        ctx.fillStyle = this.isRed ? '#ff6b81' : '#a855f7';
         ctx.fillRect(18, -5, 3, 10);
         ctx.restore();
 
-        // ルーンクリスタルアイ（紫色発光）
-        ctx.shadowColor = '#c084fc';
+        // ルーンクリスタルアイ
+        ctx.shadowColor = this.isRed ? '#ff2255' : '#c084fc';
         ctx.shadowBlur = 8;
-        ctx.fillStyle = '#e9d5ff';
+        ctx.fillStyle = this.isRed ? '#ffe4e6' : '#e9d5ff';
         ctx.beginPath();
         ctx.arc(0, -14, 6, 0, Math.PI * 2);
         ctx.fill();
@@ -1971,12 +2009,12 @@ class RuneTurret extends Enemy {
 // モアイ・古代石像の顔ドローン。イオンリング弾を吐く！
 // ==========================================
 class StoneEyeEnemy extends Enemy {
-    constructor(x, y) {
-        super(x, y);
+    constructor(x, y, isRed = false) {
+        super(x, y, isRed);
         this.width = 38;
         this.height = 42;
         this.speed = 1.4;
-        this.hp = 2;
+        this.hp = 1; // 軽快に撃破してカプセル獲得
         this.shootTimer = Math.floor(Math.random() * 50);
         this.baseY = y;
         this.floatPhase = Math.random() * Math.PI * 2;
@@ -2031,9 +2069,15 @@ class StoneEyeEnemy extends Enemy {
 
         // 古代石像・モアイフェイス（立体陰影）
         const grad = ctx.createLinearGradient(0, 0, this.width, this.height);
-        grad.addColorStop(0.0, '#94a3b8');
-        grad.addColorStop(0.4, '#64748b');
-        grad.addColorStop(1.0, '#1e293b');
+        if (this.isRed) {
+            grad.addColorStop(0.0, '#fda4af');
+            grad.addColorStop(0.4, '#e11d48');
+            grad.addColorStop(1.0, '#4c0519');
+        } else {
+            grad.addColorStop(0.0, '#94a3b8');
+            grad.addColorStop(0.4, '#64748b');
+            grad.addColorStop(1.0, '#1e293b');
+        }
         ctx.fillStyle = grad;
 
         // モアイ形状ポリゴン
@@ -2048,16 +2092,16 @@ class StoneEyeEnemy extends Enemy {
         ctx.closePath();
         ctx.fill();
 
-        ctx.strokeStyle = '#0f172a';
+        ctx.strokeStyle = this.isRed ? '#881337' : '#0f172a';
         ctx.lineWidth = 1.5;
         ctx.stroke();
 
-        // 巨大な目（シアン・発光アイ）
-        ctx.shadowColor = '#00ffff';
+        // 巨大な目（通常シアン・赤敵は黄金ゴールド）
+        ctx.shadowColor = this.isRed ? '#fbbf24' : '#00ffff';
         ctx.shadowBlur = 6;
-        ctx.fillStyle = '#00ffff';
+        ctx.fillStyle = this.isRed ? '#fef08a' : '#38bdf8';
         ctx.beginPath();
-        ctx.ellipse(14, 15, 6, 4, 0, 0, Math.PI * 2);
+        ctx.ellipse(14, this.height * 0.32, 5, 3.5, 0, 0, Math.PI * 2);
         ctx.fill();
 
         ctx.fillStyle = '#ffffff';

@@ -164,6 +164,7 @@ class StonehengeStage {
         this.generating = true;
         this.boss = null;
         this.stageClearTimer = 0;
+        this.totalColumnsGenerated = 0;
         
         // 飛ぶ敵のスポーンタイマー（1秒強の間隔でドンドン出す！）
         this.flyingEnemyTimer = 0;
@@ -192,6 +193,7 @@ class StonehengeStage {
         this.boss = null;
         this.stageClearTimer = 0;
         this.flyingEnemyTimer = 0;
+        this.totalColumnsGenerated = 0;
 
         // ステージ開幕直後から画面全域に石ブロック群がびっしり広がるよう先行生成！
         this.spawnColumnX = 240;
@@ -282,139 +284,165 @@ class StonehengeStage {
         }
     }
 
-    // 飛ぶ敵をドンドン出す処理（約1.0〜1.3秒ごとに波状攻撃）
+    // 飛ぶ敵をドンドン出す処理（編隊全滅時や赤色敵撃破でカプセル大量ドロップ！）
     updateFlyingEnemies(dt) {
         if (typeof enemies === 'undefined') return;
 
         this.flyingEnemyTimer += dt;
         if (this.flyingEnemyTimer > this.flyingEnemyInterval) {
             this.flyingEnemyTimer = 0;
-            this.flyingEnemyInterval = 1000 + Math.random() * 400; // 1.0〜1.4秒のハイテンポ！
+            this.flyingEnemyInterval = 900 + Math.random() * 400; // 0.9〜1.3秒のハイテンポ！
 
             const spawnRoll = Math.random();
 
-            if (spawnRoll < 0.40) {
-                // パターンA: 新キャラ「古代ストーンアイ（StoneEyeEnemy）」がイオンリング弾を撃ちながら飛来！
+            if (spawnRoll < 0.38) {
+                // パターンA: 新キャラ「古代ストーンアイ（StoneEyeEnemy）」イオンリング弾放射（40%で赤色＝カプセル！）
                 const spawnY = 120 + Math.random() * 360;
                 if (typeof StoneEyeEnemy !== 'undefined') {
-                    enemies.push(new StoneEyeEnemy(this.width + 50, spawnY));
-                    if (Math.random() < 0.5) {
-                        enemies.push(new StoneEyeEnemy(this.width + 100, spawnY + (Math.random() - 0.5) * 70));
-                    }
+                    const eye = new StoneEyeEnemy(this.width + 50, spawnY);
+                    if (Math.random() < 0.40) eye.isRed = true;
+                    enemies.push(eye);
                 }
-            } else if (spawnRoll < 0.75) {
-                // パターンB: 5機編隊（FanEnemy）がサイン波で掘削トンネル内を急襲！
-                const isRed = Math.random() < 0.35; // 35%でカプセル確定ドロップ赤編隊
-                const startY = 140 + Math.random() * 320;
-                const formation = (typeof EnemyFormation !== 'undefined') ? new EnemyFormation() : null;
-
-                for (let i = 0; i < 5; i++) {
-                    const delay = i * 140;
-                    setTimeout(() => {
-                        if (!this.active || typeof FanEnemy === 'undefined') return;
-                        const fe = new FanEnemy(this.width + 40, startY, isRed);
-                        if (formation) {
-                            fe.formation = formation;
-                            formation.enemies.push(fe);
-                        }
-                        enemies.push(fe);
-                    }, delay);
+            } else if (spawnRoll < 0.72) {
+                // パターンB: 5機編隊（Formation）サイン波で飛来（全滅でカプセル確定ドロップ！）
+                const startY = 120 + Math.random() * 360;
+                if (typeof Formation !== 'undefined') {
+                    new Formation(startY, 5);
                 }
             } else {
-                // パターンC: 単機または小隊の迎撃機
-                const y1 = 100 + Math.random() * 400;
-                if (typeof Enemy !== 'undefined') {
-                    enemies.push(new Enemy(this.width + 40, y1));
-                    enemies.push(new Enemy(this.width + 80, y1 + 30));
+                // パターンC: ザブ小隊（ZabSquad）奇襲編隊（全滅でカプセル確定ドロップ！）
+                const startY = 140 + Math.random() * 320;
+                if (typeof ZabSquad !== 'undefined') {
+                    new ZabSquad('FRONT', startY, 4);
                 }
             }
         }
     }
 
-    // ストーンヘンジ面全体の石ブロック化レイアウト生成（絶え間なく続く石ブロック＆敵配置）
+    // =========================================================================
+    // ストーンヘンジ面 複雑・多層古代遺跡迷路レイアウト生成
+    // 単純な上半分埋めを全廃！S字ジグザグ・古代門・ピラミッド階段・中央要塞島・チェッカー
+    // =========================================================================
     generateColumn(colX) {
-        const totalRows = Math.floor(this.height / this.columnWidth); // 600 / 40 = 15行
-        const colIndex = Math.floor(colX / this.columnWidth);
+        const totalRows = Math.floor(this.height / this.columnWidth); // 600 / 40 = 15行 (r = 0〜14)
+        const colIndex = this.totalColumnsGenerated++; // 正しい進行列インデックス！
 
-        // 天井（行0）と地面（行14）は常に破壊不能の古代巨石
+        // 1. 最外郭境界: 天井（行0）と地面（行14）は1ブロック分の古代モノリス
         this.blocks.push(new StoneBlock(colX, 0, this.columnWidth, this.columnWidth, false));
         this.blocks.push(new StoneBlock(colX, (totalRows - 1) * this.columnWidth, this.columnWidth, this.columnWidth, false));
 
-        // 12列ごとの地形サイクル
-        const phase = (colIndex % 12);
+        // 2. 36列ごとの古代遺跡迷路サイクル
+        const phase = colIndex % 36;
+        let indestructibleRows = []; // この列で壊れない石を配置する行番号
+        let enemySpawns = []; // { row, isCeil, type }
 
-        // --- A. 壊れない石（古代モノリス柱・空中要塞足場） ---
-        let hasIndestructible = false;
-        let pillarRow = -1;
-
-        if (phase === 2 || phase === 6 || phase === 10) {
-            // 上または下から突き出す巨石柱
-            const fromTop = (phase % 4 === 2);
-            const pillarHeight = 4 + (colIndex % 3); // 4〜6ブロック分の柱
-
-            for (let r = 1; r < totalRows - 1; r++) {
-                if (fromTop && r <= pillarHeight) {
-                    this.blocks.push(new StoneBlock(colX, r * this.columnWidth, this.columnWidth, this.columnWidth, false));
-                    pillarRow = pillarHeight;
-                    hasIndestructible = true;
-                } else if (!fromTop && r >= totalRows - 1 - pillarHeight) {
-                    this.blocks.push(new StoneBlock(colX, r * this.columnWidth, this.columnWidth, this.columnWidth, false));
-                    if (pillarRow === -1) pillarRow = r;
-                    hasIndestructible = true;
-                }
+        // --- ゾーン1: S字ジグザグ・クランク迷路回廊 (phase: 0〜7) ---
+        if (phase >= 1 && phase <= 3) {
+            // 上から突き出す巨石柱 (r: 1〜7) -> 下部 (r: 8〜13) が通路
+            for (let r = 1; r <= 7; r++) indestructibleRows.push(r);
+            if (phase === 2) {
+                enemySpawns.push({ row: 8, isCeil: true, type: 'RUNE' }); // 柱の下端に下向きルーン砲台
             }
-        } else if (phase === 4 || phase === 8) {
-            // 中空に浮かぶ壊れない石の空中トーチカ
-            const midR = 5 + (colIndex % 4);
-            this.blocks.push(new StoneBlock(colX, midR * this.columnWidth, this.columnWidth, this.columnWidth, false));
-            this.blocks.push(new StoneBlock(colX, (midR + 1) * this.columnWidth, this.columnWidth, this.columnWidth, false));
-            pillarRow = midR;
-            hasIndestructible = true;
-        }
-
-        // --- B. 壊れない石の上に敵を高密度配置！(古代ルーン砲台・通常砲台・ダッカー) ---
-        if (hasIndestructible && typeof enemies !== 'undefined') {
-            const enemyRoll = Math.random();
-            const spawnX = colX + 2;
-
-            if (pillarRow > 0 && pillarRow < totalRows - 1) {
-                const isCeil = (pillarRow <= 6);
-                const spawnY = isCeil ? (pillarRow + 1) * this.columnWidth : (pillarRow - 1) * this.columnWidth;
-
-                if (enemyRoll < 0.45) {
-                    // 新キャラ: 古代ルーン砲台 (RuneTurret)
-                    if (typeof RuneTurret !== 'undefined') {
-                        enemies.push(new RuneTurret(spawnX, spawnY, isCeil));
-                    }
-                } else if (enemyRoll < 0.75) {
-                    // 既存敵: 砲台 (TurretEnemy)
-                    if (typeof TurretEnemy !== 'undefined') {
-                        enemies.push(new TurretEnemy(spawnX, spawnY, isCeil, Math.random() < 0.2));
-                    }
-                } else {
-                    // 既存敵: 歩行ロボット・ダッカー (DuckerEnemy)
-                    if (typeof DuckerEnemy !== 'undefined') {
-                        enemies.push(new DuckerEnemy(spawnX, spawnY, isCeil, Math.random() < 0.2));
-                    }
-                }
+        } else if (phase >= 5 && phase <= 7) {
+            // 下から突き出す巨石柱 (r: 7〜13) -> 上部 (r: 1〜6) が通路
+            for (let r = 7; r <= 13; r++) indestructibleRows.push(r);
+            if (phase === 6) {
+                enemySpawns.push({ row: 6, isCeil: false, type: 'TURRET' }); // 柱の上端に上向き砲台
             }
         }
 
-        // --- C. 破壊できる石（砂岩ブロック）の全域連続配置（掘らないと行き詰まる！） ---
-        // 全ての列で破壊できる石を隙間なく配置し、2面全体を石で埋め尽くす！
+        // --- ゾーン2: 古代遺跡アーチゲート門＆双塔ピラー (phase: 8〜14) ---
+        else if (phase === 9) {
+            // 対向ピラー (上 r: 1〜3, 下 r: 11〜13)
+            for (let r = 1; r <= 3; r++) indestructibleRows.push(r);
+            for (let r = 11; r <= 13; r++) indestructibleRows.push(r);
+            enemySpawns.push({ row: 4, isCeil: true, type: 'DUCKER' });
+            enemySpawns.push({ row: 10, isCeil: false, type: 'TURRET' });
+        } else if (phase >= 11 && phase <= 12) {
+            // 中央巨大門柱 (r: 5〜9) -> 上下両方に回廊が開口
+            for (let r = 5; r <= 9; r++) indestructibleRows.push(r);
+            if (phase === 11) {
+                enemySpawns.push({ row: 4, isCeil: false, type: 'RUNE' }); // 門柱上面に上向きルーン砲台
+                enemySpawns.push({ row: 10, isCeil: true, type: 'RUNE' }); // 門柱下面に下向きルーン砲台
+            }
+        }
+
+        // --- ゾーン3: ピラミッド階段テラス (phase: 15〜22) ---
+        else if (phase === 16) {
+            for (let r = 12; r <= 13; r++) indestructibleRows.push(r); // 下側 1段目
+        } else if (phase === 17) {
+            for (let r = 10; r <= 13; r++) indestructibleRows.push(r); // 下側 2段目
+        } else if (phase === 18) {
+            for (let r = 8; r <= 13; r++) indestructibleRows.push(r);  // 下側 3段目 (高台)
+            enemySpawns.push({ row: 7, isCeil: false, type: 'TURRET' }); // 赤砲台テラス！
+        } else if (phase === 20) {
+            for (let r = 1; r <= 4; r++) indestructibleRows.push(r);  // 上側 階段
+            enemySpawns.push({ row: 5, isCeil: true, type: 'DUCKER' });
+        } else if (phase === 21) {
+            for (let r = 1; r <= 6; r++) indestructibleRows.push(r);
+        }
+
+        // --- ゾーン4: 回廊アイランド中央要塞島 (phase: 23〜29) ---
+        else if (phase >= 24 && phase <= 27) {
+            // 中央に浮かぶ 4×5ブロックの巨大浮遊要塞島 (r: 5〜9)
+            for (let r = 5; r <= 9; r++) indestructibleRows.push(r);
+            if (phase === 24) {
+                enemySpawns.push({ row: 4, isCeil: false, type: 'RUNE' });
+            } else if (phase === 26) {
+                enemySpawns.push({ row: 10, isCeil: true, type: 'TURRET' });
+            }
+        }
+
+        // --- ゾーン5: チェッカー＆狭窄クランク迷路 (phase: 30〜35) ---
+        else if (phase === 31) {
+            indestructibleRows.push(3, 4, 10, 11);
+            enemySpawns.push({ row: 5, isCeil: true, type: 'TURRET' });
+        } else if (phase === 33) {
+            indestructibleRows.push(6, 7, 8);
+            enemySpawns.push({ row: 5, isCeil: false, type: 'DUCKER' });
+        } else if (phase === 35) {
+            indestructibleRows.push(2, 3, 11, 12);
+        }
+
+        // 3. 壊れない石（古代モノリスブロック）の配置
+        indestructibleRows.forEach(r => {
+            this.blocks.push(new StoneBlock(colX, r * this.columnWidth, this.columnWidth, this.columnWidth, false));
+        });
+
+        // 4. 壊れない石の上に敵（砲台・ルーン砲台・ダッカー）を高密度配置（赤色確率40%！）
+        if (typeof enemies !== 'undefined') {
+            enemySpawns.forEach(sp => {
+                const isRed = Math.random() < 0.40; // 40%で赤色＝カプセル確定ドロップ！
+                const spawnX = colX + 1;
+                const spawnY = sp.row * this.columnWidth;
+
+                if (sp.type === 'RUNE' && typeof RuneTurret !== 'undefined') {
+                    const rt = new RuneTurret(spawnX, spawnY, sp.isCeil);
+                    if (isRed) rt.isRed = true;
+                    enemies.push(rt);
+                } else if (sp.type === 'DUCKER' && typeof DuckerEnemy !== 'undefined') {
+                    enemies.push(new DuckerEnemy(spawnX, spawnY, sp.isCeil, isRed));
+                } else if (typeof TurretEnemy !== 'undefined') {
+                    enemies.push(new TurretEnemy(spawnX, spawnY, sp.isCeil, isRed));
+                }
+            });
+        }
+
+        // 5. 破壊できる石（砂岩ブロック）の連続掘削配置
+        // 壊れない石がない行を隙間なく埋め尽くし、プレイヤーが掘り進む必然性を作る！
+        // 4列に1列は完全な石壁（隙間なし！）。それ以外の列は1〜2マスの開口部のみ設ける。
+        const isSolidWall = (colIndex % 4 === 0);
+        let gapCenter = 7;
+        if (phase >= 1 && phase <= 3) gapCenter = 10; // 下側が開口
+        else if (phase >= 5 && phase <= 7) gapCenter = 3; // 上側が開口
+        else if (phase >= 11 && phase <= 12) gapCenter = (colIndex % 2 === 0) ? 3 : 11; // 上下分岐
+        else if (phase >= 24 && phase <= 27) gapCenter = (colIndex % 2 === 0) ? 2 : 12; // 要塞上下
+
         for (let r = 1; r < totalRows - 1; r++) {
-            // 既に壊れない石がある位置はスキップ
-            const alreadyHasBlock = this.blocks.some(b => Math.abs(b.x - colX) < 5 && Math.abs(b.y - r * this.columnWidth) < 5);
-            if (alreadyHasBlock) continue;
+            if (indestructibleRows.includes(r)) continue;
 
-            // 通路の開口部（1〜2ブロック分のみの狭い隙間。それ以外は全域掘削ブロック！）
-            // 4列に1列は隙間すら無い「完全な石壁」にして、プレイヤーが自ら掘り進む必然性を作る！
-            const isSolidWall = (colIndex % 4 === 0);
-            const gapRow = 5 + (Math.floor(colIndex / 3) % 5);
-            const isGap = !isSolidWall && (r === gapRow || r === gapRow + 1);
-
+            const isGap = !isSolidWall && (r === gapCenter || r === gapCenter + 1);
             if (!isGap) {
-                // 破壊できる石を敷き詰める！
                 this.blocks.push(new StoneBlock(colX, r * this.columnWidth, this.columnWidth, this.columnWidth, true));
             }
         }
