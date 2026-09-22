@@ -220,8 +220,9 @@ class StonehengeStage {
         if (this.state === 'STAGE') {
             this.stageTime += dt;
 
-            // 3. 新しい石ブロック列の生成（絶え間なく密集して出現！）
+            // 3. 新しい石ブロック列の生成（スクロールに合わせて絶え間なく密集して出現！）
             if (this.generating) {
+                this.spawnColumnX -= this.scrollSpeed; // 毎フレームのスクロール追従
                 while (this.spawnColumnX < this.width + 120) {
                     this.generateColumn(this.spawnColumnX);
                     this.spawnColumnX += this.columnWidth;
@@ -231,15 +232,34 @@ class StonehengeStage {
             // 4. 飛ぶ敵をドンドン出すシステム！
             this.updateFlyingEnemies(dt);
 
-            // 約75秒経過で石地帯の生成を終了し、ボス戦への通路を開放
-            if (this.stageTime > 75000 && this.generating) {
+            // 約50秒経過で石地帯の生成を終了し、宇宙空間ワープフェーズへの準備
+            if (this.stageTime > 50000 && this.generating) {
                 this.generating = false;
             }
 
-            // 石ブロックが画面左へ全て抜けたら2面ボス（古代守護神ゴーレムコア）が登場！
-            if (this.stageTime > 82000 && this.blocks.length < 8) {
+            // 石ブロックが画面左へ抜けたらボスの前の宇宙空間「丸型ワープ兵器」フェーズへ移行！
+            if (this.stageTime > 55000 && this.blocks.length < 5) {
+                this.state = 'WARP_SPACE';
+                this.blocks = [];
+                this.warpSpaceTimer = 0;
+                this.warpWaveTimer = 0;
+            }
+        } else if (this.state === 'WARP_SPACE') {
+            this.stageTime += dt;
+            this.warpSpaceTimer += dt;
+            this.warpWaveTimer += dt;
+
+            // 丸型ワープ兵器の小隊（WarpSquad）が空間から次々とワープアウト！
+            if (this.warpWaveTimer > 1800) {
+                this.warpWaveTimer = 0;
+                if (typeof WarpSquad !== 'undefined') {
+                    new WarpSquad(Math.floor(Math.random() * 2) + 4);
+                }
+            }
+
+            // 約28秒間のワープ強襲を耐え抜いたら2面ボス（古代守護神ゴーレムコア）が登場！
+            if (this.warpSpaceTimer > 28000) {
                 this.state = 'BOSS';
-                this.blocks = []; // 残存ブロックをクリア
                 if (typeof Sound !== 'undefined') Sound.playBossBgm();
                 if (typeof GolemBoss !== 'undefined') {
                     this.boss = new GolemBoss(this.width, 185);
@@ -497,6 +517,20 @@ class StonehengeStage {
             ctx.fillText('BREAK THE STONES TO CARVE YOUR PATH!', this.width / 2, this.height / 2);
         }
 
+        // 6. 宇宙空間ワープ強襲インジケーター（開始から約3.8秒間）
+        if (this.state === 'WARP_SPACE' && this.warpSpaceTimer < 3800) {
+            const alpha = Math.min(1, Math.sin((this.warpSpaceTimer / 3800) * Math.PI));
+            ctx.font = 'bold 32px "Courier New", monospace';
+            ctx.fillStyle = `rgba(0, 255, 255, ${alpha})`;
+            ctx.textAlign = 'center';
+            ctx.shadowColor = '#0088ff';
+            ctx.shadowBlur = 14;
+            ctx.fillText('WARNING : WARP ATTACK DETECTED!', this.width / 2, this.height / 2 - 40);
+            ctx.font = 'bold 18px "Courier New", monospace';
+            ctx.fillStyle = `rgba(255, 200, 100, ${alpha})`;
+            ctx.fillText('SPHERE WARP WEAPONS INCOMING!', this.width / 2, this.height / 2 + 10);
+        }
+
         // 6. ALL CLEAR（全ステージクリア）栄光のエンディング演出！
         if (this.state === 'ALL_CLEAR') {
             ctx.save();
@@ -529,3 +563,4 @@ class StonehengeStage {
 
 // グローバルインスタンス
 let stonehengeStage = null;
+window.stonehengeStage = stonehengeStage;

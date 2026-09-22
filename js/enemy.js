@@ -1278,18 +1278,161 @@ class Volcano extends Enemy {
         ctx.restore();
     }
 }
+// 超巨大火山 (SuperVolcano: 1面ボスクライマックス用・画面停止30秒サバイバル)
+// ------------------------------------------
+class SuperVolcano extends Enemy {
+    constructor(x, y) {
+        super(x, y);
+        this.width = 210;
+        this.height = 140;
+        this.groundY = y;
+        this.burstTimer = 0;
+        this.erupting = false;
+        this.magmaAnim = 0;
+        this.hp = 99999;
+        this.targetX = 500; // 画面中央やや右に陣取る
+        this.positioned = false;
+    }
+
+    startMajorEruption() {
+        this.erupting = true;
+        this.burstTimer = 0;
+    }
+
+    stopEruption() {
+        this.erupting = false;
+    }
+
+    update() {
+        if (typeof levelManager !== 'undefined' && levelManager.terrain && levelManager.terrain.active) {
+            if (!this.positioned) {
+                this.x -= levelManager.terrain.scrollSpeed;
+                this.groundY = levelManager.terrain.getBottomY(this.x + this.width / 2);
+                this.y = this.groundY - this.height;
+                if (this.x <= this.targetX) {
+                    this.x = this.targetX;
+                    this.positioned = true;
+                }
+            } else if (!this.erupting && levelManager.terrain.scrollSpeed > 0) {
+                // サバイバル終了後にスクロール再開したら、左へ流れて画面外へ
+                this.x -= levelManager.terrain.scrollSpeed;
+                this.groundY = levelManager.terrain.getBottomY(this.x + this.width / 2);
+                this.y = this.groundY - this.height;
+                if (this.x + this.width < -100) {
+                    this.active = false;
+                }
+            }
+        }
+
+        this.magmaAnim += 0.16;
+
+        if (this.erupting) {
+            this.burstTimer++;
+            // 毎11フレーム（約0.18秒）ごとに豪快な火砕流・大量火山弾を噴射！
+            if (this.burstTimer > 11) {
+                this.burstTimer = 0;
+                if (typeof enemies !== 'undefined') {
+                    const count = Math.floor(Math.random() * 4) + 3; // 3〜6個
+                    for (let i = 0; i < count; i++) {
+                        const sizes = [18, 28, 40];
+                        const s = sizes[Math.floor(Math.random() * sizes.length)];
+                        const vx = (Math.random() - 0.72) * 6.5 - 1.2; // 画面左〜中央へ広く降り注ぐ
+                        const vy = - (Math.random() * 6.2 + 6.8); // 画面上端をはるかに超える大噴煙弾
+                        const spawnX = this.x + this.width / 2 + (Math.random() - 0.5) * 45;
+                        enemies.push(new VolcanoRock(spawnX, this.groundY - 25, vx, vy, s));
+                    }
+                    if (typeof particles !== 'undefined') {
+                        for (let p = 0; p < 8; p++) {
+                            particles.push(new Particle(this.x + this.width / 2, this.groundY - 25, Math.random() < 0.6 ? '#ff3300' : '#333333'));
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    checkCollision(rect) {
+        // 山体との大まかな台形衝突判定
+        if (!this.active) return false;
+        if (rect.x + rect.width < this.x || rect.x > this.x + this.width) return false;
+        if (rect.y + rect.height < this.y) return false;
+
+        // 火山台形の内側判定
+        const midX = this.x + this.width / 2;
+        const relX = Math.abs((rect.x + rect.width / 2) - midX);
+        const topRatio = 40 / (this.width / 2);
+        const slopeY = this.groundY - this.height * (1 - Math.max(0, (relX - 40) / (this.width / 2 - 40)));
+        return (rect.y + rect.height >= slopeY);
+    }
+
+    draw(ctx) {
+        ctx.save();
+        ctx.translate(this.x + this.width / 2, this.groundY);
+
+        // 1. 超巨大な火山山体（重厚な黒褐色の火山岩盤）
+        const mountainGrad = ctx.createLinearGradient(0, -this.height, 0, 0);
+        mountainGrad.addColorStop(0.0, '#421f06');
+        mountainGrad.addColorStop(0.35, '#5c2a08');
+        mountainGrad.addColorStop(0.7, '#331705');
+        mountainGrad.addColorStop(1.0, '#1a0b02');
+        ctx.fillStyle = mountainGrad;
+
+        ctx.beginPath();
+        ctx.moveTo(-this.width / 2, 0);
+        ctx.lineTo(-40, -this.height);
+        ctx.lineTo(40, -this.height);
+        ctx.lineTo(this.width / 2, 0);
+        ctx.closePath();
+        ctx.fill();
+
+        ctx.strokeStyle = '#1a0b02';
+        ctx.lineWidth = 3;
+        ctx.stroke();
+
+        // 2. 山肌を走る赤熱マグマの亀裂
+        ctx.strokeStyle = `rgba(255, 68, 0, ${0.7 + Math.sin(this.magmaAnim) * 0.3})`;
+        ctx.lineWidth = 2.5;
+        ctx.beginPath();
+        ctx.moveTo(-20, -this.height + 12);
+        ctx.lineTo(-30, -this.height * 0.45);
+        ctx.lineTo(-55, 0);
+        ctx.moveTo(15, -this.height + 10);
+        ctx.lineTo(28, -this.height * 0.55);
+        ctx.lineTo(50, 0);
+        ctx.stroke();
+
+        // 3. 巨大火口の超高温マグマ湖（白熱・黄金・深紅）
+        const glow = Math.sin(this.magmaAnim * 2) * 0.3 + 0.7;
+        ctx.shadowColor = '#ff2200';
+        ctx.shadowBlur = 24 * glow;
+
+        const magmaGrad = ctx.createLinearGradient(0, -this.height - 4, 0, -this.height + 22);
+        magmaGrad.addColorStop(0.0, '#ffffff');
+        magmaGrad.addColorStop(0.25, '#ffe500');
+        magmaGrad.addColorStop(0.65, '#ff4400');
+        magmaGrad.addColorStop(1.0, '#880000');
+        ctx.fillStyle = magmaGrad;
+
+        ctx.beginPath();
+        ctx.ellipse(0, -this.height + 6, 38, 12, 0, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.restore();
+    }
+}
 
 class VolcanoRock extends Enemy {
-    constructor(x, y, vx, vy) {
+    constructor(x, y, vx, vy, size = 30) {
         super(x, y);
-        this.width = 30;
-        this.height = 30;
+        this.size = size;
+        this.width = size;
+        this.height = size;
         this.vx = vx;
         this.vy = vy;
-        this.gravity = 0.12; // ゆったりした重力落下
-        this.hp = 1;
+        this.gravity = 0.14; // 放物線を描く重力
+        this.hp = size > 35 ? 2 : 1;
         this.rot = 0;
-        this.rotSpd = (Math.random() - 0.5) * 0.15;
+        this.rotSpd = (Math.random() - 0.5) * 0.2;
     }
 
     update() {
@@ -1297,6 +1440,12 @@ class VolcanoRock extends Enemy {
         this.y += this.vy;
         this.vy += this.gravity;
         this.rot += this.rotSpd;
+
+        // 画面外または地面接触で消滅
+        if (this.y > 620 || this.x < -120 || this.x > 950) {
+            this.active = false;
+            return;
+        }
 
         if (typeof levelManager !== 'undefined' && levelManager.terrain && levelManager.terrain.active) {
             const ground = levelManager.terrain.getBottomY(this.x);
@@ -1311,12 +1460,14 @@ class VolcanoRock extends Enemy {
         ctx.translate(this.x + this.width / 2, this.y + this.height / 2);
         ctx.rotate(this.rot);
 
+        const rBase = this.size / 2;
+
         // 火山弾の外郭グロー
-        ctx.shadowColor = 'rgba(255, 80, 0, 0.7)';
-        ctx.shadowBlur = 8;
+        ctx.shadowColor = 'rgba(255, 80, 0, 0.75)';
+        ctx.shadowBlur = Math.max(6, rBase * 0.6);
 
         // 白熱溶岩ボール (中心の超高温コアから外側の冷却玄武岩まで)
-        const magmaGrad = ctx.createRadialGradient(2, -2, 1, 0, 0, 14);
+        const magmaGrad = ctx.createRadialGradient(rBase * 0.15, -rBase * 0.15, 1, 0, 0, rBase);
         magmaGrad.addColorStop(0.0, '#ffffff'); // 超高温白熱コア
         magmaGrad.addColorStop(0.25, '#ffe555'); // 灼熱イエロー
         magmaGrad.addColorStop(0.55, '#ea580c'); // 溶融オレンジ
@@ -1325,11 +1476,10 @@ class VolcanoRock extends Enemy {
 
         ctx.fillStyle = magmaGrad;
         ctx.beginPath();
-        // 凹凸のあるリアルな火砕流岩石形状
         const points = 8;
         for (let i = 0; i < points; i++) {
             const angle = (i / points) * Math.PI * 2;
-            const r = 12 + ((i % 2 === 0) ? 2.5 : -1.5);
+            const r = rBase * (0.85 + ((i % 2 === 0) ? 0.2 : -0.1));
             const px = Math.cos(angle) * r;
             const py = Math.sin(angle) * r;
             if (i === 0) ctx.moveTo(px, py);
@@ -1338,12 +1488,6 @@ class VolcanoRock extends Enemy {
         ctx.closePath();
         ctx.fill();
 
-        ctx.shadowBlur = 0;
-
-        // 表面の溶岩亀裂ライン (輝くマグマの筋)
-        ctx.strokeStyle = '#ffe555';
-        ctx.lineWidth = 1.2;
-        ctx.beginPath();
         ctx.moveTo(-4, -6);
         ctx.lineTo(2, -2);
         ctx.lineTo(7, 3);
@@ -1933,3 +2077,182 @@ class StoneEyeEnemy extends Enemy {
         ctx.restore();
     }
 }
+
+// ==========================================
+// STAGE 2 新キャラ: 丸型ワープ兵器 (WarpSphereEnemy & WarpSquad)
+// 宇宙空間の至る所から光の波紋とともにワープアウトして自機を強襲する球体ドローン
+// ==========================================
+class WarpSquad extends FormationBase {
+    constructor(count = 4) {
+        super(count);
+        this.enemies = [];
+        
+        // 自機の周囲ランダム（前方・後方・上下）にワープイン配置
+        for (let i = 0; i < count; i++) {
+            const rx = 120 + Math.random() * 640;
+            const ry = 80 + Math.random() * 440;
+            const delay = i * 16;
+            const isHoming = Math.random() < 0.65;
+            const enemy = new WarpSphereEnemy(rx, ry, isHoming ? 'HOMING' : 'SHOOTER', this, delay);
+            this.enemies.push(enemy);
+            enemies.push(enemy);
+        }
+    }
+}
+
+class WarpSphereEnemy extends Enemy {
+    constructor(x, y, behaviorType = 'HOMING', formation = null, delay = 0) {
+        super(x, y);
+        this.width = 38;
+        this.height = 38;
+        this.behaviorType = behaviorType; // 'HOMING' (高速追撃) or 'SHOOTER' (リング弾発射)
+        this.formation = formation;
+        this.delay = delay;
+        this.hp = 2;
+        this.state = 'WARPING'; // 'WARPING' -> 'ACTIVE'
+        this.warpTimer = 0;
+        this.warpDuration = 45; // 約0.75秒のワープイン演出
+        this.activeTimer = 0;
+        this.ringAngle = Math.random() * Math.PI * 2;
+        this.shootTimer = Math.floor(Math.random() * 30);
+    }
+
+    update() {
+        if (this.delay > 0) {
+            this.delay--;
+            return;
+        }
+
+        this.ringAngle += 0.09;
+
+        if (this.state === 'WARPING') {
+            this.warpTimer++;
+            if (this.warpTimer >= this.warpDuration) {
+                this.state = 'ACTIVE';
+                // ワープ完了時のシアン光粒子
+                if (typeof particles !== 'undefined') {
+                    for (let i = 0; i < 8; i++) {
+                        particles.push(new Particle(this.x + this.width / 2, this.y + this.height / 2, '#00ffff'));
+                    }
+                }
+            }
+            return;
+        }
+
+        this.activeTimer++;
+
+        if (this.behaviorType === 'HOMING') {
+            // 自機に向かってスムーズに加速旋回突進
+            if (typeof player !== 'undefined') {
+                const dx = (player.x + player.width / 2) - (this.x + this.width / 2);
+                const dy = (player.y + player.height / 2) - (this.y + this.height / 2);
+                const dist = Math.sqrt(dx * dx + dy * dy);
+                if (dist > 0) {
+                    const spd = Math.min(4.8, 1.8 + this.activeTimer * 0.035);
+                    this.x += (dx / dist) * spd - 0.8;
+                    this.y += (dy / dist) * spd;
+                }
+            } else {
+                this.x -= 3.2;
+            }
+        } else {
+            // SHOOTER: 浮遊旋回しながら古代イオンリング弾を発射
+            this.x -= 1.4;
+            this.y += Math.sin(this.activeTimer * 0.06) * 1.8;
+
+            this.shootTimer++;
+            if (this.shootTimer > 65) {
+                this.shootTimer = 0;
+                this.shoot();
+            }
+        }
+
+        if (this.x < -100 || this.x > 900 || this.y < -100 || this.y > 700) {
+            if (this.activeTimer > 150) this.active = false;
+        }
+    }
+
+    shoot() {
+        if (typeof player === 'undefined' || typeof enemyBullets === 'undefined') return;
+        const cx = this.x + this.width / 2;
+        const cy = this.y + this.height / 2;
+        const dx = (player.x + player.width / 2) - cx;
+        const dy = (player.y + player.height / 2) - cy;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+
+        if (dist > 0 && typeof RingBullet !== 'undefined') {
+            const spd = 4.4;
+            enemyBullets.push(new RingBullet(cx, cy, (dx / dist) * spd, (dy / dist) * spd, '#38bdf8'));
+        }
+    }
+
+    draw(ctx) {
+        if (this.delay > 0) return;
+        ctx.save();
+        const cx = this.x + this.width / 2;
+        const cy = this.y + this.height / 2;
+
+        if (this.state === 'WARPING') {
+            // ワープイン演出（空間の光彩歪み＆拡大リング）
+            const progress = this.warpTimer / this.warpDuration;
+            const radius = 24 * Math.sin(progress * Math.PI);
+
+            ctx.strokeStyle = `rgba(0, 255, 255, ${Math.sin(progress * Math.PI)})`;
+            ctx.lineWidth = 3;
+            ctx.shadowColor = '#00ffff';
+            ctx.shadowBlur = 14;
+            ctx.beginPath();
+            ctx.arc(cx, cy, radius, 0, Math.PI * 2);
+            ctx.stroke();
+
+            ctx.strokeStyle = `rgba(255, 255, 255, ${Math.sin(progress * Math.PI)})`;
+            ctx.lineWidth = 1.5;
+            ctx.beginPath();
+            ctx.arc(cx, cy, radius * 0.6, 0, Math.PI * 2);
+            ctx.stroke();
+
+            ctx.restore();
+            return;
+        }
+
+        // 実体化後の丸型ワープ兵器
+        // 1. 周囲を高速回転するプラズマリング
+        ctx.save();
+        ctx.translate(cx, cy);
+        ctx.rotate(this.ringAngle);
+        ctx.strokeStyle = '#00ffff';
+        ctx.shadowColor = '#00ffff';
+        ctx.shadowBlur = 10;
+        ctx.lineWidth = 2.5;
+        ctx.beginPath();
+        ctx.ellipse(0, 0, 23, 9, 0, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.restore();
+
+        // 2. メタリック球体本体（3D光沢スフィア）
+        const sphereGrad = ctx.createRadialGradient(cx - 5, cy - 5, 2, cx, cy, 18);
+        sphereGrad.addColorStop(0.0, '#ffffff');
+        sphereGrad.addColorStop(0.25, '#38bdf8');
+        sphereGrad.addColorStop(0.65, '#0369a1');
+        sphereGrad.addColorStop(1.0, '#0f172a');
+        ctx.fillStyle = sphereGrad;
+        ctx.beginPath();
+        ctx.arc(cx, cy, 18, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.strokeStyle = '#0284c7';
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
+
+        // 3. 発光センサーアイ
+        ctx.fillStyle = '#ffffff';
+        ctx.shadowColor = '#00ffff';
+        ctx.shadowBlur = 6;
+        ctx.beginPath();
+        ctx.arc(cx - 3, cy - 3, 4, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.restore();
+    }
+}
+

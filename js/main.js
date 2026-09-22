@@ -59,6 +59,13 @@ function startGame() {
 function init() {
     player = new Player(100, canvas.height / 2 - 10);
     levelManager = new LevelManager(canvas.width, canvas.height);
+    window.player = player;
+    window.levelManager = levelManager;
+    window.getEnemies = () => enemies;
+    window.getLevelManager = () => levelManager;
+    window.getPlayer = () => player;
+    window.playerBullets = playerBullets;
+    window.enemyBullets = enemyBullets;
 
     // スタート画面操作のバインド
     const startScreen = document.getElementById('start-screen');
@@ -235,6 +242,7 @@ function handleCollisions() {
 
         enemies.forEach(enemy => {
             if (enemy instanceof FanEnemy && !enemy.visible) return;
+            if (typeof WarpSphereEnemy !== 'undefined' && enemy instanceof WarpSphereEnemy && enemy.state === 'WARPING') return;
 
             if (bullet.active && enemy.active && checkCollision(bullet, enemy)) {
                 if (!(bullet instanceof Laser)) {
@@ -260,6 +268,7 @@ function handleCollisions() {
     // プレイヤーと敵の当たり判定
     enemies.forEach(enemy => {
         if (enemy instanceof FanEnemy && !enemy.visible) return;
+        if (typeof WarpSphereEnemy !== 'undefined' && enemy instanceof WarpSphereEnemy && enemy.state === 'WARPING') return;
 
         if (enemy.active && checkCollision(player, enemy)) {
             if (player.shieldActive) {

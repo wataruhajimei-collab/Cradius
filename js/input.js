@@ -5,6 +5,65 @@ class InputManager {
         // キーボード入力
         window.addEventListener('keydown', (e) => {
             this.keys[e.code] = true;
+
+            // テスト用ショートカットキー
+            if (e.code === 'KeyV') {
+                // 1面 火山サバイバル直前へワープ
+                if (typeof levelManager !== 'undefined' && levelManager.stage === 1) {
+                    levelManager.time = 63800;
+                    if (!levelManager.terrain.active) levelManager.terrain.start();
+                    console.log('Shortcut: Warped to Volcano Survival');
+                }
+            } else if (e.code === 'KeyB') {
+                // 1面 ビッグコアボス戦へワープ
+                if (typeof levelManager !== 'undefined' && levelManager.stage === 1) {
+                    levelManager.state = 'BOSS';
+                    levelManager.terrain.active = false;
+                    if (typeof Sound !== 'undefined') Sound.playBossBgm();
+                    if (typeof Boss !== 'undefined') levelManager.boss = new Boss(levelManager.starfield.width, 200);
+                    console.log('Shortcut: Warped to Stage 1 Boss');
+                }
+            } else if (e.code === 'Digit2') {
+                // 2面（ストーンヘンジ面）へワープ
+                if (typeof levelManager !== 'undefined') {
+                    levelManager.startStage2();
+                    console.log('Shortcut: Warped to Stage 2 Stonehenge');
+                }
+            } else if (e.code === 'KeyW') {
+                // 2面 宇宙空間・丸型ワープ兵器フェーズへワープ
+                if (typeof stonehengeStage !== 'undefined' && stonehengeStage) {
+                    stonehengeStage.blocks = [];
+                    stonehengeStage.generating = false;
+                    stonehengeStage.state = 'WARP_SPACE';
+                    stonehengeStage.warpSpaceTimer = 0;
+                    stonehengeStage.warpWaveTimer = 0;
+                    console.log('Shortcut: Warped to Warp Sphere Phase');
+                }
+            } else if (e.code === 'KeyG') {
+                // 2面ボス 古代守護神ゴーレムコア戦へワープ
+                if (typeof stonehengeStage !== 'undefined' && stonehengeStage) {
+                    stonehengeStage.blocks = [];
+                    stonehengeStage.generating = false;
+                    stonehengeStage.state = 'BOSS';
+                    if (typeof Sound !== 'undefined') Sound.playBossBgm();
+                    if (typeof GolemBoss !== 'undefined') stonehengeStage.boss = new GolemBoss(stonehengeStage.width, 185);
+                    console.log('Shortcut: Warped to Golem Boss');
+                }
+            } else if (e.code === 'KeyP') {
+                // フルパワーアップチート
+                if (typeof player !== 'undefined') {
+                    player.speed = 6;
+                    player.hasMissile = true;
+                    player.weaponType = 'LASER';
+                    player.shieldActive = true;
+                    player.shieldHp = 5;
+                    while (player.options.length < player.maxOptions) {
+                        const delay = (player.options.length + 1) * 15;
+                        player.options.push(new Option(player, delay));
+                    }
+                    console.log('Shortcut: Full Power Activated');
+                }
+            }
         });
 
         window.addEventListener('keyup', (e) => {

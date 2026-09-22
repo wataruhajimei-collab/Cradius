@@ -384,13 +384,16 @@ class LevelManager {
         this.starfield = new Starfield(canvasWidth, canvasHeight);
         this.terrain = new Terrain(canvasWidth, canvasHeight);
         this.time = 0;
-        this.state = 'WAVES'; // WAVES -> BOSS -> STAGE_CLEAR -> STAGE2
+        this.state = 'WAVES'; // WAVES -> VOLCANO_SURVIVAL -> POST_VOLCANO -> BOSS -> STAGE_CLEAR -> STAGE2
         this.stage = 1;
         this.boss = null;
         this.floatingIslands = [];
         this.islandSpawnTimes = [26000, 41000, 56000]; // 途中に3つ浮遊大陸を設置
         this.islandSpawnedCount = 0;
-        this.volcanoSpawned = false; // ボス直前の火山噴火フラグ
+        this.volcanoSpawned = false; // 超巨大火山のスポーンフラグ
+        this.superVolcano = null;
+        this.volcanoSurvivalTimer = 0; // 30秒サバイバルタイマー (ms)
+        this.postVolcanoTimer = 0;
         this.stageClearTimer = 0;
     }
 
@@ -433,22 +436,46 @@ class LevelManager {
                     this.islandSpawnedCount++;
                 }
 
-                // 66秒経過でボス直前の名物「ダブルボルケーノ（巨大火山2基）」が出現して大噴火！
-                if (this.time > 66000 && !this.volcanoSpawned && typeof Volcano !== 'undefined') {
+                // 64秒経過で「超巨大火山 (SuperVolcano)」が画面右から進入！
+                if (this.time > 64000 && !this.volcanoSpawned && typeof SuperVolcano !== 'undefined') {
                     this.volcanoSpawned = true;
-                    // 地上のダブルボルケーノ（激しい連続噴火モード）
-                    const v1 = new Volcano(this.starfield.width + 50, this.terrain.getBottomY(this.starfield.width + 50), true);
-                    const v2 = new Volcano(this.starfield.width + 240, this.terrain.getBottomY(this.starfield.width + 240), true);
-                    enemies.push(v1, v2);
+                    const spawnX = this.starfield.width + 40;
+                    const groundY = this.terrain.getBottomY(spawnX + 105);
+                    this.superVolcano = new SuperVolcano(spawnX, groundY);
+                    if (typeof enemies !== 'undefined') {
+                        enemies.push(this.superVolcano);
+                    }
                 }
 
-                // 76秒経過で地形生成を終了（火山地帯を抜けてボス前の静寂へ）
-                if (this.time > 76000 && this.terrain.generating) {
-                    this.terrain.stopGenerating();
+                // 超巨大火山が定位置（画面中央やや右 x <= 500）に到達したら、
+                // 画面スクロール完全停止＆30秒サバイバル大噴火イベント突入！
+                if (this.superVolcano && this.superVolcano.positioned && this.state === 'WAVES') {
+                    this.state = 'VOLCANO_SURVIVAL';
+                    this.volcanoSurvivalTimer = 30000; // 30秒間耐える！
+                    this.terrain.scrollSpeed = 0; // 地形スクロールをピタリと停止！
+                    this.superVolcano.startMajorEruption(); // 大噴火開始！
+                    if (typeof Sound !== 'undefined' && typeof Sound.playWarning === 'function') {
+                        Sound.playWarning();
+                    }
                 }
+            } else if (this.state === 'VOLCANO_SURVIVAL') {
+                this.volcanoSurvivalTimer -= dt;
 
-                // 84秒経過（約1分24秒）でボス戦へ突入（2倍ビッグコア）
-                if (this.time > 84000) {
+                // 30秒耐え抜いたら火山沈静化、スクロール再開してボス戦へ！
+                if (this.volcanoSurvivalTimer <= 0) {
+                    this.volcanoSurvivalTimer = 0;
+                    if (this.superVolcano) {
+                        this.superVolcano.stopEruption();
+                    }
+                    this.terrain.scrollSpeed = 2.5; // スクロール再開（スムーズに火山を画面外へ）
+                    this.terrain.stopGenerating(); // 新規地形生成を終了
+                    this.state = 'POST_VOLCANO';
+                    this.postVolcanoTimer = 0;
+                }
+            } else if (this.state === 'POST_VOLCANO') {
+                this.postVolcanoTimer += dt;
+                // 約4.5秒（地形と火山が完全に左に抜けた頃）でボス戦へ突入！
+                if (this.postVolcanoTimer > 4500 || !this.terrain.active) {
                     this.state = 'BOSS';
                     this.time = 0;
                     this.terrain.active = false;
@@ -501,6 +528,7 @@ class LevelManager {
 
         if (typeof StonehengeStage !== 'undefined') {
             stonehengeStage = new StonehengeStage(this.starfield.width, this.starfield.height);
+            window.stonehengeStage = stonehengeStage;
             stonehengeStage.start();
         }
         if (typeof Sound !== 'undefined') {
@@ -516,6 +544,8 @@ class LevelManager {
             for (let i = 0; i < this.floatingIslands.length; i++) {
                 if (this.floatingIslands[i].checkCollision(rect)) return true;
             }
+            // 超巨大火山との衝突
+            if (this.superVolcano && this.superVolcano.checkCollision(rect)) return true;
         } else if (this.stage === 2) {
             if (typeof stonehengeStage !== 'undefined' && stonehengeStage) {
                 return stonehengeStage.checkCollision(rect);
@@ -531,6 +561,44 @@ class LevelManager {
             
             // 浮遊大陸の描画
             this.floatingIslands.forEach(island => island.draw(ctx));
+
+            // 火山大噴火サバイバルHUD演出（画面上部の緊迫した警告・カウントダウン）
+            if (this.state === 'VOLCANO_SURVIVAL') {
+                ctx.save();
+                const remainSec = Math.max(0, (this.volcanoSurvivalTimer / 1000)).toFixed(1);
+                const pulse = Math.sin(Date.now() * 0.008);
+
+                // 上部警告バナー背景（半透明黒＋赤熱グロー枠）
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+                ctx.fillRect(this.starfield.width / 2 - 250, 14, 500, 56);
+                ctx.strokeStyle = `rgba(255, 68, 0, ${0.7 + pulse * 0.3})`;
+                ctx.lineWidth = 2.5;
+                ctx.strokeRect(this.starfield.width / 2 - 250, 14, 500, 56);
+
+                ctx.textAlign = 'center';
+                ctx.font = 'bold 20px "Courier New", monospace';
+                ctx.fillStyle = '#ff3300';
+                ctx.shadowColor = '#ff5500';
+                ctx.shadowBlur = 12;
+                ctx.fillText('WARNING: VOLCANO MAJOR ERUPTION!', this.starfield.width / 2, 38);
+
+                ctx.font = 'bold 18px "Courier New", monospace';
+                ctx.fillStyle = '#ffea00';
+                ctx.shadowColor = '#ffaa00';
+                ctx.shadowBlur = 10;
+                ctx.fillText(`SURVIVE : ${remainSec}s`, this.starfield.width / 2, 60);
+
+                ctx.restore();
+            } else if (this.state === 'POST_VOLCANO') {
+                ctx.save();
+                ctx.textAlign = 'center';
+                ctx.font = 'bold 22px "Courier New", monospace';
+                ctx.fillStyle = '#00ffff';
+                ctx.shadowColor = '#0088ff';
+                ctx.shadowBlur = 10;
+                ctx.fillText('VOLCANO SUBSIDED - ENEMY CORE APPROACHING!', this.starfield.width / 2, 45);
+                ctx.restore();
+            }
             
             if (this.state === 'BOSS' && this.boss) {
                 this.boss.draw(ctx);
