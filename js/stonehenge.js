@@ -13,7 +13,7 @@ class StoneBlock {
         this.width = width;
         this.height = height;
         this.isDestructible = isDestructible;
-        this.maxHp = isDestructible ? 3 : Infinity;
+        this.maxHp = isDestructible ? 2 : Infinity;
         this.hp = this.maxHp;
         this.active = true;
         this.flashTimer = 0;
@@ -331,77 +331,79 @@ class StonehengeStage {
         this.blocks.push(new StoneBlock(colX, 0, this.columnWidth, this.columnWidth, false));
         this.blocks.push(new StoneBlock(colX, (totalRows - 1) * this.columnWidth, this.columnWidth, this.columnWidth, false));
 
-        // 2. 36列ごとの古代遺跡迷路サイクル
+        // 2. 36列ごとの古代遺跡迷路サイクル（余裕のある配置・詰みポイント完全排除）
         const phase = colIndex % 36;
-        let indestructibleRows = []; // この列で壊れない石を配置する行番号
+        let indestructibleRows = []; // この列で壊れない石を配置する行番号（最大3ブロックまでに厳格制限！）
         let enemySpawns = []; // { row, isCeil, type }
 
-        // --- ゾーン1: S字ジグザグ・クランク迷路回廊 (phase: 0〜7) ---
+        // --- ゾーン1: 天井・床の古代モノリスピラー (phase: 0〜7) ---
+        // 画面半分を塞ぐ巨大壁を完全廃止！最大3ブロック厚の適度なアクセント＋砲台台座
         if (phase >= 1 && phase <= 3) {
-            // 上から突き出す巨石柱 (r: 1〜7) -> 下部 (r: 8〜13) が通路
-            for (let r = 1; r <= 7; r++) indestructibleRows.push(r);
+            // 天井から突き出す巨石柱 (r: 1〜3) -> 残り10ブロック (r: 4〜13) は広大な空間！
+            for (let r = 1; r <= 3; r++) indestructibleRows.push(r);
             if (phase === 2) {
-                enemySpawns.push({ row: 8, isCeil: true, type: 'RUNE' }); // 柱の下端に下向きルーン砲台
+                enemySpawns.push({ row: 4, isCeil: true, type: 'RUNE' }); // 柱の下端に下向きルーン砲台
             }
         } else if (phase >= 5 && phase <= 7) {
-            // 下から突き出す巨石柱 (r: 7〜13) -> 上部 (r: 1〜6) が通路
-            for (let r = 7; r <= 13; r++) indestructibleRows.push(r);
+            // 地面から突き出す巨石台座 (r: 11〜13) -> 残り10ブロック (r: 1〜10) は広大な空間！
+            for (let r = 11; r <= 13; r++) indestructibleRows.push(r);
             if (phase === 6) {
-                enemySpawns.push({ row: 6, isCeil: false, type: 'TURRET' }); // 柱の上端に上向き砲台
+                enemySpawns.push({ row: 10, isCeil: false, type: 'TURRET' }); // 台座の上端に上向き砲台
             }
         }
 
-        // --- ゾーン2: 古代遺跡アーチゲート門＆双塔ピラー (phase: 8〜14) ---
+        // --- ゾーン2: 古代アーチゲート門 & 中央浮島 (phase: 8〜14) ---
         else if (phase === 9) {
-            // 対向ピラー (上 r: 1〜3, 下 r: 11〜13)
-            for (let r = 1; r <= 3; r++) indestructibleRows.push(r);
-            for (let r = 11; r <= 13; r++) indestructibleRows.push(r);
-            enemySpawns.push({ row: 4, isCeil: true, type: 'DUCKER' });
-            enemySpawns.push({ row: 10, isCeil: false, type: 'TURRET' });
-        } else if (phase >= 11 && phase <= 12) {
-            // 中央巨大門柱 (r: 5〜9) -> 上下両方に回廊が開口
-            for (let r = 5; r <= 9; r++) indestructibleRows.push(r);
+            // 対向ピラー (上 r: 1〜2, 下 r: 12〜13) -> 中央 (r: 3〜11: 9ブロック分) が大開口！
+            indestructibleRows.push(1, 2, 12, 13);
+            enemySpawns.push({ row: 3, isCeil: true, type: 'DUCKER' });
+            enemySpawns.push({ row: 11, isCeil: false, type: 'TURRET' });
+        } else if (phase >= 11 && phase <= 13) {
+            // 中央浮島モノリス (r: 6〜7: わずか2ブロック厚！) -> 上 (r: 1〜5: 5ブロック) と下 (r: 8〜13: 6ブロック) の両方が通過可能！
+            indestructibleRows.push(6, 7);
             if (phase === 11) {
-                enemySpawns.push({ row: 4, isCeil: false, type: 'RUNE' }); // 門柱上面に上向きルーン砲台
-                enemySpawns.push({ row: 10, isCeil: true, type: 'RUNE' }); // 門柱下面に下向きルーン砲台
+                enemySpawns.push({ row: 5, isCeil: false, type: 'TURRET' }); // 浮島上面に上向き砲台
+            } else if (phase === 13) {
+                enemySpawns.push({ row: 8, isCeil: true, type: 'RUNE' }); // 浮島下面に下向きルーン砲台
             }
         }
 
         // --- ゾーン3: ピラミッド階段テラス (phase: 15〜22) ---
         else if (phase === 16) {
-            for (let r = 12; r <= 13; r++) indestructibleRows.push(r); // 下側 1段目
+            indestructibleRows.push(13); // 下側 1段目
         } else if (phase === 17) {
-            for (let r = 10; r <= 13; r++) indestructibleRows.push(r); // 下側 2段目
+            indestructibleRows.push(12, 13); // 下側 2段目
         } else if (phase === 18) {
-            for (let r = 8; r <= 13; r++) indestructibleRows.push(r);  // 下側 3段目 (高台)
-            enemySpawns.push({ row: 7, isCeil: false, type: 'TURRET' }); // 赤砲台テラス！
+            indestructibleRows.push(11, 12, 13); // 下側 3段目 (最大でも3段！)
+            enemySpawns.push({ row: 10, isCeil: false, type: 'TURRET' }); // 赤砲台テラス！
         } else if (phase === 20) {
-            for (let r = 1; r <= 4; r++) indestructibleRows.push(r);  // 上側 階段
-            enemySpawns.push({ row: 5, isCeil: true, type: 'DUCKER' });
+            indestructibleRows.push(1, 2); // 上側 2段
+            enemySpawns.push({ row: 3, isCeil: true, type: 'DUCKER' });
         } else if (phase === 21) {
-            for (let r = 1; r <= 6; r++) indestructibleRows.push(r);
+            indestructibleRows.push(1, 2, 3); // 上側 3段 (最大でも3段！)
         }
 
-        // --- ゾーン4: 回廊アイランド中央要塞島 (phase: 23〜29) ---
-        else if (phase >= 24 && phase <= 27) {
-            // 中央に浮かぶ 4×5ブロックの巨大浮遊要塞島 (r: 5〜9)
-            for (let r = 5; r <= 9; r++) indestructibleRows.push(r);
-            if (phase === 24) {
-                enemySpawns.push({ row: 4, isCeil: false, type: 'RUNE' });
-            } else if (phase === 26) {
-                enemySpawns.push({ row: 10, isCeil: true, type: 'TURRET' });
+        // --- ゾーン4: 回廊アイランド要塞 (phase: 23〜29) ---
+        else if (phase >= 25 && phase <= 27) {
+            // 中央浮島 (r: 6〜7: わずか2ブロック厚！)
+            indestructibleRows.push(6, 7);
+            if (phase === 25) {
+                enemySpawns.push({ row: 5, isCeil: false, type: 'RUNE' });
+            } else if (phase === 27) {
+                enemySpawns.push({ row: 8, isCeil: true, type: 'TURRET' });
             }
         }
 
-        // --- ゾーン5: チェッカー＆狭窄クランク迷路 (phase: 30〜35) ---
+        // --- ゾーン5: チェッカー障害物 (phase: 30〜35) ---
         else if (phase === 31) {
-            indestructibleRows.push(3, 4, 10, 11);
-            enemySpawns.push({ row: 5, isCeil: true, type: 'TURRET' });
+            indestructibleRows.push(2, 3, 11, 12); // 上下各2ブロック
+            enemySpawns.push({ row: 4, isCeil: true, type: 'TURRET' });
         } else if (phase === 33) {
-            indestructibleRows.push(6, 7, 8);
-            enemySpawns.push({ row: 5, isCeil: false, type: 'DUCKER' });
+            indestructibleRows.push(5, 6); // 中段上寄り 2ブロック
+            enemySpawns.push({ row: 7, isCeil: false, type: 'DUCKER' });
         } else if (phase === 35) {
-            indestructibleRows.push(2, 3, 11, 12);
+            indestructibleRows.push(8, 9); // 中段下寄り 2ブロック
+            enemySpawns.push({ row: 7, isCeil: false, type: 'TURRET' });
         }
 
         // 3. 壊れない石（古代モノリスブロック）の配置
@@ -417,9 +419,7 @@ class StonehengeStage {
                 const spawnY = sp.row * this.columnWidth;
 
                 if (sp.type === 'RUNE' && typeof RuneTurret !== 'undefined') {
-                    const rt = new RuneTurret(spawnX, spawnY, sp.isCeil);
-                    if (isRed) rt.isRed = true;
-                    enemies.push(rt);
+                    enemies.push(new RuneTurret(spawnX, spawnY, sp.isCeil, isRed));
                 } else if (sp.type === 'DUCKER' && typeof DuckerEnemy !== 'undefined') {
                     enemies.push(new DuckerEnemy(spawnX, spawnY, sp.isCeil, isRed));
                 } else if (typeof TurretEnemy !== 'undefined') {
@@ -428,23 +428,32 @@ class StonehengeStage {
             });
         }
 
-        // 5. 破壊できる石（砂岩ブロック）の連続掘削配置
-        // 壊れない石がない行を隙間なく埋め尽くし、プレイヤーが掘り進む必然性を作る！
-        // 4列に1列は完全な石壁（隙間なし！）。それ以外の列は1〜2マスの開口部のみ設ける。
-        const isSolidWall = (colIndex % 4 === 0);
-        let gapCenter = 7;
-        if (phase >= 1 && phase <= 3) gapCenter = 10; // 下側が開口
-        else if (phase >= 5 && phase <= 7) gapCenter = 3; // 上側が開口
-        else if (phase >= 11 && phase <= 12) gapCenter = (colIndex % 2 === 0) ? 3 : 11; // 上下分岐
-        else if (phase >= 24 && phase <= 27) gapCenter = (colIndex % 2 === 0) ? 2 : 12; // 要塞上下
+        // 5. 破壊できる石（砂岩ブロック）の面積を大幅増加！（本家グラディウス2面の再現）
+        // 画面全体の約70%を壊れる石で充填し、バリバリ掘進する快感を最大化！
+        // 安全な開口トンネル（幅3ブロック）は緩やかなS字サイン波で必ず確保し、詰みや圧死を完全防止！
+        const waveCenter = Math.round(7 + Math.sin(colIndex * 0.22) * 3.2); // r: 4〜10 の間をゆったり波打つ
+        const isTunnelRow = (r) => {
+            return (r >= waveCenter - 1 && r <= waveCenter + 1); // 幅3ブロック分の開口トンネル
+        };
 
         for (let r = 1; r < totalRows - 1; r++) {
+            // すでに壊れない石がある行はスキップ
             if (indestructibleRows.includes(r)) continue;
 
-            const isGap = !isSolidWall && (r === gapCenter || r === gapCenter + 1);
-            if (!isGap) {
-                this.blocks.push(new StoneBlock(colX, r * this.columnWidth, this.columnWidth, this.columnWidth, true));
+            // 開口トンネル部分:
+            // 75%の列では完全に空洞（幅3マスの安全な通り道）、
+            // 25%の列（4列に1列）では掘削ターゲット（砂岩）を1マスだけ配置
+            if (isTunnelRow(r)) {
+                if (colIndex % 4 === 0 && r === waveCenter) {
+                    this.blocks.push(new StoneBlock(colX, r * this.columnWidth, this.columnWidth, this.columnWidth, true));
+                }
+                continue;
             }
+
+            // それ以外の行（画面の上下・周囲）は全て「壊れる石（砂岩ブロック）」でぎっしり敷き詰める！
+            // プレイヤーは自由意志で上下を掘り進んで広い空間を作ったり、
+            // 奥の赤敵（カプセル持ち砲台）を掘り出して破壊できる！
+            this.blocks.push(new StoneBlock(colX, r * this.columnWidth, this.columnWidth, this.columnWidth, true));
         }
     }
 
