@@ -9,17 +9,19 @@ class Boss {
         this.maxHp = 35;
         this.hp = 35;
         this.active = true;
+        this.isEntering = true; // 登場中は完全無敵
         this.color = '#aa4444';
         
-        // 遮蔽板: 5枚の金属風シールドプレート (各3発耐久、合計15発)
+        // 遮蔽板: 5枚の金属風シールドプレート (各8発耐久、合計40発)
         this.maxShields = 5;
         this.shields = 5;
-        this.shieldHpPerPlate = 3;
+        this.shieldHpPerPlate = 8; // レーザーで一瞬で溶けないよう十分な耐久力
         this.currentShieldHp = this.shieldHpPerPlate;
+        this.shieldHitCooldown = 0; // 連続多重ヒット抑制用クールダウン
         this.shieldFlashTimer = 0;
         this.hitFlashTimer = 0;
 
-        this.coreOpen = false;
+        this.coreOpen = false; // 遮蔽板が1枚でも残っている間はコアは絶対に露出しない
         this.coreTimer = 0;
         this.moveTimer = 0;
         this.rotationAngle = 0;
@@ -33,29 +35,30 @@ class Boss {
         // 登場シーン（画面外から定位置へ素早くスムーズに前進）
         if (this.x > this.targetX) {
             this.x -= 3.2;
+            this.isEntering = true;
             return;
         }
+        this.isEntering = false; // 定位置に到着して戦闘開始
 
         this.moveTimer += 0.02; // スムーズな上下浮動
         // 高さ200pxのボスが画面中央付近（Y: 80〜320、下端: 280〜520）を美しく移動
         this.y = 200 + Math.sin(this.moveTimer) * 120;
         this.rotationAngle += 0.04; // コア内部の回転
 
+        if (this.shieldHitCooldown > 0) this.shieldHitCooldown--;
         if (this.shieldFlashTimer > 0) this.shieldFlashTimer--;
         if (this.hitFlashTimer > 0) this.hitFlashTimer--;
 
-        // 遮蔽板が残っている場合は定期的に開閉、遮蔽板が全て破壊されたらコアは常時露出
+        // 遮蔽板が残っている間は攻撃のみ行い、コアは露出させない
         if (this.shields > 0) {
+            this.coreOpen = false;
             this.coreTimer++;
-            if (this.coreTimer > 120) {
-                this.coreOpen = !this.coreOpen;
+            if (this.coreTimer > 100) {
                 this.coreTimer = 0;
-                if (this.coreOpen) {
-                    this.shoot();
-                }
+                this.shoot();
             }
         } else {
-            // 遮蔽板全滅時はコア露出＆激しい猛攻モード
+            // 遮蔽板全滅時はコアが完全に露出し猛攻モード
             this.coreOpen = true;
             this.coreTimer++;
             if (this.coreTimer > 75) {
@@ -81,9 +84,11 @@ class Boss {
         this.bullets.push(new Bullet(startX, coreCenterY + 48, -7.0, 0, '#00ffff'));
     }
 
-    // 遮蔽板ダメージ処理
+    // 遮蔽板ダメージ処理（レーザーの瞬間多重ヒットを抑止）
     hitShield() {
-        this.shieldFlashTimer = 4;
+        if (this.shieldHitCooldown > 0) return false;
+        this.shieldHitCooldown = 3; // 約50msのヒット間隔
+        this.shieldFlashTimer = 5;
         this.currentShieldHp--;
         if (this.currentShieldHp <= 0) {
             this.shields--;
@@ -97,6 +102,73 @@ class Boss {
     hitCore(damage = 1) {
         this.hitFlashTimer = 4;
         this.hp -= damage;
+    }
+
+    // プレイヤーの弾との当たり判定処理（遮蔽板によるコアの確実な保護＆登場中無敵）
+    handleBulletCollision(bullet) {
+        if (this.isEntering || this.isDying || !this.active) return;
+
+        const topHull = this.getTopHullBounds();
+        const bottomHull = this.getBottomHullBounds();
+        const shieldBounds = this.getShieldBounds();
+        const coreHitbox = this.getCoreBounds();
+
+        // レーザーのヒットレート抑制
+        if (bullet instanceof Laser) {
+            if (bullet.bossHitCooldown && bullet.bossHitCooldown > 0) {
+                bullet.bossHitCooldown--;
+                return;
+            }
+            bullet.bossHitCooldown = 4;
+        }
+
+        // 1. 遮蔽板への命中判定（遮蔽板が1枚でも残っていれば絶対にコアには当たらない！）
+        if (this.shields > 0 && shieldBounds && checkCollision(bullet, shieldBounds)) {
+            if (!(bullet instanceof Laser)) {
+                bullet.active = false;
+            }
+            const hitX = Math.min(bullet.x + bullet.width, shieldBounds.x);
+            const destroyed = this.hitShield();
+            if (destroyed) {
+                createExplosion(hitX, bullet.y, '#99b3cc');
+                createExplosion(hitX, bullet.y, '#ffaa00');
+                if (typeof Sound !== 'undefined') {
+                    if (typeof Sound.playShieldBreak === 'function') Sound.playShieldBreak();
+                    else if (typeof Sound.playExplosion === 'function') Sound.playExplosion();
+                }
+            } else {
+                createExplosion(hitX, bullet.y, '#ffffaa');
+                if (typeof Sound !== 'undefined' && typeof Sound.playBossHit === 'function') {
+                    Sound.playBossHit();
+                }
+            }
+            return; // 遮蔽板に当たったのでコア判定は遮断！
+        }
+
+        // 2. コアへの直撃判定（遮蔽板が全て破壊された時のみ！）
+        if (this.shields === 0 && checkCollision(bullet, coreHitbox)) {
+            if (!(bullet instanceof Laser)) {
+                bullet.active = false;
+            }
+            this.hitCore(1);
+            createExplosion(bullet.x + bullet.width / 2, bullet.y, '#00ffff');
+            if (typeof Sound !== 'undefined') Sound.playBossHit();
+
+            if (this.hp <= 0) {
+                if (typeof triggerBossDefeatExplosion === 'function') {
+                    triggerBossDefeatExplosion(this);
+                }
+            }
+            return;
+        }
+
+        // 3. 上下ハル（無敵装甲アーム）への弾かれ判定
+        if (checkCollision(bullet, topHull) || checkCollision(bullet, bottomHull)) {
+            bullet.active = false;
+            createExplosion(bullet.x, bullet.y, '#667788');
+            if (typeof Sound !== 'undefined') Sound.playBossHit();
+            return;
+        }
     }
 
     draw(ctx) {
@@ -380,3 +452,405 @@ class Boss {
         };
     }
 }
+
+// ==========================================
+// STAGE 2 BOSS: 古代守護神「ストーン・ゴーレムコア (GolemBoss)」
+// 巨大古代玄武岩と2基の発光ルーンコアを持つストーンヘンジの主
+// ==========================================
+class GolemBoss {
+    constructor(x, y) {
+        this.scale = 2;
+        this.width = 170;
+        this.height = 230;
+        this.x = x + 150;
+        this.targetX = x - 220; // 画面右端に堂々陣取る定位置
+        this.y = 185;
+        this.active = true;
+        this.isEntering = true;
+        this.isDying = false;
+
+        // 2つの古代ルーンコア（上下に各1基）
+        this.core1Hp = 25;
+        this.core1MaxHp = 25;
+        this.core2Hp = 25;
+        this.core2MaxHp = 25;
+        this.hp = 50; // 合計HP
+
+        // 各コアを守る古代石板シールド（上下各3枚、耐久力各8発）
+        this.shields1 = 3;
+        this.shields2 = 3;
+        this.shieldHpPerPlate = 8;
+        this.currentShieldHp1 = this.shieldHpPerPlate;
+        this.currentShieldHp2 = this.shieldHpPerPlate;
+        this.shieldHitCooldown = 0;
+
+        this.moveTimer = 0;
+        this.ringTimer = 0;
+        this.laserTimer = 0;
+        this.rotationAngle = 0;
+        this.bullets = [];
+        this.hitFlashTimer1 = 0;
+        this.hitFlashTimer2 = 0;
+        this.shieldFlashTimer1 = 0;
+        this.shieldFlashTimer2 = 0;
+    }
+
+    update() {
+        if (this.isDying) return;
+
+        // 登場シーン
+        if (this.x > this.targetX) {
+            this.x -= 2.8;
+            this.isEntering = true;
+            return;
+        }
+        this.isEntering = false;
+
+        this.moveTimer += 0.018;
+        this.y = 185 + Math.sin(this.moveTimer) * 110;
+        this.rotationAngle += 0.035;
+
+        if (this.shieldHitCooldown > 0) this.shieldHitCooldown--;
+        if (this.hitFlashTimer1 > 0) this.hitFlashTimer1--;
+        if (this.hitFlashTimer2 > 0) this.hitFlashTimer2--;
+        if (this.shieldFlashTimer1 > 0) this.shieldFlashTimer1--;
+        if (this.shieldFlashTimer2 > 0) this.shieldFlashTimer2--;
+
+        // 攻撃1: 古代イオンリング弾（Moai RingBullet）拡散放射
+        this.ringTimer++;
+        if (this.ringTimer > 105) {
+            this.ringTimer = 0;
+            this.shootRings();
+        }
+
+        // 攻撃2: 連装古代ヘビーレーザー
+        this.laserTimer++;
+        if (this.laserTimer > 145) {
+            this.laserTimer = 0;
+            this.shootLasers();
+        }
+
+        this.bullets.forEach(b => b.update(600));
+        this.bullets = this.bullets.filter(b => b.active);
+    }
+
+    shootRings() {
+        if (typeof RingBullet === 'undefined') return;
+        const cx = this.x - 10;
+        const cy1 = this.y + 60;
+        const cy2 = this.y + 170;
+
+        // 上下コアから放射状にイオンリング弾を発射
+        const angles = [-0.25, -0.08, 0.08, 0.25];
+        angles.forEach(ang => {
+            const spd = 4.2;
+            const vx = -Math.cos(ang) * spd;
+            const vy = Math.sin(ang) * spd;
+            if (this.core1Hp > 0) this.bullets.push(new RingBullet(cx, cy1, vx, vy, '#38bdf8'));
+            if (this.core2Hp > 0) this.bullets.push(new RingBullet(cx, cy2, vx, vy, '#ffaa00'));
+        });
+    }
+
+    shootLasers() {
+        const startX = this.x - 20;
+        // 上下ホーン砲門から高速ビーム
+        this.bullets.push(new Bullet(startX, this.y + 20, -7.5, 0, '#00ffff'));
+        this.bullets.push(new Bullet(startX, this.y + this.height - 20, -7.5, 0, '#00ffff'));
+    }
+
+    hitShield(isCore1) {
+        if (this.shieldHitCooldown > 0) return false;
+        this.shieldHitCooldown = 3;
+        if (isCore1) {
+            this.shieldFlashTimer1 = 5;
+            this.currentShieldHp1--;
+            if (this.currentShieldHp1 <= 0) {
+                this.shields1--;
+                this.currentShieldHp1 = this.shieldHpPerPlate;
+                return true;
+            }
+        } else {
+            this.shieldFlashTimer2 = 5;
+            this.currentShieldHp2--;
+            if (this.currentShieldHp2 <= 0) {
+                this.shields2--;
+                this.currentShieldHp2 = this.shieldHpPerPlate;
+                return true;
+            }
+        }
+        return false;
+    }
+
+    hitCore(isCore1, damage = 1) {
+        if (isCore1) {
+            this.hitFlashTimer1 = 4;
+            this.core1Hp -= damage;
+            if (this.core1Hp <= 0 && this.core1Hp + damage > 0) {
+                // 上コア破壊エフェクト
+                if (typeof createExplosion === 'function') {
+                    createExplosion(this.x + 60, this.y + 60, '#00ffff');
+                    createExplosion(this.x + 60, this.y + 60, '#ffaa00');
+                }
+            }
+        } else {
+            this.hitFlashTimer2 = 4;
+            this.core2Hp -= damage;
+            if (this.core2Hp <= 0 && this.core2Hp + damage > 0) {
+                // 下コア破壊エフェクト
+                if (typeof createExplosion === 'function') {
+                    createExplosion(this.x + 60, this.y + 170, '#00ffff');
+                    createExplosion(this.x + 60, this.y + 170, '#ffaa00');
+                }
+            }
+        }
+        this.hp = Math.max(0, this.core1Hp) + Math.max(0, this.core2Hp);
+    }
+
+    handleBulletCollision(bullet) {
+        if (this.isEntering || this.isDying || !this.active) return;
+
+        // レーザーのヒットレート抑制
+        if (bullet instanceof Laser) {
+            if (bullet.bossHitCooldown && bullet.bossHitCooldown > 0) {
+                bullet.bossHitCooldown--;
+                return;
+            }
+            bullet.bossHitCooldown = 4;
+        }
+
+        const core1Bounds = { x: this.x + 40, y: this.y + 40, width: 44, height: 44 };
+        const core2Bounds = { x: this.x + 40, y: this.y + 150, width: 44, height: 44 };
+
+        const shield1Bounds = this.shields1 > 0 ? { x: this.x + 10, y: this.y + 35, width: 30, height: 54 } : null;
+        const shield2Bounds = this.shields2 > 0 ? { x: this.x + 10, y: this.y + 145, width: 30, height: 54 } : null;
+
+        // 1. 上コアの遮蔽板
+        if (this.shields1 > 0 && shield1Bounds && checkCollision(bullet, shield1Bounds)) {
+            if (!(bullet instanceof Laser)) bullet.active = false;
+            const hitX = Math.min(bullet.x + bullet.width, shield1Bounds.x);
+            const destroyed = this.hitShield(true);
+            createExplosion(hitX, bullet.y, destroyed ? '#ffaa00' : '#ffffaa');
+            if (typeof Sound !== 'undefined' && typeof Sound.playBossHit === 'function') Sound.playBossHit();
+            return;
+        }
+
+        // 2. 下コアの遮蔽板
+        if (this.shields2 > 0 && shield2Bounds && checkCollision(bullet, shield2Bounds)) {
+            if (!(bullet instanceof Laser)) bullet.active = false;
+            const hitX = Math.min(bullet.x + bullet.width, shield2Bounds.x);
+            const destroyed = this.hitShield(false);
+            createExplosion(hitX, bullet.y, destroyed ? '#ffaa00' : '#ffffaa');
+            if (typeof Sound !== 'undefined' && typeof Sound.playBossHit === 'function') Sound.playBossHit();
+            return;
+        }
+
+        // 3. 上コアへの直撃（遮蔽板全滅後）
+        if (this.shields1 === 0 && this.core1Hp > 0 && checkCollision(bullet, core1Bounds)) {
+            if (!(bullet instanceof Laser)) bullet.active = false;
+            this.hitCore(true, 1);
+            createExplosion(bullet.x + bullet.width / 2, bullet.y, '#00ffff');
+            if (typeof Sound !== 'undefined') Sound.playBossHit();
+            this.checkDefeat();
+            return;
+        }
+
+        // 4. 下コアへの直撃（遮蔽板全滅後）
+        if (this.shields2 === 0 && this.core2Hp > 0 && checkCollision(bullet, core2Bounds)) {
+            if (!(bullet instanceof Laser)) bullet.active = false;
+            this.hitCore(false, 1);
+            createExplosion(bullet.x + bullet.width / 2, bullet.y, '#ffaa00');
+            if (typeof Sound !== 'undefined') Sound.playBossHit();
+            this.checkDefeat();
+            return;
+        }
+
+        // 5. 外装玄武岩アーマーへの弾かれ
+        const hullBounds = { x: this.x - 20, y: this.y, width: this.width + 20, height: this.height };
+        if (checkCollision(bullet, hullBounds)) {
+            bullet.active = false;
+            createExplosion(bullet.x, bullet.y, '#556677');
+            if (typeof Sound !== 'undefined') Sound.playBossHit();
+        }
+    }
+
+    checkDefeat() {
+        if (this.core1Hp <= 0 && this.core2Hp <= 0 && !this.isDying) {
+            if (typeof triggerBossDefeatExplosion === 'function') {
+                triggerBossDefeatExplosion(this);
+            }
+        }
+    }
+
+    draw(ctx) {
+        ctx.save();
+
+        if (this.isDying) {
+            ctx.translate((Math.random() - 0.5) * 14, (Math.random() - 0.5) * 14);
+            if (Math.floor(Date.now() / 60) % 2 === 0) {
+                ctx.filter = 'brightness(2.4) saturate(2.0)';
+            }
+        }
+
+        const bx = this.x;
+        const by = this.y;
+        const bw = this.width;
+        const bh = this.height;
+
+        // --- 1. 重厚な古代玄武岩モノリス・メインボディ ---
+        const stoneGrad = ctx.createLinearGradient(bx, by, bx + bw, by + bh);
+        stoneGrad.addColorStop(0.0, '#475569');
+        stoneGrad.addColorStop(0.4, '#1e293b');
+        stoneGrad.addColorStop(0.8, '#0f172a');
+        stoneGrad.addColorStop(1.0, '#020617');
+        ctx.fillStyle = stoneGrad;
+
+        // 重厚な多角形石壁
+        ctx.beginPath();
+        ctx.moveTo(bx + 40, by);
+        ctx.lineTo(bx + bw, by + 20);
+        ctx.lineTo(bx + bw - 15, by + bh - 20);
+        ctx.lineTo(bx + 40, by + bh);
+        ctx.lineTo(bx, by + bh - 40);
+        ctx.lineTo(bx + 15, by + bh / 2 + 25);
+        ctx.lineTo(bx - 10, by + bh / 2);
+        ctx.lineTo(bx + 15, by + bh / 2 - 25);
+        ctx.lineTo(bx, by + 40);
+        ctx.closePath();
+        ctx.fill();
+
+        ctx.strokeStyle = '#020617';
+        ctx.lineWidth = 3;
+        ctx.stroke();
+
+        // 巨石ハイライト
+        ctx.strokeStyle = 'rgba(203, 213, 225, 0.4)';
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.moveTo(bx + 40, by + 2);
+        ctx.lineTo(bx + bw - 2, by + 22);
+        ctx.stroke();
+
+        // --- 2. 古代ルーン紋様（シアン発光） ---
+        ctx.strokeStyle = 'rgba(56, 189, 248, 0.7)';
+        ctx.lineWidth = 2;
+        ctx.shadowColor = '#38bdf8';
+        ctx.shadowBlur = 8;
+        ctx.beginPath();
+        ctx.arc(bx + bw * 0.65, by + bh * 0.3, 16, 0, Math.PI * 2);
+        ctx.arc(bx + bw * 0.65, by + bh * 0.7, 16, 0, Math.PI * 2);
+        ctx.moveTo(bx + bw * 0.65, by + bh * 0.3 + 16);
+        ctx.lineTo(bx + bw * 0.65, by + bh * 0.7 - 16);
+        ctx.stroke();
+        ctx.shadowBlur = 0;
+
+        // --- 3. 2基の古代ルーンコア ---
+        this.drawCore(ctx, bx + 62, by + 62, this.core1Hp, this.core1MaxHp, this.hitFlashTimer1, '#00ffff');
+        this.drawCore(ctx, bx + 62, by + 172, this.core2Hp, this.core2MaxHp, this.hitFlashTimer2, '#ffaa00');
+
+        // --- 4. 古代石板シールド（ストーンタブレット） ---
+        this.drawStoneShields(ctx, bx + 16, by + 62, this.shields1, this.shieldFlashTimer1);
+        this.drawStoneShields(ctx, bx + 16, by + 172, this.shields2, this.shieldFlashTimer2);
+
+        ctx.restore();
+
+        // 弾の描画
+        this.bullets.forEach(b => b.draw(ctx));
+    }
+
+    drawCore(ctx, cx, cy, hp, maxHp, flashTimer, coreThemeColor) {
+        ctx.save();
+        const r = 24;
+
+        if (hp <= 0) {
+            // 破壊されたコア: 黒焦げの空洞
+            ctx.fillStyle = '#0a0d14';
+            ctx.beginPath();
+            ctx.arc(cx, cy, r, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.strokeStyle = '#334155';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+            ctx.restore();
+            return;
+        }
+
+        const isFlashing = flashTimer > 0;
+        const pulse = Math.sin(Date.now() * 0.008) * 0.3 + 0.7;
+
+        // コア外郭フレーム
+        ctx.fillStyle = '#0f172a';
+        ctx.beginPath();
+        ctx.arc(cx, cy, r + 5, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.strokeStyle = '#475569';
+        ctx.lineWidth = 3;
+        ctx.stroke();
+
+        // コアグロー
+        ctx.shadowColor = isFlashing ? '#ffffff' : coreThemeColor;
+        ctx.shadowBlur = 20 * pulse;
+
+        // 球体グラデーション
+        const grad = ctx.createRadialGradient(cx - 7, cy - 7, 2, cx, cy, r);
+        if (isFlashing) {
+            grad.addColorStop(0, '#ffffff');
+            grad.addColorStop(1, '#ffffff');
+        } else {
+            grad.addColorStop(0, '#ffffff');
+            grad.addColorStop(0.3, coreThemeColor);
+            grad.addColorStop(0.8, '#0369a1');
+            grad.addColorStop(1.0, '#020617');
+        }
+        ctx.fillStyle = grad;
+        ctx.beginPath();
+        ctx.arc(cx, cy, r, 0, Math.PI * 2);
+        ctx.fill();
+
+        // 回転する古代ルーン環
+        ctx.save();
+        ctx.translate(cx, cy);
+        ctx.rotate(this.rotationAngle);
+        ctx.strokeStyle = `rgba(255, 255, 255, ${0.6 * pulse})`;
+        ctx.lineWidth = 2;
+        ctx.strokeRect(-12, -12, 24, 24);
+        ctx.restore();
+
+        ctx.restore();
+    }
+
+    drawStoneShields(ctx, sx, sy, shields, flashTimer) {
+        if (shields <= 0) return;
+        const w = 8;
+        const h = 50;
+        const spacing = 12;
+        const isFlashing = flashTimer > 0;
+
+        for (let i = 0; i < shields; i++) {
+            const px = sx - (shields - 1 - i) * spacing;
+            const py = sy - h / 2;
+
+            ctx.save();
+            const grad = ctx.createLinearGradient(px, py, px + w, py);
+            if (isFlashing && i === 0) {
+                grad.addColorStop(0, '#ffffff');
+                grad.addColorStop(1, '#ffeeaa');
+            } else {
+                grad.addColorStop(0, '#cbd5e1');
+                grad.addColorStop(0.5, '#64748b');
+                grad.addColorStop(1, '#1e293b');
+            }
+            ctx.fillStyle = grad;
+            ctx.fillRect(px, py, w, h);
+
+            ctx.strokeStyle = '#0f172a';
+            ctx.lineWidth = 1;
+            ctx.strokeRect(px, py, w, h);
+
+            // ルーン彫刻ライン
+            ctx.fillStyle = '#38bdf8';
+            ctx.fillRect(px + 2, py + 15, 4, 20);
+            ctx.restore();
+        }
+    }
+}
+

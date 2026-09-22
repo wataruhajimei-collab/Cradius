@@ -92,15 +92,32 @@ class Player {
             }
         }
 
-        // テスト用ショートカット: Bキーで即座にボス戦（2倍ビッグコア）へワープ
+        // テスト用ショートカット: Vキーで即座に火山大噴火ゾーン（65.5秒）へワープ
+        if (Input.isDown('KeyV')) {
+            if (typeof levelManager !== 'undefined' && levelManager.stage === 1) {
+                levelManager.time = 65500;
+                if (!levelManager.terrain.active) levelManager.terrain.start();
+            }
+        }
+
+        // テスト用ショートカット: Bキーで即座にボス戦へワープ（1面: ビッグコア / 2面: ゴーレムコア）
         if (Input.isDown('KeyB')) {
-            if (typeof levelManager !== 'undefined' && levelManager.stage === 1 && levelManager.state !== 'BOSS') {
-                levelManager.state = 'BOSS';
-                levelManager.time = 0;
-                levelManager.terrain.active = false;
-                if (typeof Sound !== 'undefined') Sound.playBossBgm();
-                if (typeof Boss !== 'undefined') {
-                    levelManager.boss = new Boss(levelManager.starfield.width, 200);
+            if (typeof levelManager !== 'undefined') {
+                if (levelManager.stage === 1 && levelManager.state !== 'BOSS') {
+                    levelManager.state = 'BOSS';
+                    levelManager.time = 0;
+                    levelManager.terrain.active = false;
+                    if (typeof Sound !== 'undefined') Sound.playBossBgm();
+                    if (typeof Boss !== 'undefined') {
+                        levelManager.boss = new Boss(levelManager.starfield.width, 200);
+                    }
+                } else if (levelManager.stage === 2 && typeof stonehengeStage !== 'undefined' && stonehengeStage && stonehengeStage.state !== 'BOSS') {
+                    stonehengeStage.state = 'BOSS';
+                    stonehengeStage.blocks = [];
+                    if (typeof Sound !== 'undefined') Sound.playBossBgm();
+                    if (typeof GolemBoss !== 'undefined') {
+                        stonehengeStage.boss = new GolemBoss(stonehengeStage.width, 185);
+                    }
                 }
             }
         }

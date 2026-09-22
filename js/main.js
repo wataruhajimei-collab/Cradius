@@ -194,7 +194,13 @@ function update(dt) {
     }
 
     enemies.forEach(e => e.update());
-    enemies = enemies.filter(e => e.active && e.x < canvas.width + 100 && e.x + e.width > -80);
+    enemies = enemies.filter(e => {
+        if (!e.active) return false;
+        if (e.parentIsland) {
+            return e.parentIsland.active && (e.parentIsland.x + e.parentIsland.width > -120);
+        }
+        return e.x < canvas.width + 300 && e.x + e.width > -100;
+    });
 
     enemyBullets.forEach(b => b.update());
     enemyBullets = enemyBullets.filter(b => b.active && b.x > -50 && b.x < canvas.width && b.y > -50 && b.y < canvas.height);
@@ -307,70 +313,23 @@ function handleCollisions() {
         }
     });
 
-    // ボス戦の当たり判定
-    if (levelManager.state === 'BOSS' && levelManager.boss) {
-        const boss = levelManager.boss;
-        
-        playerBullets.forEach(bullet => {
-            if (bullet.active && boss.active) {
-                const topHull = typeof boss.getTopHullBounds === 'function' ? boss.getTopHullBounds() : { x: boss.x - 20, y: boss.y, width: boss.width + 20, height: 32 };
-                const bottomHull = typeof boss.getBottomHullBounds === 'function' ? boss.getBottomHullBounds() : { x: boss.x - 20, y: boss.y + 68, width: boss.width + 20, height: 32 };
-                const shieldBounds = boss.getShieldBounds();
-                const coreHitbox = boss.getCoreBounds();
+    // ボス戦の当たり判定（ステージ1ボス または ステージ2ボス）
+    const currentBoss = (levelManager.stage === 1 && levelManager.state === 'BOSS') ? levelManager.boss :
+                        (levelManager.stage === 2 && typeof stonehengeStage !== 'undefined' && stonehengeStage && stonehengeStage.boss) ? stonehengeStage.boss : null;
 
-                // レーザーのヒットレート抑制（毎フレーム連続多重ヒットによる負荷とSE爆音を防止）
-                if (bullet instanceof Laser) {
-                    if (bullet.bossHitCooldown && bullet.bossHitCooldown > 0) {
-                        bullet.bossHitCooldown--;
-                        return;
-                    }
-                    bullet.bossHitCooldown = 3; // 約50msごとに1ヒットの心地よい削り音
-                }
+    if (currentBoss && currentBoss.active) {
+        const boss = currentBoss;
 
-                // 1. 遮蔽板への命中判定（遮蔽板が残っている場合、コアを守る）
-                if (shieldBounds && checkCollision(bullet, shieldBounds)) {
-                    if (!(bullet instanceof Laser)) {
-                        bullet.active = false;
-                    }
-                    const hitX = Math.min(bullet.x + bullet.width, shieldBounds.x);
-                    const destroyed = boss.hitShield();
-                    if (destroyed) {
-                        // 遮蔽板が1枚破壊された時の派手な金属粉砕エフェクト！
-                        createExplosion(hitX, bullet.y, '#99b3cc');
-                        createExplosion(hitX, bullet.y, '#ffaa00');
-                        if (typeof Sound !== 'undefined') {
-                            if (typeof Sound.playShieldBreak === 'function') Sound.playShieldBreak();
-                            else if (typeof Sound.playExplosion === 'function') Sound.playExplosion();
-                        }
-                    } else {
-                        // 遮蔽板被弾時の金属火花
-                        createExplosion(hitX, bullet.y, '#ffffaa');
-                        if (typeof Sound !== 'undefined' && typeof Sound.playBossHit === 'function') {
-                            Sound.playBossHit();
-                        }
+        // 登場中（isEntering）や撃破中（isDying）は無敵
+        if (!boss.isEntering && !boss.isDying) {
+            playerBullets.forEach(bullet => {
+                if (bullet.active && boss.active) {
+                    if (typeof boss.handleBulletCollision === 'function') {
+                        boss.handleBulletCollision(bullet);
                     }
                 }
-                // 2. コアへの直撃判定（遮蔽板全滅、またはコア開放時）
-                else if ((boss.shields === 0 || boss.coreOpen) && checkCollision(bullet, coreHitbox)) {
-                    if (!(bullet instanceof Laser)) {
-                        bullet.active = false;
-                    }
-                    boss.hitCore(1);
-                    createExplosion(bullet.x + bullet.width / 2, bullet.y, '#00ffff');
-                    if (typeof Sound !== 'undefined') Sound.playBossHit();
-
-                    if (boss.hp <= 0) {
-                        triggerBossDefeatExplosion(boss);
-                    }
-                }
-                // 3. 上下ハル（無敵装甲）への弾かれ判定
-                else if (checkCollision(bullet, topHull) || checkCollision(bullet, bottomHull)) {
-                    bullet.active = false;
-                    createExplosion(bullet.x, bullet.y, '#667788');
-                    if (typeof Sound !== 'undefined') Sound.playBossHit();
-                }
-            }
-        });
+            });
+        }
 
         boss.bullets.forEach(bullet => {
             if (bullet.active && checkCollision(player, bullet)) {

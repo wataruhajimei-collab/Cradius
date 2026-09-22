@@ -1180,12 +1180,15 @@ class RugraEnemy extends Enemy {
 // 火山 (Volcano) ＆ 火山弾 (VolcanoRock: 大きく放物線)
 // ------------------------------------------
 class Volcano extends Enemy {
-    constructor(x, y) {
+    constructor(x, y, isErupting = false) {
         super(x, y);
-        this.width = 60;
-        this.height = 42;
+        this.width = 90;
+        this.height = 65;
         this.groundY = y;
         this.burstTimer = 0;
+        this.isErupting = isErupting; // ボス直前の激しい大噴火モード
+        this.magmaAnim = Math.random() * 10;
+        this.hp = 9999; // 破壊不能ギミック
     }
 
     update() {
@@ -1197,14 +1200,24 @@ class Volcano extends Enemy {
             this.x -= this.speed;
         }
 
+        this.magmaAnim += 0.12;
         this.burstTimer++;
-        if (this.burstTimer > 180) {
+
+        // 噴火頻度: 大噴火時は約24フレーム（0.4秒）ごとに火山弾を乱れ撃ち！
+        const threshold = this.isErupting ? 24 : 110;
+        if (this.burstTimer > threshold) {
             this.burstTimer = 0;
             if (typeof enemies !== 'undefined') {
-                for (let i = 0; i < 5; i++) {
-                    const vx = (Math.random() - 0.5) * 2.5 - 1.2;
-                    const vy = - (Math.random() * 3 + 4.5); // ゆったりフワッと舞い上がる
-                    enemies.push(new VolcanoRock(this.x + this.width / 2, this.groundY - 10, vx, vy));
+                const count = this.isErupting ? (Math.floor(Math.random() * 3) + 3) : 3;
+                for (let i = 0; i < count; i++) {
+                    const vx = (Math.random() - 0.65) * 4.2 - 1.2;
+                    const vy = - (Math.random() * 4.8 + 6.0); // 高く豪快に舞い上がる放物線
+                    enemies.push(new VolcanoRock(this.x + this.width / 2 + (Math.random() - 0.5) * 24, this.groundY - 18, vx, vy));
+                }
+                if (typeof particles !== 'undefined') {
+                    for (let p = 0; p < 6; p++) {
+                        particles.push(new Particle(this.x + this.width / 2, this.groundY - 20, Math.random() < 0.5 ? '#ff4400' : '#555555'));
+                    }
                 }
             }
         }
@@ -1214,17 +1227,53 @@ class Volcano extends Enemy {
         ctx.save();
         ctx.translate(this.x + this.width / 2, this.groundY);
 
-        ctx.fillStyle = '#443322';
+        // 巨大火山の山体（重厚な溶岩岩盤グラデーション）
+        const mountainGrad = ctx.createLinearGradient(0, -this.height, 0, 0);
+        mountainGrad.addColorStop(0.0, '#3d1c06');
+        mountainGrad.addColorStop(0.4, '#54280b');
+        mountainGrad.addColorStop(0.8, '#2d1405');
+        mountainGrad.addColorStop(1.0, '#150902');
+        ctx.fillStyle = mountainGrad;
+
         ctx.beginPath();
-        ctx.moveTo(-30, 0);
-        ctx.lineTo(-18, -this.height);
-        ctx.lineTo(18, -this.height);
-        ctx.lineTo(30, 0);
+        ctx.moveTo(-this.width / 2, 0);
+        ctx.lineTo(-24, -this.height);
+        ctx.lineTo(24, -this.height);
+        ctx.lineTo(this.width / 2, 0);
         ctx.closePath();
         ctx.fill();
 
-        ctx.fillStyle = (Math.floor(Date.now() / 150) % 2 === 0) ? '#ff4400' : '#ffaa00';
-        ctx.fillRect(-12, -this.height, 24, 8);
+        ctx.strokeStyle = '#150902';
+        ctx.lineWidth = 2.5;
+        ctx.stroke();
+
+        // 山肌の溶岩亀裂（赤く脈動するマグマライン）
+        ctx.strokeStyle = `rgba(255, 68, 0, ${0.6 + Math.sin(this.magmaAnim) * 0.3})`;
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(-10, -this.height + 8);
+        ctx.lineTo(-16, -this.height * 0.4);
+        ctx.lineTo(-26, 0);
+        ctx.moveTo(8, -this.height + 6);
+        ctx.lineTo(14, -this.height * 0.5);
+        ctx.lineTo(24, 0);
+        ctx.stroke();
+
+        // 火口の白熱マグマ溜まり（激しく煮え滾る溶岩）
+        const glow = Math.sin(this.magmaAnim * 2) * 0.25 + 0.75;
+        ctx.shadowColor = '#ff3300';
+        ctx.shadowBlur = 16 * glow;
+
+        const magmaGrad = ctx.createLinearGradient(0, -this.height, 0, -this.height + 14);
+        magmaGrad.addColorStop(0.0, '#ffffff');
+        magmaGrad.addColorStop(0.3, '#ffaa00');
+        magmaGrad.addColorStop(0.8, '#ff2200');
+        magmaGrad.addColorStop(1.0, '#660000');
+        ctx.fillStyle = magmaGrad;
+
+        ctx.beginPath();
+        ctx.ellipse(0, -this.height + 4, 22, 7, 0, 0, Math.PI * 2);
+        ctx.fill();
 
         ctx.restore();
     }
@@ -1496,10 +1545,10 @@ class LaserTurretEnemy extends Enemy {
         this.parentIsland = parentIsland;
         this.relX = relX;
         this.isCeiling = isCeiling; // false: 上面, true: 下面
-        this.width = 36;
-        this.height = 28;
-        this.hp = 2;
-        this.shootTimer = Math.floor(Math.random() * 80);
+        this.width = 42;
+        this.height = 32;
+        this.hp = 3;
+        this.shootTimer = Math.floor(Math.random() * 60);
         this.barrelAngle = isCeiling ? Math.PI / 2 : -Math.PI / 2;
         this.updatePosition();
     }
@@ -1527,7 +1576,7 @@ class LaserTurretEnemy extends Enemy {
             return;
         }
 
-        if (this.x < -100) {
+        if (this.x < -120) {
             this.active = false;
             return;
         }
@@ -1535,13 +1584,13 @@ class LaserTurretEnemy extends Enemy {
         // 自機方向への砲身トラッキング
         if (typeof player !== 'undefined') {
             const centerX = this.x + this.width / 2;
-            const centerY = this.isCeiling ? this.groundY + 12 : this.groundY - 12;
+            const centerY = this.isCeiling ? this.groundY + 14 : this.groundY - 14;
             const targetAngle = Math.atan2(player.y - centerY, player.x - centerX);
             this.barrelAngle = targetAngle;
         }
 
         this.shootTimer++;
-        if (this.shootTimer > 140) {
+        if (this.shootTimer > 85) {
             this.shootTimer = 0;
             this.shoot();
         }
@@ -1550,19 +1599,19 @@ class LaserTurretEnemy extends Enemy {
     shoot() {
         if (typeof player === 'undefined' || typeof enemyBullets === 'undefined') return;
         const centerX = this.x + this.width / 2;
-        const centerY = this.isCeiling ? this.groundY + 14 : this.groundY - 14;
+        const centerY = this.isCeiling ? this.groundY + 16 : this.groundY - 16;
 
         const dx = (player.x + player.width / 2) - centerX;
         const dy = (player.y + player.height / 2) - centerY;
         const dist = Math.sqrt(dx * dx + dy * dy);
 
-        if (dist > 0 && dist < 700) {
-            const speed = 4.8; // レーザー特有のシャープな高速弾速
+        if (dist > 0 && dist < 750) {
+            const speed = 5.2; // レーザー特有のシャープな高速弾速
             const speedX = (dx / dist) * speed;
             const speedY = (dy / dist) * speed;
 
             // 砲身先端から発射
-            const barrelLen = 22;
+            const barrelLen = 26;
             const spawnX = centerX + Math.cos(this.barrelAngle) * barrelLen;
             const spawnY = centerY + Math.sin(this.barrelAngle) * barrelLen;
 
@@ -1587,69 +1636,80 @@ class LaserTurretEnemy extends Enemy {
         ctx.translate(centerX, this.groundY);
         if (this.isCeiling) ctx.scale(1, -1);
 
-        // --- 1. ベースマウント（ハイテク・ネイビーチタン） ---
-        const baseGrad = ctx.createLinearGradient(-20, 0, 20, 0);
-        baseGrad.addColorStop(0.0, '#0f172a');
-        baseGrad.addColorStop(0.3, '#1e293b');
-        baseGrad.addColorStop(0.5, '#334155');
-        baseGrad.addColorStop(0.7, '#1e293b');
-        baseGrad.addColorStop(1.0, '#020617');
+        // --- 1. ベースマウント（高輝度シルバーチタン＆シアンLED） ---
+        const baseGrad = ctx.createLinearGradient(-24, 0, 24, 0);
+        baseGrad.addColorStop(0.0, '#475569');
+        baseGrad.addColorStop(0.3, '#cbd5e1');
+        baseGrad.addColorStop(0.5, '#f8fafc');
+        baseGrad.addColorStop(0.7, '#cbd5e1');
+        baseGrad.addColorStop(1.0, '#334155');
         ctx.fillStyle = baseGrad;
         ctx.beginPath();
-        ctx.ellipse(0, 0, 20, 5, 0, 0, Math.PI * 2);
+        ctx.ellipse(0, 0, 24, 6, 0, 0, Math.PI * 2);
         ctx.fill();
 
-        ctx.strokeStyle = '#38bdf8';
-        ctx.lineWidth = 1;
+        ctx.strokeStyle = '#00ffff';
+        ctx.lineWidth = 1.5;
         ctx.stroke();
 
         // --- 2. 旋回レーザー砲身 ---
         ctx.save();
-        ctx.translate(0, -10);
-        // isCeiling反転を考慮した砲身回転角の調整
+        ctx.translate(0, -12);
         const drawAngle = this.isCeiling ? -this.barrelAngle : this.barrelAngle;
         ctx.rotate(drawAngle);
 
-        // 砲身（ダブルバレル風のハイテクレーザーキャノン）
-        const barrelGrad = ctx.createLinearGradient(0, -5, 24, 5);
-        barrelGrad.addColorStop(0.0, '#475569');
-        barrelGrad.addColorStop(0.5, '#94a3b8');
-        barrelGrad.addColorStop(1.0, '#1e293b');
+        // 砲身（ダブルバレル風のハイテクレーザーキャノン: シルバー＆シアン）
+        const barrelGrad = ctx.createLinearGradient(0, -6, 26, 6);
+        barrelGrad.addColorStop(0.0, '#64748b');
+        barrelGrad.addColorStop(0.4, '#e2e8f0');
+        barrelGrad.addColorStop(0.7, '#94a3b8');
+        barrelGrad.addColorStop(1.0, '#334155');
         ctx.fillStyle = barrelGrad;
-        ctx.fillRect(0, -5, 22, 10);
+        ctx.fillRect(0, -6, 26, 12);
 
         // レーザー集束コイル（シアンの発光ライン）
         ctx.fillStyle = '#00ffff';
         ctx.shadowColor = '#00ffff';
-        ctx.shadowBlur = 6;
-        ctx.fillRect(6, -6, 2, 12);
-        ctx.fillRect(12, -6, 2, 12);
-        ctx.fillRect(18, -6, 2, 12);
+        ctx.shadowBlur = 8;
+        ctx.fillRect(6, -7, 3, 14);
+        ctx.fillRect(13, -7, 3, 14);
+        ctx.fillRect(20, -7, 3, 14);
         ctx.shadowBlur = 0;
 
-        // 砲口レンズ
+        // 砲口レンズ（白熱発光）
         ctx.fillStyle = '#ffffff';
-        ctx.fillRect(22, -4, 2, 8);
+        ctx.fillRect(26, -5, 3, 10);
 
         ctx.restore();
 
-        // --- 3. コントロール砲塔ドーム ---
-        const domeGrad = ctx.createRadialGradient(-3, -16, 2, 0, -10, 14);
-        domeGrad.addColorStop(0.0, '#e2e8f0');
-        domeGrad.addColorStop(0.4, '#64748b');
-        domeGrad.addColorStop(1.0, '#0f172a');
+        // --- 3. コントロール砲塔ドーム（クロームシルバー＆シアン追尾アイ） ---
+        const domeGrad = ctx.createRadialGradient(-4, -18, 3, 0, -12, 16);
+        domeGrad.addColorStop(0.0, '#ffffff');
+        domeGrad.addColorStop(0.4, '#cbd5e1');
+        domeGrad.addColorStop(0.8, '#64748b');
+        domeGrad.addColorStop(1.0, '#1e293b');
         ctx.fillStyle = domeGrad;
         ctx.beginPath();
-        ctx.arc(0, -10, 13, Math.PI, 0);
+        ctx.arc(0, -12, 15, Math.PI, 0);
         ctx.closePath();
         ctx.fill();
 
-        // 光学アイ (シアンに輝くレンズ)
+        ctx.strokeStyle = '#0f172a';
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
+
+        // 光学アイ (鮮烈にシアン発光するセンサーアイ)
         ctx.fillStyle = '#00ffff';
         ctx.shadowColor = '#00ffff';
-        ctx.shadowBlur = 5;
+        ctx.shadowBlur = 8;
         ctx.beginPath();
-        ctx.arc(0, -10, 3.5, 0, Math.PI * 2);
+        ctx.arc(0, -12, 4.5, 0, Math.PI * 2);
+        ctx.fill();
+
+        // レンズ中心ハイライト
+        ctx.fillStyle = '#ffffff';
+        ctx.beginPath();
+        ctx.arc(-1, -13, 1.5, 0, Math.PI * 2);
         ctx.fill();
 
         ctx.restore();

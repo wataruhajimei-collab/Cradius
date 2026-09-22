@@ -286,23 +286,19 @@ class FloatingIsland {
         const bevelY = 20;
 
         // 立体感を際立たせるドロップシャドウ
-        ctx.shadowColor = 'rgba(0, 0, 0, 0.8)';
-        ctx.shadowBlur = 10;
-        ctx.shadowOffsetX = -4;
+        ctx.shadowColor = 'rgba(0, 0, 0, 0.85)';
+        ctx.shadowBlur = 12;
+        ctx.shadowOffsetX = -5;
         ctx.shadowOffsetY = 6;
 
-        // 地形画像パターンまたは金属光沢岩盤グラデーション
-        if (typeof images !== 'undefined' && images.terrain && images.terrain.complete) {
-            const pattern = ctx.createPattern(images.terrain, 'repeat');
-            ctx.fillStyle = pattern;
-        } else {
-            const grad = ctx.createLinearGradient(this.x, this.y, this.x, this.y + h);
-            grad.addColorStop(0.0, '#85542b');
-            grad.addColorStop(0.3, '#623f20');
-            grad.addColorStop(0.7, '#432913');
-            grad.addColorStop(1.0, '#221408');
-            ctx.fillStyle = grad;
-        }
+        // 多層岩石グラデーション（浮遊大陸のローカル座標 this.x, this.y に100%固定・ズレ皆無！）
+        const grad = ctx.createLinearGradient(this.x, this.y, this.x, this.y + h);
+        grad.addColorStop(0.0, '#9a6332'); // 陽光を浴びる上部岩盤
+        grad.addColorStop(0.2, '#7a4b22');
+        grad.addColorStop(0.5, '#563314'); // 地層の中央部
+        grad.addColorStop(0.8, '#39200b');
+        grad.addColorStop(1.0, '#1c0f05'); // 深い底面シャドウ
+        ctx.fillStyle = grad;
 
         // アーケード・グラディウス特有の重厚なオクタゴナル浮遊岩盤ポリゴン
         ctx.beginPath();
@@ -320,19 +316,65 @@ class FloatingIsland {
         ctx.shadowColor = 'transparent';
 
         // 重厚な外郭エッジライン
-        ctx.strokeStyle = '#221100';
+        ctx.strokeStyle = '#180d04';
         ctx.lineWidth = 3;
         ctx.stroke();
 
         // 上部・側面エッジの光沢ハイライトライン
-        ctx.strokeStyle = 'rgba(255, 230, 180, 0.45)';
-        ctx.lineWidth = 1.5;
+        ctx.strokeStyle = 'rgba(255, 235, 190, 0.55)';
+        ctx.lineWidth = 2;
         ctx.beginPath();
         ctx.moveTo(this.x + bevelX, this.y + 2);
         ctx.lineTo(this.x + w - bevelX, this.y + 2);
         ctx.lineTo(this.x + w - 2, this.y + bevelY);
         ctx.stroke();
 
+        // 内部地層ライン（岩肌の横縞クラック）
+        ctx.strokeStyle = 'rgba(30, 15, 5, 0.6)';
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.moveTo(this.x + 20, this.y + h * 0.35);
+        ctx.lineTo(this.x + w * 0.4, this.y + h * 0.38);
+        ctx.lineTo(this.x + w - 25, this.y + h * 0.32);
+        ctx.moveTo(this.x + 35, this.y + h * 0.68);
+        ctx.lineTo(this.x + w * 0.55, this.y + h * 0.65);
+        ctx.lineTo(this.x + w - 30, this.y + h * 0.72);
+        ctx.stroke();
+
+        // 4基のレーザー砲台が設置される「金属製マウントベース（砲台台座）」を島に直接描画！
+        const relX1 = w * 0.22 + 21; // 砲台センター (42px幅の中心)
+        const relX2 = w * 0.68 + 21;
+        const mountW = 44;
+        const mountH = 7;
+
+        // 上面マウント 2箇所
+        this.drawMountBase(ctx, this.x + relX1, this.y - 2, mountW, mountH, false);
+        this.drawMountBase(ctx, this.x + relX2, this.y - 2, mountW, mountH, false);
+        // 下面マウント 2箇所
+        this.drawMountBase(ctx, this.x + relX1, this.y + h - 5, mountW, mountH, true);
+        this.drawMountBase(ctx, this.x + relX2, this.y + h - 5, mountW, mountH, true);
+
+        ctx.restore();
+    }
+
+    drawMountBase(ctx, cx, y, w, h, isCeil) {
+        ctx.save();
+        const baseGrad = ctx.createLinearGradient(cx - w/2, y, cx + w/2, y);
+        baseGrad.addColorStop(0.0, '#334155');
+        baseGrad.addColorStop(0.3, '#cbd5e1');
+        baseGrad.addColorStop(0.7, '#64748b');
+        baseGrad.addColorStop(1.0, '#1e293b');
+        ctx.fillStyle = baseGrad;
+        ctx.fillRect(cx - w/2, y, w, h);
+
+        ctx.strokeStyle = '#00ffff';
+        ctx.lineWidth = 1;
+        ctx.strokeRect(cx - w/2, y, w, h);
+
+        // シアンLEDインジケーターランプ
+        ctx.fillStyle = '#00ffff';
+        ctx.fillRect(cx - 10, y + 2, 4, 3);
+        ctx.fillRect(cx + 6, y + 2, 4, 3);
         ctx.restore();
     }
 }
@@ -346,9 +388,9 @@ class LevelManager {
         this.stage = 1;
         this.boss = null;
         this.floatingIslands = [];
-        // ユーザーが遊びやすい快適なテンポに調整（約1分半で1面完結）
-        this.islandSpawnTimes = [26000, 42000, 58000]; // 途中に3つ浮遊大陸を設置
+        this.islandSpawnTimes = [26000, 41000, 56000]; // 途中に3つ浮遊大陸を設置
         this.islandSpawnedCount = 0;
+        this.volcanoSpawned = false; // ボス直前の火山噴火フラグ
         this.stageClearTimer = 0;
     }
 
@@ -391,8 +433,17 @@ class LevelManager {
                     this.islandSpawnedCount++;
                 }
 
-                // 74秒経過で地形生成を終了
-                if (this.time > 74000 && this.terrain.generating) {
+                // 66秒経過でボス直前の名物「ダブルボルケーノ（巨大火山2基）」が出現して大噴火！
+                if (this.time > 66000 && !this.volcanoSpawned && typeof Volcano !== 'undefined') {
+                    this.volcanoSpawned = true;
+                    // 地上のダブルボルケーノ（激しい連続噴火モード）
+                    const v1 = new Volcano(this.starfield.width + 50, this.terrain.getBottomY(this.starfield.width + 50), true);
+                    const v2 = new Volcano(this.starfield.width + 240, this.terrain.getBottomY(this.starfield.width + 240), true);
+                    enemies.push(v1, v2);
+                }
+
+                // 76秒経過で地形生成を終了（火山地帯を抜けてボス前の静寂へ）
+                if (this.time > 76000 && this.terrain.generating) {
                     this.terrain.stopGenerating();
                 }
 
