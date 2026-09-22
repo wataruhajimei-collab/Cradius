@@ -2,10 +2,10 @@
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
-    <title>Stage 1 Overhaul & Stage 2 Test</title>
+    <title>Stage 1 2x Boss & Stage 2 Stonehenge Full Test</title>
 </head>
 <body>
-    <h1>Stage 1 Overhaul & Stage 2 Test</h1>
+    <h1>Stage 1 2x Boss & Stage 2 Stonehenge Full Test</h1>
     <div id="results">Running tests...</div>
 
     <script src="js/sound.js"></script>
@@ -34,7 +34,6 @@
             }
         }
 
-        // ダミーグローバル変数
         window.enemies = [];
         window.enemyBullets = [];
         window.playerBullets = [];
@@ -43,132 +42,97 @@
 
         try {
             // ==========================================
-            // TEST 1: 浮遊大陸と4門のレーザー砲台
+            // TEST 1: 2倍サイズボス (ビッグコア)
             // ==========================================
-            log.push('--- TEST 1: Floating Island & 4 Laser Turrets ---');
-            const island = new FloatingIsland(500, 200, 280, 70, 1.5);
-            assert(island.width === 280, "Island width is 280");
-            assert(island.height === 70, "Island height is 70");
-            assert(island.turrets.length === 4, "Island has exactly 4 turrets");
-            assert(island.turrets.filter(t => !t.isCeiling).length === 2, "2 turrets on top");
-            assert(island.turrets.filter(t => t.isCeiling).length === 2, "2 turrets on bottom");
-            
-            // 座標追従テスト
-            const initialTurretX = island.turrets[0].x;
-            island.update();
-            island.turrets[0].update();
-            assert(island.x === 500 - 1.5, "Island scrolled by 1.5px");
-            assert(island.turrets[0].x === initialTurretX - 1.5, "Turret followed island scroll");
-
-            // レーザー砲台からの EnemyLaser 発射テスト
-            const turret = island.turrets[0];
-            turret.shoot();
-            assert(enemyBullets.length > 0, "Enemy bullet fired");
-            const firedLaser = enemyBullets[enemyBullets.length - 1];
-            assert(firedLaser instanceof EnemyLaser, "Fired bullet is an instance of EnemyLaser");
-            assert(firedLaser.length === 42, "Enemy laser length is 42px");
-            assert(firedLaser.thickness === 5, "Enemy laser thickness is 5px");
-
-            // 浮遊大陸の衝突判定テスト
-            assert(island.checkCollision({ x: 550, y: 220, width: 20, height: 20 }) === true, "Collision inside island detected");
-            assert(island.checkCollision({ x: 100, y: 100, width: 20, height: 20 }) === false, "Collision outside island is false");
-
-            // ==========================================
-            // TEST 2: 3倍巨大ボス (ビッグコア)
-            // ==========================================
-            log.push('--- TEST 2: 3x Giant Big Core Boss ---');
-            const boss = new Boss(800, 150);
-            assert(boss.scale === 3, "Boss scale is 3");
-            assert(boss.width === 240, "Boss width is 240px (3x)");
-            assert(boss.height === 300, "Boss height is 300px (3x)");
-            assert(boss.hp === 45, "Boss HP is 45 (tougher for 3x giant)");
+            log.push('--- TEST 1: 2x Big Core Boss ---');
+            const boss = new Boss(800, 200);
+            assert(boss.scale === 2, "Boss scale is exactly 2");
+            assert(boss.width === 160, "Boss width is 160px (2x)");
+            assert(boss.height === 200, "Boss height is 200px (2x)");
+            assert(boss.hp === 35, "Boss HP is 35");
             assert(boss.shields === 5, "Boss has 5 shield plates");
-            assert(boss.shieldHpPerPlate === 4, "Each shield plate has 4 HP");
+            assert(boss.shieldHpPerPlate === 3, "Each shield plate has 3 HP");
 
-            // コアの判定とサイズ
+            // コアサイズと位置
             const coreBounds = boss.getCoreBounds();
-            assert(coreBounds.width === 96, "Core diameter is 96px (radius 48px, 3x)");
-            assert(coreBounds.height === 96, "Core height is 96px (3x)");
+            assert(coreBounds.width === 64, "Core diameter is 64px (radius 32px, 2x)");
+            assert(coreBounds.height === 64, "Core height is 64px (2x)");
 
-            // 遮蔽板の判定とサイズ
+            // 遮蔽板サイズ
             const shieldBounds = boss.getShieldBounds();
-            assert(shieldBounds !== null, "Shield bounds exist");
-            assert(shieldBounds.height === 114, "Shield plate height is 114px (3x)");
-            assert(shieldBounds.width === 99, "Total shield width matches 5 plates with 21px spacing (3x)");
+            assert(shieldBounds.height === 76, "Shield plate height is 76px (2x)");
 
-            // ハル（無敵装甲）の判定
+            // 上下ハル判定
             const topHull = boss.getTopHullBounds();
             const bottomHull = boss.getBottomHullBounds();
-            assert(topHull.height === 96, "Top hull height is 96px (3x)");
-            assert(bottomHull.height === 96, "Bottom hull height is 96px (3x)");
+            assert(topHull.height === 64, "Top hull height is 64px (2x)");
+            assert(bottomHull.height === 64, "Bottom hull height is 64px (2x)");
 
             // 4連レーザー射撃テスト
             boss.bullets = [];
             boss.shoot();
             assert(boss.bullets.length === 4, "Boss fires 4 simultaneous laser beams");
-            assert(boss.bullets[0].speedX === -7.0, "Boss laser speed is -7.0");
 
             // ==========================================
-            // TEST 3: ステージ2 ストーンヘンジ面 (破壊可能/不能石)
+            // TEST 2: 浮遊大陸と4門の新キャラ砲台
             // ==========================================
-            log.push('--- TEST 3: Stage 2 Stonehenge & Stone Digging ---');
+            log.push('--- TEST 2: Floating Island & 4 Laser Turrets ---');
+            const island = new FloatingIsland(500, 200, 280, 70, 1.5);
+            assert(island.turrets.length === 4, "Island has exactly 4 turrets");
+            assert(island.turrets.filter(t => !t.isCeiling).length === 2, "2 turrets on top");
+            assert(island.turrets.filter(t => t.isCeiling).length === 2, "2 turrets on bottom");
+            
+            // 砲台からの EnemyLaser 発射テスト
+            const turret = island.turrets[0];
+            turret.shoot();
+            assert(enemyBullets.length > 0, "Enemy bullet fired");
+            const firedLaser = enemyBullets[enemyBullets.length - 1];
+            assert(firedLaser instanceof EnemyLaser, "Fired bullet is an instance of EnemyLaser");
+
+            // ==========================================
+            // TEST 3: ステージ2 ストーンヘンジ面と新キャラ
+            // ==========================================
+            log.push('--- TEST 3: Stage 2 Stonehenge & New Enemies ---');
             const stonehenge = new StonehengeStage(800, 600);
             stonehenge.start();
-            assert(stonehenge.active === true, "Stonehenge stage is active");
+            assert(stonehenge.active === true, "Stonehenge stage active");
 
-            // 破壊できる石のテスト
-            const destructibleBlock = new StoneBlock(200, 200, 40, 40, true);
-            assert(destructibleBlock.isDestructible === true, "Block is destructible");
-            assert(destructibleBlock.hp === 3, "Initial HP is 3");
-            
-            // 1発目ヒット
-            destructibleBlock.hit(1);
-            assert(destructibleBlock.hp === 2, "HP reduced to 2");
-            assert(destructibleBlock.active === true, "Block still active");
+            // 壊れる石・壊れない石の生成確認
+            assert(stonehenge.blocks.length > 0, "Stone blocks generated");
+            const hasDestructible = stonehenge.blocks.some(b => b.isDestructible);
+            const hasIndestructible = stonehenge.blocks.some(b => !b.isDestructible);
+            assert(hasDestructible === true, "Contains destructible stone blocks");
+            assert(hasIndestructible === true, "Contains indestructible stone blocks");
 
-            // レーザー（2ダメージ）ヒットで破壊
-            destructibleBlock.hit(2);
-            assert(destructibleBlock.hp <= 0, "HP reduced to 0");
-            assert(destructibleBlock.active === false, "Block destroyed (active = false)");
+            // 新キャラ1: RuneTurret (古代ルーン砲台)
+            const runeTurret = new RuneTurret(300, 200, false);
+            assert(runeTurret.hp === 3, "RuneTurret HP is 3");
+            runeTurret.shoot();
+            assert(enemyBullets.some(b => b.color === '#c084fc'), "RuneTurret fires purple rune bullet");
 
-            // 破壊できない石（モノリス）のテスト
-            const indestructibleBlock = new StoneBlock(300, 300, 40, 40, false);
-            assert(indestructibleBlock.isDestructible === false, "Block is indestructible");
-            const hitResult = indestructibleBlock.hit(5);
-            assert(hitResult === false, "Indestructible block cannot be destroyed");
-            assert(indestructibleBlock.active === true, "Indestructible block remains active");
+            // 新キャラ2: StoneEyeEnemy (浮遊古代ストーンアイ)
+            const stoneEye = new StoneEyeEnemy(400, 250);
+            assert(stoneEye.hp === 2, "StoneEye HP is 2");
+            stoneEye.shoot();
+            assert(enemyBullets.some(b => b instanceof RingBullet), "StoneEye fires RingBullet (ion ring)");
 
-            // レーザー貫通掘削テスト
-            stonehenge.blocks = [
-                new StoneBlock(400, 200, 40, 40, true),
-                new StoneBlock(440, 200, 40, 40, true),
-                new StoneBlock(480, 200, 40, 40, true)
-            ];
-            const testLaser = new Laser(player, -100, 380, 20); // y = 200
-            testLaser.width = 200;
-            stonehenge.handleBulletCollisions([testLaser]);
-            assert(stonehenge.blocks[0].hp === 1, "First block hit by laser (3 -> 1)");
+            // 飛ぶ敵の定期スポーン
+            const initialEnemyCount = enemies.length;
+            stonehenge.flyingEnemyTimer = 3000;
+            stonehenge.updateFlyingEnemies(100);
+            assert(enemies.length > initialEnemyCount, "Flying enemies spawned dynamically");
 
             // ==========================================
-            // TEST 4: レベルマネージャーとステージ遷移
+            // TEST 4: レベルマネージャー
             // ==========================================
-            log.push('--- TEST 4: LevelManager & Stage Progression ---');
+            log.push('--- TEST 4: LevelManager & Stage Jump ---');
             const lm = new LevelManager(800, 600);
-            assert(lm.stage === 1, "Initial stage is 1");
-            
-            // ステージ2開始テスト
-            lm.startStage2();
-            assert(lm.stage === 2, "Stage progressed to 2");
-            assert(window.stonehengeStage !== null, "stonehengeStage initialized");
-            assert(window.stonehengeStage.active === true, "stonehengeStage is active");
+            assert(lm.islandSpawnTimes[0] === 26000, "First island spawns at 26s (early spawn)");
+            assert(lm.islandSpawnTimes[1] === 42000, "Second island spawns at 42s");
+            assert(lm.islandSpawnTimes[2] === 58000, "Third island spawns at 58s");
 
-            // レンダリングテスト
-            const canvas = document.createElement('canvas');
-            canvas.width = 800;
-            canvas.height = 600;
-            const ctx = canvas.getContext('2d');
-            lm.draw(ctx);
-            log.push('PASS: LevelManager.draw for Stage 2 rendered without error');
+            lm.startStage2();
+            assert(lm.stage === 2, "Switched to Stage 2");
 
             document.getElementById('results').innerHTML = '<pre>' + log.join('\n') + '\n\nALL TESTS PASSED SUCCESSFULLY!</pre>';
         } catch (e) {

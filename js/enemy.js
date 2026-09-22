@@ -1655,3 +1655,221 @@ class LaserTurretEnemy extends Enemy {
         ctx.restore();
     }
 }
+
+// 浮遊大陸用新キャラ砲台のエイリアス
+const LaserCannonTurret = LaserTurretEnemy;
+
+// ==========================================
+// STAGE 2 新キャラ1: 古代ルーン砲台 (RuneTurret)
+// 壊れない石の上に鎮座する古代遺跡の防衛装置
+// ==========================================
+class RuneTurret extends Enemy {
+    constructor(x, y, isCeiling = false) {
+        super(x, y);
+        this.width = 38;
+        this.height = 32;
+        this.isCeiling = isCeiling;
+        this.shootTimer = Math.floor(Math.random() * 60);
+        this.hp = 3;
+        this.groundY = y;
+        this.barrelAngle = isCeiling ? Math.PI / 2 : -Math.PI / 2;
+    }
+
+    update() {
+        // ステージ2のスクロール速度に連動
+        const scrollSpeed = (typeof stonehengeStage !== 'undefined' && stonehengeStage) ? stonehengeStage.scrollSpeed : 1.5;
+        this.x -= scrollSpeed;
+        if (this.x < -100) {
+            this.active = false;
+            return;
+        }
+
+        // 自機追尾
+        if (typeof player !== 'undefined') {
+            const centerX = this.x + this.width / 2;
+            const centerY = this.isCeiling ? this.y + 12 : this.y + this.height - 12;
+            this.barrelAngle = Math.atan2(player.y - centerY, player.x - centerX);
+        }
+
+        this.shootTimer++;
+        if (this.shootTimer > 150) {
+            this.shootTimer = 0;
+            this.shoot();
+        }
+    }
+
+    shoot() {
+        if (typeof player === 'undefined' || typeof enemyBullets === 'undefined') return;
+        const centerX = this.x + this.width / 2;
+        const centerY = this.isCeiling ? this.y + 14 : this.y + this.height - 14;
+
+        const dx = (player.x + player.width / 2) - centerX;
+        const dy = (player.y + player.height / 2) - centerY;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+
+        if (dist > 0 && dist < 650) {
+            const speed = 4.2;
+            // 紫色の古代ルーン光弾
+            enemyBullets.push(new Bullet(centerX, centerY, (dx / dist) * speed, (dy / dist) * speed, '#c084fc', true));
+            if (typeof particles !== 'undefined') {
+                for (let i = 0; i < 4; i++) {
+                    particles.push(new Particle(centerX, centerY, '#c084fc'));
+                }
+            }
+        }
+    }
+
+    draw(ctx) {
+        ctx.save();
+        const centerX = this.x + this.width / 2;
+        const baseY = this.isCeiling ? this.y : this.y + this.height;
+        ctx.translate(centerX, baseY);
+        if (this.isCeiling) ctx.scale(1, -1);
+
+        // 古代石柱マウント
+        const baseGrad = ctx.createLinearGradient(-18, 0, 18, 0);
+        baseGrad.addColorStop(0.0, '#1e1b4b');
+        baseGrad.addColorStop(0.5, '#4338ca');
+        baseGrad.addColorStop(1.0, '#0f172a');
+        ctx.fillStyle = baseGrad;
+        ctx.fillRect(-18, -8, 36, 8);
+        ctx.strokeStyle = '#818cf8';
+        ctx.lineWidth = 1;
+        ctx.strokeRect(-18, -8, 36, 8);
+
+        // 回転ルーン砲頭
+        ctx.save();
+        ctx.translate(0, -14);
+        const drawAngle = this.isCeiling ? -this.barrelAngle : this.barrelAngle;
+        ctx.rotate(drawAngle);
+
+        // 砲身
+        ctx.fillStyle = '#6366f1';
+        ctx.fillRect(0, -4, 20, 8);
+        ctx.fillStyle = '#a855f7';
+        ctx.fillRect(18, -5, 3, 10);
+        ctx.restore();
+
+        // ルーンクリスタルアイ（紫色発光）
+        ctx.shadowColor = '#c084fc';
+        ctx.shadowBlur = 8;
+        ctx.fillStyle = '#e9d5ff';
+        ctx.beginPath();
+        ctx.arc(0, -14, 6, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.restore();
+    }
+}
+
+// ==========================================
+// STAGE 2 新キャラ2: 浮遊古代ストーンアイ (StoneEyeEnemy)
+// モアイ・古代石像の顔ドローン。イオンリング弾を吐く！
+// ==========================================
+class StoneEyeEnemy extends Enemy {
+    constructor(x, y) {
+        super(x, y);
+        this.width = 38;
+        this.height = 42;
+        this.speed = 1.4;
+        this.hp = 2;
+        this.shootTimer = Math.floor(Math.random() * 50);
+        this.baseY = y;
+        this.floatPhase = Math.random() * Math.PI * 2;
+    }
+
+    update() {
+        this.x -= this.speed;
+        this.floatPhase += 0.05;
+        this.y = this.baseY + Math.sin(this.floatPhase) * 25; // ふわふわ浮遊
+
+        if (this.x < -80) {
+            this.active = false;
+            return;
+        }
+
+        this.shootTimer++;
+        if (this.shootTimer > 120) {
+            this.shootTimer = 0;
+            this.shoot();
+        }
+    }
+
+    shoot() {
+        if (typeof player === 'undefined' || typeof enemyBullets === 'undefined') return;
+        const mouthX = this.x;
+        const mouthY = this.y + this.height * 0.65;
+
+        const dx = (player.x + player.width / 2) - mouthX;
+        const dy = (player.y + player.height / 2) - mouthY;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+
+        if (dist > 0 && dist < 650) {
+            const speed = 3.6;
+            // イオンリング弾（口から発射！）
+            if (typeof RingBullet !== 'undefined') {
+                enemyBullets.push(new RingBullet(mouthX, mouthY, (dx / dist) * speed, (dy / dist) * speed, '#38bdf8'));
+            } else {
+                enemyBullets.push(new Bullet(mouthX, mouthY, (dx / dist) * speed, (dy / dist) * speed, '#38bdf8', true));
+            }
+
+            if (typeof particles !== 'undefined') {
+                for (let i = 0; i < 5; i++) {
+                    particles.push(new Particle(mouthX, mouthY, '#38bdf8'));
+                }
+            }
+        }
+    }
+
+    draw(ctx) {
+        ctx.save();
+        ctx.translate(this.x, this.y);
+
+        // 古代石像・モアイフェイス（立体陰影）
+        const grad = ctx.createLinearGradient(0, 0, this.width, this.height);
+        grad.addColorStop(0.0, '#94a3b8');
+        grad.addColorStop(0.4, '#64748b');
+        grad.addColorStop(1.0, '#1e293b');
+        ctx.fillStyle = grad;
+
+        // モアイ形状ポリゴン
+        ctx.beginPath();
+        ctx.moveTo(8, 0); // 額
+        ctx.lineTo(this.width, 4); // 後頭部
+        ctx.lineTo(this.width - 4, this.height); // 顎裏
+        ctx.lineTo(6, this.height); // 顎先
+        ctx.lineTo(2, this.height * 0.7); // 唇
+        ctx.lineTo(0, this.height * 0.45); // 鼻
+        ctx.lineTo(6, this.height * 0.3); // 眉間
+        ctx.closePath();
+        ctx.fill();
+
+        ctx.strokeStyle = '#0f172a';
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
+
+        // 巨大な目（シアン・発光アイ）
+        ctx.shadowColor = '#00ffff';
+        ctx.shadowBlur = 6;
+        ctx.fillStyle = '#00ffff';
+        ctx.beginPath();
+        ctx.ellipse(14, 15, 6, 4, 0, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.fillStyle = '#ffffff';
+        ctx.beginPath();
+        ctx.arc(12, 14, 2, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.shadowBlur = 0;
+
+        // 口の溝
+        ctx.strokeStyle = '#0f172a';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(3, this.height * 0.65);
+        ctx.lineTo(14, this.height * 0.65);
+        ctx.stroke();
+
+        ctx.restore();
+    }
+}

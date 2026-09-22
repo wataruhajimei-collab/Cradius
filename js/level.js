@@ -259,6 +259,10 @@ class FloatingIsland {
         if (this.x + this.width < -150) {
             this.active = false;
         }
+        // 浮遊大陸上の砲台の位置を確実に毎フレーム同期
+        this.turrets.forEach(t => {
+            if (t.active) t.updatePosition();
+        });
     }
 
     checkCollision(rect) {
@@ -342,7 +346,8 @@ class LevelManager {
         this.stage = 1;
         this.boss = null;
         this.floatingIslands = [];
-        this.islandSpawnTimes = [60000, 85000, 110000]; // 途中に3つ浮遊大陸を設置
+        // ユーザーが遊びやすい快適なテンポに調整（約1分半で1面完結）
+        this.islandSpawnTimes = [26000, 42000, 58000]; // 途中に3つ浮遊大陸を設置
         this.islandSpawnedCount = 0;
         this.stageClearTimer = 0;
     }
@@ -360,8 +365,8 @@ class LevelManager {
             if (this.state === 'WAVES') {
                 this.time += dt;
                 
-                // 40秒経過で地上地形が出現
-                if (this.time > 40000 && !this.terrain.active && this.terrain.topPoints.length === 0) {
+                // 20秒経過で地上地形が出現（空中戦からスムーズに地形戦へ突入）
+                if (this.time > 20000 && !this.terrain.active && this.terrain.topPoints.length === 0) {
                     this.terrain.start();
                     if (typeof Sound !== 'undefined') {
                         Sound.playStageBgm(); // 陸地出現！最高に溌剌としたメインBGMへ劇的転換！
@@ -372,7 +377,7 @@ class LevelManager {
                 if (this.islandSpawnedCount < 3 && this.time > this.islandSpawnTimes[this.islandSpawnedCount]) {
                     const idx = this.islandSpawnedCount;
                     // 島ごとに高さを変えてルートの戦略性を生む
-                    const heights = [220, 310, 240];
+                    const heights = [200, 310, 230];
                     const widths = [270, 290, 310];
                     const thicks = [70, 80, 75];
                     const island = new FloatingIsland(
@@ -386,19 +391,19 @@ class LevelManager {
                     this.islandSpawnedCount++;
                 }
 
-                // 130秒経過で地形生成を終了
-                if (this.time > 130000 && this.terrain.generating) {
+                // 74秒経過で地形生成を終了
+                if (this.time > 74000 && this.terrain.generating) {
                     this.terrain.stopGenerating();
                 }
 
-                // 145秒経過でボス戦へ突入（3倍ビッグコア）
-                if (this.time > 145000) {
+                // 84秒経過（約1分24秒）でボス戦へ突入（2倍ビッグコア）
+                if (this.time > 84000) {
                     this.state = 'BOSS';
                     this.time = 0;
                     this.terrain.active = false;
                     if (typeof Sound !== 'undefined') Sound.playBossBgm();
                     if (typeof Boss !== 'undefined') {
-                        this.boss = new Boss(this.starfield.width, 150);
+                        this.boss = new Boss(this.starfield.width, 200);
                     }
                 }
             } else if (this.state === 'BOSS') {

@@ -1,20 +1,20 @@
 class Boss {
     constructor(x, y) {
-        this.scale = 3; // ユーザー要望によりボスを3倍の大きさに巨大化！
-        this.width = 80 * this.scale;  // 240px
-        this.height = 100 * this.scale; // 300px
-        this.x = x + 300; // 画面外から登場
-        this.targetX = x - 270; // 巨大な巨体が画面右側に堂々陣取る定位置
-        this.y = 150;
-        this.maxHp = 45;
-        this.hp = 45;
+        this.scale = 2; // ユーザー要望によりボスの大きさを元の2倍（幅160px、高さ200px）に最適化！
+        this.width = 80 * this.scale;   // 160px
+        this.height = 100 * this.scale; // 200px
+        this.x = x + 150; // 画面外右側から登場
+        this.targetX = x - 200; // 画面右端（800px中 600〜760px）に堂々陣取る定位置
+        this.y = 200;
+        this.maxHp = 35;
+        this.hp = 35;
         this.active = true;
         this.color = '#aa4444';
         
-        // 遮蔽板: 5枚の金属風シールドプレート (各4発耐久、合計20発で全滅)
+        // 遮蔽板: 5枚の金属風シールドプレート (各3発耐久、合計15発)
         this.maxShields = 5;
         this.shields = 5;
-        this.shieldHpPerPlate = 4;
+        this.shieldHpPerPlate = 3;
         this.currentShieldHp = this.shieldHpPerPlate;
         this.shieldFlashTimer = 0;
         this.hitFlashTimer = 0;
@@ -30,16 +30,16 @@ class Boss {
     update() {
         if (this.isDying) return; // 撃破中は行動停止
 
-        // 登場シーン（巨大戦艦が重厚に侵入）
+        // 登場シーン（画面外から定位置へ素早くスムーズに前進）
         if (this.x > this.targetX) {
-            this.x -= 2.2;
+            this.x -= 3.2;
             return;
         }
 
-        this.moveTimer += 0.016; // 巨体ならではの重厚で滑らかな浮遊移動
-        // 高さ300pxの巨体が画面(600px)の上下中央付近(Y: 50〜250)を雄大に浮遊
-        this.y = 150 + Math.sin(this.moveTimer) * 95;
-        this.rotationAngle += 0.035; // コア内部の回転
+        this.moveTimer += 0.02; // スムーズな上下浮動
+        // 高さ200pxのボスが画面中央付近（Y: 80〜320、下端: 280〜520）を美しく移動
+        this.y = 200 + Math.sin(this.moveTimer) * 120;
+        this.rotationAngle += 0.04; // コア内部の回転
 
         if (this.shieldFlashTimer > 0) this.shieldFlashTimer--;
         if (this.hitFlashTimer > 0) this.hitFlashTimer--;
@@ -70,15 +70,15 @@ class Boss {
     }
 
     shoot() {
-        // ビッグコア伝統の超巨大4連レーザー・スプレッドショット！
-        const startX = this.x - 25;
-        const coreCenterY = this.y + 150;
+        // ビッグコア伝統の4連レーザー・スプレッドショット！
+        const startX = this.x - 15;
+        const coreCenterY = this.y + 100;
         
-        // 上下アーム先端の砲門（上下に大きく広がった4門）から超高速極太ビーム斉射！
-        this.bullets.push(new Bullet(startX, coreCenterY - 80, -7.0, 0, '#00ffff'));
-        this.bullets.push(new Bullet(startX, coreCenterY - 28, -7.0, 0, '#ffaa00'));
-        this.bullets.push(new Bullet(startX, coreCenterY + 28, -7.0, 0, '#ffaa00'));
-        this.bullets.push(new Bullet(startX, coreCenterY + 80, -7.0, 0, '#00ffff'));
+        // 上下アーム砲台から2門ずつ、計4連ビーム
+        this.bullets.push(new Bullet(startX, coreCenterY - 48, -7.0, 0, '#00ffff'));
+        this.bullets.push(new Bullet(startX, coreCenterY - 16, -7.0, 0, '#ffaa00'));
+        this.bullets.push(new Bullet(startX, coreCenterY + 16, -7.0, 0, '#ffaa00'));
+        this.bullets.push(new Bullet(startX, coreCenterY + 48, -7.0, 0, '#00ffff'));
     }
 
     // 遮蔽板ダメージ処理
@@ -104,21 +104,21 @@ class Boss {
 
         // 撃破時の激しい振動（シェイク）と赤白フラッシュ
         if (this.isDying) {
-            ctx.translate((Math.random() - 0.5) * 16, (Math.random() - 0.5) * 16);
+            ctx.translate((Math.random() - 0.5) * 12, (Math.random() - 0.5) * 12);
             if (Math.floor(Date.now() / 60) % 2 === 0) {
-                ctx.filter = 'brightness(2.5) saturate(2.5)';
+                ctx.filter = 'brightness(2.2) saturate(2.0)';
             }
         }
 
-        // 1. ボス本体の描画 (3倍スケール)
+        // 1. ボス本体の描画 (2倍スケール)
         if (typeof images !== 'undefined' && images.boss && images.boss.complete) {
-            ctx.shadowColor = 'rgba(0, 0, 0, 0.8)';
-            ctx.shadowBlur = 24;
-            ctx.shadowOffsetX = -12;
-            ctx.shadowOffsetY = 12;
+            ctx.shadowColor = 'rgba(0, 0, 0, 0.75)';
+            ctx.shadowBlur = 16;
+            ctx.shadowOffsetX = -8;
+            ctx.shadowOffsetY = 8;
 
-            // 600px × 600px の大迫力スプライト描画
-            ctx.drawImage(images.boss, this.x - 180, this.y - 150, 600, 600);
+            // 400px × 400px の2倍スケール画像描画
+            ctx.drawImage(images.boss, this.x - 120, this.y - 100, 400, 400);
 
             ctx.shadowBlur = 0;
             ctx.shadowOffsetX = 0;
@@ -128,15 +128,15 @@ class Boss {
             this.drawMechanicalHull(ctx);
         }
 
-        // 3倍スケールのコア中心と半径
-        const coreX = this.x + 108;
-        const coreY = this.y + 150;
-        const coreR = 48;
+        // 2倍スケールのコア中心と半径
+        const coreX = this.x + 72;
+        const coreY = this.y + 100;
+        const coreR = 32;
 
-        // 2. 立体感と輝きのある超巨大ハイテク・クリスタルコア
+        // 2. 立体感と輝きのある2倍ハイテク・クリスタルコア
         this.drawHighTechCore(ctx, coreX, coreY, coreR);
 
-        // 3. 3倍サイズの5枚の金属風遮蔽板（シールドプレート）
+        // 3. 2倍サイズの5枚の金属風遮蔽板（シールドプレート）
         this.drawShieldPlates(ctx, coreX, coreY);
 
         ctx.restore();
@@ -145,7 +145,7 @@ class Boss {
         this.bullets.forEach(b => b.draw(ctx));
     }
 
-    // メカニカルなハル（船体）の代替描画 (3倍スケール)
+    // メカニカルなハル（船体）の代替描画 (2倍スケール)
     drawMechanicalHull(ctx) {
         // メインハル
         const grad = ctx.createLinearGradient(this.x, this.y, this.x + this.width, this.y + this.height);
@@ -155,13 +155,13 @@ class Boss {
         ctx.fillStyle = grad;
         ctx.fillRect(this.x, this.y, this.width, this.height);
 
-        // 上部・下部巨大アーム
+        // 上部・下部アーム
         ctx.fillStyle = '#1e2631';
-        ctx.fillRect(this.x - 60, this.y - 30, 120, 90);
-        ctx.fillRect(this.x - 60, this.y + 240, 120, 90);
+        ctx.fillRect(this.x - 40, this.y - 20, 80, 60);
+        ctx.fillRect(this.x - 40, this.y + 160, 80, 60);
     }
 
-    // 立体感と輝きのあるハイテク・クリスタルコア (3倍スケール)
+    // 立体感と輝きのあるハイテク・クリスタルコア (2倍スケール)
     drawHighTechCore(ctx, coreX, coreY, r) {
         ctx.save();
 
@@ -193,27 +193,27 @@ class Boss {
 
         // A. コア・マウントリング（重厚金属フレーム）
         ctx.beginPath();
-        ctx.arc(coreX, coreY, r + 10, 0, Math.PI * 2);
+        ctx.arc(coreX, coreY, r + 7, 0, Math.PI * 2);
         ctx.fillStyle = '#1c232d';
         ctx.fill();
         ctx.strokeStyle = '#4a5b6e';
-        ctx.lineWidth = 6;
+        ctx.lineWidth = 4;
         ctx.stroke();
 
-        // 8箇所の固定ボルトリベット
-        for (let i = 0; i < 8; i++) {
-            const angle = (Math.PI / 4) * i;
-            const rx = coreX + Math.cos(angle) * (r + 6);
-            const ry = coreY + Math.sin(angle) * (r + 6);
+        // 6箇所の固定ボルト
+        for (let i = 0; i < 6; i++) {
+            const angle = (Math.PI / 3) * i;
+            const rx = coreX + Math.cos(angle) * (r + 4.5);
+            const ry = coreY + Math.sin(angle) * (r + 4.5);
             ctx.fillStyle = '#88a0b8';
             ctx.beginPath();
-            ctx.arc(rx, ry, 3.5, 0, Math.PI * 2);
+            ctx.arc(rx, ry, 2.5, 0, Math.PI * 2);
             ctx.fill();
         }
 
         // B. 多重エネルギーオーラ
         ctx.shadowColor = glowColor;
-        ctx.shadowBlur = (this.coreOpen ? 50 : 25) * pulse;
+        ctx.shadowBlur = (this.coreOpen ? 35 : 18) * pulse;
 
         // C. 球体立体グラデーション（3D光沢スフィア）
         const sphereGrad = ctx.createRadialGradient(
@@ -235,7 +235,7 @@ class Boss {
         ctx.translate(coreX, coreY);
         ctx.rotate(this.rotationAngle);
         ctx.strokeStyle = `rgba(255, 255, 255, ${0.45 * pulse})`;
-        ctx.lineWidth = 3.5;
+        ctx.lineWidth = 2.5;
         ctx.beginPath();
         for (let i = 0; i < 6; i++) {
             const a = (Math.PI / 3) * i;
@@ -254,12 +254,12 @@ class Boss {
         ctx.ellipse(coreX - r * 0.3, coreY - r * 0.3, r * 0.45, r * 0.22, -Math.PI / 4, 0, Math.PI * 2);
         ctx.fill();
 
-        // F. コア開放時の強力パルス波動
+        // F. コア開放時の放出パルスリング
         if (this.coreOpen) {
-            const waveR = r + (Date.now() * 0.03 % 30);
-            const waveAlpha = Math.max(0, 1 - (waveR - r) / 30);
-            ctx.strokeStyle = `rgba(255, 255, 255, ${waveAlpha * 0.75})`;
-            ctx.lineWidth = 3.5;
+            const waveR = r + (Date.now() * 0.025 % 20);
+            const waveAlpha = Math.max(0, 1 - (waveR - r) / 20);
+            ctx.strokeStyle = `rgba(255, 255, 255, ${waveAlpha * 0.7})`;
+            ctx.lineWidth = 2.5;
             ctx.beginPath();
             ctx.arc(coreX, coreY, waveR, 0, Math.PI * 2);
             ctx.stroke();
@@ -268,14 +268,14 @@ class Boss {
         ctx.restore();
     }
 
-    // 3倍サイズの5枚の金属風遮蔽板（シールドプレート）
+    // 2倍サイズの5枚の金属風遮蔽板（シールドプレート）
     drawShieldPlates(ctx, coreX, coreY) {
         if (this.shields <= 0) return;
 
-        const plateW = 15;
-        const plateH = 114;
-        const spacing = 21;
-        const startX = coreX - 54;
+        const plateW = 10;
+        const plateH = 76;
+        const spacing = 14;
+        const startX = coreX - 36;
 
         for (let i = 0; i < this.shields; i++) {
             const px = startX - (this.shields - 1 - i) * spacing;
@@ -286,10 +286,10 @@ class Boss {
 
             ctx.save();
 
-            ctx.shadowColor = 'rgba(0, 0, 0, 0.7)';
-            ctx.shadowBlur = 8;
-            ctx.shadowOffsetX = -4;
-            ctx.shadowOffsetY = 4;
+            ctx.shadowColor = 'rgba(0, 0, 0, 0.65)';
+            ctx.shadowBlur = 6;
+            ctx.shadowOffsetX = -3;
+            ctx.shadowOffsetY = 3;
 
             // チタングラデーション
             const metalGrad = ctx.createLinearGradient(px, py, px + plateW, py);
@@ -309,33 +309,33 @@ class Boss {
 
             // 金属ベベル枠
             ctx.strokeStyle = isFlashing ? '#ffffff' : '#99b3cc';
-            ctx.lineWidth = 2;
+            ctx.lineWidth = 1.5;
             ctx.strokeRect(px, py, plateW, plateH);
 
-            // リベットボルト
+            // 上下リベットボルト
             ctx.fillStyle = isFlashing ? '#ffffff' : '#222d38';
-            ctx.fillRect(px + 3, py + 6, 8, 6);
-            ctx.fillRect(px + 3, py + plateH - 12, 8, 6);
+            ctx.fillRect(px + 2, py + 4, 6, 4);
+            ctx.fillRect(px + 2, py + plateH - 8, 6, 4);
 
             // 冷却エナジーライン
             ctx.fillStyle = isFlashing ? '#ffaa00' : '#00ffee';
             ctx.shadowColor = ctx.fillStyle;
-            ctx.shadowBlur = 8;
-            ctx.fillRect(px + 5, py + plateH * 0.35, 4, plateH * 0.3);
+            ctx.shadowBlur = 6;
+            ctx.fillRect(px + 3, py + plateH * 0.35, 3, plateH * 0.3);
 
             ctx.restore();
         }
     }
 
-    // 遮蔽板の当たり判定バウンディングボックス (3倍スケール)
+    // 遮蔽板の当たり判定バウンディングボックス (2倍スケール)
     getShieldBounds() {
         if (this.shields <= 0) return null;
-        const coreX = this.x + 108;
-        const coreY = this.y + 150;
-        const plateW = 15;
-        const plateH = 114;
-        const spacing = 21;
-        const startX = coreX - 54;
+        const coreX = this.x + 72;
+        const coreY = this.y + 100;
+        const plateW = 10;
+        const plateH = 76;
+        const spacing = 14;
+        const startX = coreX - 36;
         const frontX = startX - (this.shields - 1) * spacing;
         const totalW = (this.shields - 1) * spacing + plateW;
 
@@ -347,11 +347,11 @@ class Boss {
         };
     }
 
-    // コアの当たり判定バウンディングボックス (3倍スケール)
+    // コアの当たり判定バウンディングボックス (2倍スケール)
     getCoreBounds() {
-        const coreX = this.x + 108;
-        const coreY = this.y + 150;
-        const r = 48;
+        const coreX = this.x + 72;
+        const coreY = this.y + 100;
+        const r = 32;
         return {
             x: coreX - r,
             y: coreY - r,
@@ -360,23 +360,23 @@ class Boss {
         };
     }
 
-    // 上部ハル（無敵装甲アーム）の当たり判定 (3倍スケール)
+    // 上部ハル（無敵装甲アーム）の当たり判定 (2倍スケール)
     getTopHullBounds() {
         return {
-            x: this.x - 50,
+            x: this.x - 30,
             y: this.y,
-            width: this.width + 50,
-            height: 96
+            width: this.width + 30,
+            height: 64
         };
     }
 
-    // 下部ハル（無敵装甲アーム）の当たり判定 (3倍スケール)
+    // 下部ハル（無敵装甲アーム）の当たり判定 (2倍スケール)
     getBottomHullBounds() {
         return {
-            x: this.x - 50,
-            y: this.y + 204,
-            width: this.width + 50,
-            height: 96
+            x: this.x - 30,
+            y: this.y + 136,
+            width: this.width + 30,
+            height: 64
         };
     }
 }

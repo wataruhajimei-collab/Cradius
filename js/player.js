@@ -84,6 +84,26 @@ class Player {
         if (Input.isDown('KeyL')) {
             this.weaponType = 'LASER';
         }
+
+        // テスト用ショートカット: 2キーで即座にステージ2（ストーンヘンジ面）へワープ
+        if (Input.isDown('Digit2')) {
+            if (typeof levelManager !== 'undefined' && levelManager.stage === 1) {
+                levelManager.startStage2();
+            }
+        }
+
+        // テスト用ショートカット: Bキーで即座にボス戦（2倍ビッグコア）へワープ
+        if (Input.isDown('KeyB')) {
+            if (typeof levelManager !== 'undefined' && levelManager.stage === 1 && levelManager.state !== 'BOSS') {
+                levelManager.state = 'BOSS';
+                levelManager.time = 0;
+                levelManager.terrain.active = false;
+                if (typeof Sound !== 'undefined') Sound.playBossBgm();
+                if (typeof Boss !== 'undefined') {
+                    levelManager.boss = new Boss(levelManager.starfield.width, 200);
+                }
+            }
+        }
     }
 
     // 指定のパワーアップスロットが選択（発動）可能かどうかを判定

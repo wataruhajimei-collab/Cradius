@@ -1,6 +1,8 @@
 // ==========================================
 // CRADIUS STAGE 2: STONEHENGE STAGE (ストーンヘンジ面)
 // 破壊できる石（掘削ブロック）と破壊できない石（古代モノリス）
+// 壊れない石の上に既存敵（砲台・ダッカー）と新キャラ（ルーンタレット）を配置！
+// 飛ぶ敵（編隊・新キャラストーンアイ）がドンドン出現！
 // 掘削しないとスクロールに挟まれて行き詰まるオリジナルグラディウスの完全再現！
 // ==========================================
 
@@ -15,7 +17,6 @@ class StoneBlock {
         this.hp = this.maxHp;
         this.active = true;
         this.flashTimer = 0;
-        this.seed = Math.random() * 100;
     }
 
     update(scrollSpeed) {
@@ -70,7 +71,6 @@ class StoneBlock {
                 grad.addColorStop(0.5, '#ffeecc');
                 grad.addColorStop(1.0, '#ffffff');
             } else {
-                // 耐久力低下に応じて暗くヒビ割れ感
                 const hpRatio = this.hp / this.maxHp;
                 if (hpRatio > 0.66) {
                     grad.addColorStop(0.0, '#e5c392'); // 明るい砂岩
@@ -95,7 +95,7 @@ class StoneBlock {
             ctx.lineWidth = 1.5;
             ctx.strokeRect(this.x, this.y, this.width, this.height);
 
-            // 切り石の上面・左面ハイライトライン
+            // 切り石のハイライトライン
             ctx.strokeStyle = 'rgba(255, 255, 255, 0.4)';
             ctx.lineWidth = 1;
             ctx.beginPath();
@@ -108,7 +108,6 @@ class StoneBlock {
             ctx.strokeStyle = isFlashing ? '#ffaa00' : 'rgba(40, 25, 10, 0.7)';
             ctx.lineWidth = 1.2;
             ctx.beginPath();
-            // 基本クラック
             ctx.moveTo(this.x + 8, this.y + 10);
             ctx.lineTo(this.x + 22, this.y + 24);
             ctx.lineTo(this.x + 32, this.y + 20);
@@ -132,7 +131,6 @@ class StoneBlock {
             ctx.fillStyle = grad;
             ctx.fillRect(this.x, this.y, this.width, this.height);
 
-            // 破壊不能の鋼のような外枠
             ctx.strokeStyle = '#020617';
             ctx.lineWidth = 2;
             ctx.strokeRect(this.x, this.y, this.width, this.height);
@@ -163,14 +161,18 @@ class StonehengeStage {
         this.active = false;
         this.stageTime = 0;
         
+        // 飛ぶ敵のスポーンタイマー（ドンドン出す！）
+        this.flyingEnemyTimer = 0;
+        this.flyingEnemyInterval = 1800; // 1.8秒ごと
+        
         // 遠景パララックス用ストーンヘンジ巨石シルエット
         this.bgMonoliths = [];
-        for (let i = 0; i < 12; i++) {
+        for (let i = 0; i < 14; i++) {
             this.bgMonoliths.push({
-                x: (canvasWidth / 10) * i,
-                y: canvasHeight - (80 + Math.random() * 80),
-                w: 30 + Math.random() * 25,
-                h: 120 + Math.random() * 90,
+                x: (canvasWidth / 12) * i,
+                y: canvasHeight - (90 + Math.random() * 90),
+                w: 32 + Math.random() * 28,
+                h: 130 + Math.random() * 100,
                 speed: 0.4
             });
         }
@@ -180,8 +182,15 @@ class StonehengeStage {
         this.active = true;
         this.blocks = [];
         this.distance = 0;
-        this.spawnColumnX = this.width;
         this.stageTime = 0;
+        this.flyingEnemyTimer = 0;
+
+        // ステージ開幕直後から画面前方に石ブロック群がびっしり広がるよう先行生成！
+        this.spawnColumnX = 320;
+        while (this.spawnColumnX < this.width + 120) {
+            this.generateColumn(this.spawnColumnX);
+            this.spawnColumnX += this.columnWidth;
+        }
     }
 
     update(dt) {
@@ -189,7 +198,7 @@ class StonehengeStage {
         this.stageTime += dt;
         this.distance += this.scrollSpeed;
 
-        // 遠景シルエットのスクロール
+        // 1. 遠景シルエットのスクロール
         this.bgMonoliths.forEach(m => {
             m.x -= m.speed;
             if (m.x + m.w < 0) {
@@ -197,18 +206,70 @@ class StonehengeStage {
             }
         });
 
-        // 石ブロックの移動と画面外削除
+        // 2. 石ブロックの移動と画面外削除
         this.blocks.forEach(b => b.update(this.scrollSpeed));
         this.blocks = this.blocks.filter(b => b.active);
 
-        // 新しい列ブロック群の定期生成
+        // 3. 新しい石ブロック列の生成（絶え間なく密集して出現！）
         while (this.spawnColumnX < this.width + 120) {
             this.generateColumn(this.spawnColumnX);
             this.spawnColumnX += this.columnWidth;
         }
+
+        // 4. 飛ぶ敵をドンドン出すシステム！
+        this.updateFlyingEnemies(dt);
     }
 
-    // ストーンヘンジ面のレイアウト生成（破壊できる石で塞がれた掘削エリア）
+    // 飛ぶ敵をドンドン出す処理
+    updateFlyingEnemies(dt) {
+        if (typeof enemies === 'undefined') return;
+
+        this.flyingEnemyTimer += dt;
+        if (this.flyingEnemyTimer > this.flyingEnemyInterval) {
+            this.flyingEnemyTimer = 0;
+            this.flyingEnemyInterval = 1600 + Math.random() * 800; // 1.6〜2.4秒間隔
+
+            const spawnRoll = Math.random();
+
+            if (spawnRoll < 0.40) {
+                // パターンA: 新キャラ「古代ストーンアイ（StoneEyeEnemy）」が浮遊飛来！
+                const spawnY = 120 + Math.random() * 360;
+                if (typeof StoneEyeEnemy !== 'undefined') {
+                    enemies.push(new StoneEyeEnemy(this.width + 50, spawnY));
+                    if (Math.random() < 0.5) {
+                        enemies.push(new StoneEyeEnemy(this.width + 110, spawnY + (Math.random() - 0.5) * 60));
+                    }
+                }
+            } else if (spawnRoll < 0.75) {
+                // パターンB: 編隊敵（FanEnemy）の高速サイン波編隊（5機編隊）
+                const isRed = Math.random() < 0.35; // 35%の確率でカプセル確定ドロップ赤編隊！
+                const startY = 140 + Math.random() * 320;
+                const formation = (typeof EnemyFormation !== 'undefined') ? new EnemyFormation() : null;
+
+                for (let i = 0; i < 5; i++) {
+                    const delay = i * 160;
+                    setTimeout(() => {
+                        if (!this.active || typeof FanEnemy === 'undefined') return;
+                        const fe = new FanEnemy(this.width + 40, startY, isRed);
+                        if (formation) {
+                            fe.formation = formation;
+                            formation.enemies.push(fe);
+                        }
+                        enemies.push(fe);
+                    }, delay);
+                }
+            } else {
+                // パターンC: 単機またはペアの急襲戦闘機
+                const y1 = 100 + Math.random() * 400;
+                if (typeof Enemy !== 'undefined') {
+                    enemies.push(new Enemy(this.width + 40, y1));
+                    enemies.push(new Enemy(this.width + 90, y1 + 30));
+                }
+            }
+        }
+    }
+
+    // ストーンヘンジ面のレイアウト生成（石に多くを占められた面＆壊れない石の上の敵）
     generateColumn(colX) {
         const totalRows = Math.floor(this.height / this.columnWidth); // 600 / 40 = 15行
         const colIndex = Math.floor(colX / this.columnWidth);
@@ -217,31 +278,84 @@ class StonehengeStage {
         this.blocks.push(new StoneBlock(colX, 0, this.columnWidth, this.columnWidth, false));
         this.blocks.push(new StoneBlock(colX, (totalRows - 1) * this.columnWidth, this.columnWidth, this.columnWidth, false));
 
-        // 周期的なパターン生成 (掘削ウォールエリア & オープンエリア)
-        const patternPhase = (colIndex % 32);
+        // 16列ごとの大型サイクル
+        const phase = (colIndex % 16);
 
-        if (patternPhase >= 8 && patternPhase <= 22) {
-            // --- 掘削エリア（通路が破壊できる石で埋め尽くされ、掘らないと行き詰まる！） ---
+        // --- A. 壊れない石（古代モノリス柱・足場）の配置 ---
+        let hasIndestructible = false;
+        let pillarRow = -1;
+
+        if (phase === 2 || phase === 8 || phase === 13) {
+            // 上下から突き出す巨石柱
+            const fromTop = (phase % 2 === 0);
+            const pillarHeight = 4 + (colIndex % 3); // 4〜6ブロック分の柱
+
             for (let r = 1; r < totalRows - 1; r++) {
-                // 上下から突き出る破壊不能モノリス柱
-                const isIndestructiblePillar = (r <= 2 || r >= totalRows - 3) && (colIndex % 4 === 0);
-                
-                if (isIndestructiblePillar) {
+                if (fromTop && r <= pillarHeight) {
                     this.blocks.push(new StoneBlock(colX, r * this.columnWidth, this.columnWidth, this.columnWidth, false));
+                    pillarRow = pillarHeight;
+                    hasIndestructible = true;
+                } else if (!fromTop && r >= totalRows - 1 - pillarHeight) {
+                    this.blocks.push(new StoneBlock(colX, r * this.columnWidth, this.columnWidth, this.columnWidth, false));
+                    if (pillarRow === -1) pillarRow = r;
+                    hasIndestructible = true;
+                }
+            }
+        } else if (phase === 5 || phase === 11) {
+            // 中空に浮かぶ壊れない石の要塞足場
+            const midR = 6 + (colIndex % 3);
+            this.blocks.push(new StoneBlock(colX, midR * this.columnWidth, this.columnWidth, this.columnWidth, false));
+            this.blocks.push(new StoneBlock(colX, (midR + 1) * this.columnWidth, this.columnWidth, this.columnWidth, false));
+            pillarRow = midR;
+            hasIndestructible = true;
+        }
+
+        // --- B. 壊れない石の上に敵を配置！(既存敵 & 新キャラ) ---
+        if (hasIndestructible && typeof enemies !== 'undefined') {
+            const enemyRoll = Math.random();
+            const spawnX = colX + 2;
+
+            if (pillarRow > 0 && pillarRow < totalRows - 1) {
+                // 上面設置または下面設置
+                const isCeil = (pillarRow <= 6);
+                const spawnY = isCeil ? (pillarRow + 1) * this.columnWidth : (pillarRow - 1) * this.columnWidth;
+
+                if (enemyRoll < 0.40) {
+                    // 新キャラ1: 古代ルーン砲台 (RuneTurret)
+                    if (typeof RuneTurret !== 'undefined') {
+                        enemies.push(new RuneTurret(spawnX, spawnY, isCeil));
+                    }
+                } else if (enemyRoll < 0.70) {
+                    // 既存敵: 砲台 (TurretEnemy)
+                    if (typeof TurretEnemy !== 'undefined') {
+                        enemies.push(new TurretEnemy(spawnX, spawnY, isCeil, Math.random() < 0.2));
+                    }
                 } else {
-                    // 全面を破壊できる石で埋め尽くす！（ショットやレーザーで掘削が必須）
-                    // ただし稀に1〜2マスだけ狭い抜け道やカプセル用隙間を設ける
-                    const isNarrowPath = (patternPhase === 15 && (r === 6 || r === 7));
-                    if (!isNarrowPath) {
-                        this.blocks.push(new StoneBlock(colX, r * this.columnWidth, this.columnWidth, this.columnWidth, true));
+                    // 既存敵: 歩行ロボット・ダッカー (DuckerEnemy)
+                    if (typeof DuckerEnemy !== 'undefined') {
+                        enemies.push(new DuckerEnemy(spawnX, spawnY, isCeil, Math.random() < 0.2));
                     }
                 }
             }
-        } else if (patternPhase === 4 || patternPhase === 26) {
-            // 柱状の障害物（ストーンヘンジの門）
+        }
+
+        // --- C. 破壊できる石（砂岩ブロック）の連続高密度配置（掘らないと行き詰まる！） ---
+        // 16列中、10列以上でびっしりと石の層が出現！
+        const isDenseWallPhase = (phase >= 1 && phase <= 4) || (phase >= 7 && phase <= 10) || (phase >= 12 && phase <= 15);
+
+        if (isDenseWallPhase) {
             for (let r = 1; r < totalRows - 1; r++) {
-                if (r < 5 || r > 9) {
-                    this.blocks.push(new StoneBlock(colX, r * this.columnWidth, this.columnWidth, this.columnWidth, false));
+                // 既に壊れない石がある場所には重ねない
+                const alreadyHasBlock = this.blocks.some(b => Math.abs(b.x - colX) < 5 && Math.abs(b.y - r * this.columnWidth) < 5);
+                if (alreadyHasBlock) continue;
+
+                // 通路の開口部（1〜2ブロック分だけ狭い隙間。それ以外は全部掘削ブロック！）
+                const gapRow = 5 + (Math.floor(colIndex / 4) % 5);
+                const isGap = (r === gapRow);
+
+                if (!isGap) {
+                    // 破壊できる石を敷き詰める！
+                    this.blocks.push(new StoneBlock(colX, r * this.columnWidth, this.columnWidth, this.columnWidth, true));
                 }
             }
         }
@@ -326,7 +440,7 @@ class StonehengeStage {
         // 3. 全ての石ブロックの描画
         this.blocks.forEach(b => b.draw(ctx));
 
-        // 4. ステージ2開幕インジケーター（開始から約3秒間）
+        // 4. ステージ2開幕インジケーター（開始から約3.5秒間）
         if (this.stageTime < 3500) {
             const alpha = Math.min(1, Math.sin((this.stageTime / 3500) * Math.PI));
             ctx.font = 'bold 36px "Courier New", monospace';

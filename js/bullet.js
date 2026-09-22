@@ -189,3 +189,46 @@ class EnemyLaser extends Bullet {
         ctx.restore();
     }
 }
+
+// 古代イオンリング弾 (RingBullet: ストーンアイ・モアイが放つリング光弾)
+class RingBullet extends Bullet {
+    constructor(x, y, speedX, speedY, color = '#38bdf8') {
+        super(x - 8, y - 8, speedX, speedY, color, true);
+        this.radius = 8;
+        this.width = 16;
+        this.height = 16;
+        this.color = color;
+        this.pulse = 0;
+    }
+
+    update(canvasHeight) {
+        super.update(canvasHeight);
+        this.pulse += 0.15;
+    }
+
+    draw(ctx) {
+        ctx.save();
+        const cx = this.x + this.width / 2;
+        const cy = this.y + this.height / 2;
+        const r = this.radius + Math.sin(this.pulse) * 1.5;
+
+        ctx.shadowColor = this.color;
+        ctx.shadowBlur = 10;
+
+        // 外周リング
+        ctx.strokeStyle = this.color;
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.arc(cx, cy, r, 0, Math.PI * 2);
+        ctx.stroke();
+
+        // 内周ホワイトリング
+        ctx.strokeStyle = '#ffffff';
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.arc(cx, cy, r * 0.65, 0, Math.PI * 2);
+        ctx.stroke();
+
+        ctx.restore();
+    }
+}
