@@ -15,10 +15,10 @@ class Boss {
         this.isEntering = true; // 登場中は完全無敵
         this.color = '#aa4444';
         
-        // 遮蔽板: 5枚の金属風シールドプレート (各4発耐久、ダブル弾なら2発で粉砕)
+        // 遮蔽板: 5枚の金属風シールドプレート (各36発耐久、ダブル弾なら18発で破壊)
         this.maxShields = 5;
         this.shields = 5;
-        this.shieldHpPerPlate = 4; // ダブルや通常弾でもサクサク壊せる爽快バランス！
+        this.shieldHpPerPlate = 36; // 硬め（1枚あたり36発耐久）
         this.currentShieldHp = this.shieldHpPerPlate;
         this.shieldHitCooldown = 0; // 連続多重ヒット抑制用クールダウン
         this.shieldFlashTimer = 0;
@@ -122,13 +122,13 @@ class Boss {
         const shieldBounds = this.getShieldBounds();
         const coreHitbox = this.getCoreBounds();
 
-        // レーザーのヒットレート抑制
+        // レーザーのヒットレート抑制（レーザーに対して遮蔽板・コアを頑丈に）
         if (bullet instanceof Laser) {
             if (bullet.bossHitCooldown && bullet.bossHitCooldown > 0) {
                 bullet.bossHitCooldown--;
                 return;
             }
-            bullet.bossHitCooldown = 4;
+            bullet.bossHitCooldown = 20;
         }
 
         // ダブル弾の判定（ダブル弾なら遮蔽板に2ダメージ！）
@@ -913,3 +913,364 @@ class GolemBoss {
     }
 }
 
+
+// ==========================================
+// STAGE 3 BOSS: ビッグコア (BigCoreBoss)
+// グラディウス伝統の4シールドコア＋中央コア型機械要塞ボス
+// 前面4つの防衛コアを全滅させてからコア本体を攻撃！
+// ==========================================
+class BigCoreBoss {
+    constructor(x, y) {
+        this.x = (x || 800) + 100;
+        this.targetX = 580;
+        this.y = y || 300;
+        this.width = 240;
+        this.height = 180;
+        this.active = true;
+        this.isEntering = true;
+        this.isDying = false;
+
+        this.maxHp = 40;
+        this.hp = 40;
+
+        // 前面4つのシールドコア
+        this.shieldCores = [
+            { hp: 8, maxHp: 8, flashTimer: 0, active: true },
+            { hp: 8, maxHp: 8, flashTimer: 0, active: true },
+            { hp: 8, maxHp: 8, flashTimer: 0, active: true },
+            { hp: 8, maxHp: 8, flashTimer: 0, active: true },
+        ];
+
+        this.coreOpen = false;
+        this.hitFlashTimer = 0;
+        this.moveTimer = 0;
+        this.rotationAngle = 0;
+        this.fireTimer = 0;
+        this.bullets = [];
+    }
+
+    get allShieldsDestroyed() {
+        return this.shieldCores.every(c => !c.active);
+    }
+
+    update() {
+        if (this.isDying) return;
+
+        if (this.x > this.targetX) {
+            this.x -= 2.8;
+            this.isEntering = true;
+            return;
+        }
+        this.isEntering = false;
+
+        this.moveTimer += 0.018;
+        this.y = 300 + Math.sin(this.moveTimer) * 70;
+        this.rotationAngle += 0.05;
+
+        this.shieldCores.forEach(c => { if (c.flashTimer > 0) c.flashTimer--; });
+        if (this.hitFlashTimer > 0) this.hitFlashTimer--;
+
+        this.coreOpen = this.allShieldsDestroyed;
+
+        this.fireTimer++;
+        const interval = this.coreOpen ? 70 : 95;
+        if (this.fireTimer >= interval) {
+            this.fireTimer = 0;
+            this.shoot();
+        }
+
+        this.bullets.forEach(b => b.update(600));
+        this.bullets = this.bullets.filter(b => b.active);
+    }
+
+    shoot() {
+        const bx = this.x - this.width / 2 + 10;
+        const by = this.y;
+        const spd = this.coreOpen ? -8.5 : -7.0;
+        this.bullets.push(new Bullet(bx, by - 54, spd, 0, '#00ffff', true));
+        this.bullets.push(new Bullet(bx, by - 18, spd, 0, '#ffaa00', true));
+        this.bullets.push(new Bullet(bx, by + 18, spd, 0, '#ffaa00', true));
+        this.bullets.push(new Bullet(bx, by + 54, spd, 0, '#00ffff', true));
+    }
+
+    _getShieldCoreX(index) {
+        const leftEdge = this.x - this.width / 2;
+        return leftEdge + 22 + index * 38;
+    }
+
+    _getShieldCoreBounds(index) {
+        const cx = this._getShieldCoreX(index);
+        const r = 15;
+        return { x: cx - r, y: this.y - r, width: r * 2, height: r * 2 };
+    }
+
+    hitShieldCore(damage) {
+        for (let i = 0; i < this.shieldCores.length; i++) {
+            const core = this.shieldCores[i];
+            if (core.active) {
+                core.hp -= damage;
+                core.flashTimer = 8;
+                if (core.hp <= 0) {
+                    core.active = false;
+                    const scx = this._getShieldCoreX(i);
+                    if (typeof createExplosion === 'function') {
+                        createExplosion(scx, this.y, '#00ffff');
+                        createExplosion(scx, this.y, '#ffaa00');
+                    }
+                    if (typeof Sound !== 'undefined' && typeof Sound.playExplosion === 'function') Sound.playExplosion();
+                }
+                return true;
+            }
+            break; // 最前列のみ受け付ける
+        }
+        return false;
+    }
+
+    hitCore(damage) {
+        this.hitFlashTimer = 5;
+        this.hp -= damage;
+    }
+
+    handleBulletCollision(bullet) {
+        if (this.isEntering || this.isDying || !this.active) return;
+
+        if (bullet instanceof Laser) {
+            if (bullet.bossHitCooldown && bullet.bossHitCooldown > 0) {
+                bullet.bossHitCooldown--;
+                return;
+            }
+            bullet.bossHitCooldown = 18;
+        }
+
+        // シールドコア判定（最前列のアクティブなコアを探す）
+        for (let i = 0; i < this.shieldCores.length; i++) {
+            const core = this.shieldCores[i];
+            if (!core.active) continue;
+            const bounds = this._getShieldCoreBounds(i);
+            if (checkCollision(bullet, bounds)) {
+                if (!(bullet instanceof Laser)) bullet.active = false;
+                this.hitShieldCore(1);
+                createExplosion(bullet.x, bullet.y, '#ffffaa');
+                if (typeof Sound !== 'undefined' && typeof Sound.playBossHit === 'function') Sound.playBossHit();
+                return;
+            }
+            break; // 最前列のみ
+        }
+
+        // 中央コア判定（全シールド破壊後のみ）
+        if (this.allShieldsDestroyed) {
+            const coreBounds = { x: this.x - 28, y: this.y - 28, width: 56, height: 56 };
+            if (checkCollision(bullet, coreBounds)) {
+                if (!(bullet instanceof Laser)) bullet.active = false;
+                this.hitCore(1);
+                createExplosion(bullet.x, bullet.y, '#ff4400');
+                if (typeof Sound !== 'undefined') Sound.playBossHit();
+                if (this.hp <= 0 && typeof triggerBossDefeatExplosion === 'function') {
+                    triggerBossDefeatExplosion(this);
+                }
+                return;
+            }
+        }
+
+        // 上下アーム（無敵装甲）
+        const topArm = { x: this.x - this.width / 2, y: this.y - 90, width: this.width - 20, height: 55 };
+        const botArm = { x: this.x - this.width / 2, y: this.y + 35, width: this.width - 20, height: 55 };
+        if (checkCollision(bullet, topArm) || checkCollision(bullet, botArm)) {
+            if (!(bullet instanceof Laser)) bullet.active = false;
+            createExplosion(bullet.x, bullet.y, '#556677');
+            if (typeof Sound !== 'undefined') Sound.playBossHit();
+        }
+    }
+
+    draw(ctx) {
+        if (!this.active) return;
+        ctx.save();
+
+        if (this.isDying) {
+            ctx.translate((Math.random() - 0.5) * 14, (Math.random() - 0.5) * 14);
+            if (Math.floor(Date.now() / 60) % 2 === 0) ctx.filter = 'brightness(2.4) saturate(2)';
+        }
+
+        const cx = this.x;
+        const cy = this.y;
+        const hw = this.width / 2;
+
+        // 上部アーム
+        this._drawArm(ctx, cx, cy, hw, false);
+        // 下部アーム
+        this._drawArm(ctx, cx, cy, hw, true);
+
+        // メインボディ胴体
+        const bodyGrad = ctx.createLinearGradient(cx - hw, cy - 30, cx + hw, cy + 30);
+        bodyGrad.addColorStop(0, '#1a2a3a');
+        bodyGrad.addColorStop(0.35, '#2a4055');
+        bodyGrad.addColorStop(0.65, '#1a2a3a');
+        bodyGrad.addColorStop(1, '#0a1520');
+        ctx.fillStyle = bodyGrad;
+        ctx.shadowColor = 'rgba(0,0,0,0.8)';
+        ctx.shadowBlur = 12;
+        ctx.beginPath();
+        ctx.moveTo(cx + hw, cy - 28);
+        ctx.lineTo(cx + hw - 8, cy - 30);
+        ctx.lineTo(cx - hw + 18, cy - 26);
+        ctx.lineTo(cx - hw, cy);
+        ctx.lineTo(cx - hw + 18, cy + 26);
+        ctx.lineTo(cx + hw - 8, cy + 30);
+        ctx.lineTo(cx + hw, cy + 28);
+        ctx.closePath();
+        ctx.fill();
+        ctx.shadowBlur = 0;
+        ctx.strokeStyle = '#3a5a7a';
+        ctx.lineWidth = 2;
+        ctx.stroke();
+
+        // 中央コア
+        this._drawMainCore(ctx, cx, cy);
+
+        // 前面シールドコア4つ
+        this._drawShieldCores(ctx, cy);
+
+        ctx.restore();
+
+        this.bullets.forEach(b => b.draw(ctx));
+    }
+
+    _drawArm(ctx, cx, cy, hw, isBottom) {
+        const sign = isBottom ? 1 : -1;
+        const grad = ctx.createLinearGradient(cx - hw, cy, cx + hw, cy);
+        grad.addColorStop(0, '#1a2535');
+        grad.addColorStop(0.5, '#2e4a65');
+        grad.addColorStop(1, '#0f1820');
+        ctx.fillStyle = grad;
+        ctx.shadowColor = 'rgba(0,0,0,0.7)';
+        ctx.shadowBlur = 8;
+        ctx.beginPath();
+        ctx.moveTo(cx + hw, cy + sign * 5);
+        ctx.lineTo(cx + hw - 12, cy + sign * 50);
+        ctx.lineTo(cx - hw + 30, cy + sign * 50);
+        ctx.lineTo(cx - hw, cy + sign * 30);
+        ctx.lineTo(cx - hw, cy + sign * 5);
+        ctx.closePath();
+        ctx.fill();
+        ctx.shadowBlur = 0;
+        ctx.strokeStyle = '#3a5a7a';
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
+        // アームパネル
+        ctx.strokeStyle = 'rgba(0,200,255,0.25)';
+        ctx.lineWidth = 1;
+        const ay = cy + sign * 28;
+        ctx.beginPath();
+        ctx.moveTo(cx + hw * 0.3, cy + sign * 8);
+        ctx.lineTo(cx + hw * 0.3, ay);
+        ctx.moveTo(cx + hw * 0.6, cy + sign * 8);
+        ctx.lineTo(cx + hw * 0.6, ay);
+        ctx.stroke();
+    }
+
+    _drawMainCore(ctx, cx, cy) {
+        ctx.save();
+        const hpRatio = Math.max(0, this.hp / this.maxHp);
+        const pulse = Math.sin(Date.now() * 0.008) * 0.25 + 0.75;
+
+        let baseColor, glowColor;
+        if (this.hitFlashTimer > 0) {
+            baseColor = '#ffffff'; glowColor = '#ffffff';
+        } else if (hpRatio > 0.5) {
+            baseColor = '#ff4400'; glowColor = '#ff2200';
+        } else if (hpRatio > 0.25) {
+            baseColor = '#ff6600'; glowColor = '#ffaa00';
+        } else {
+            const f = Math.floor(Date.now() / 80) % 2 === 0;
+            baseColor = f ? '#ffffff' : '#ff0000'; glowColor = '#ff0000';
+        }
+
+        const r = 26;
+        ctx.shadowColor = glowColor;
+        ctx.shadowBlur = (this.coreOpen ? 32 : 16) * pulse;
+
+        // マウントリング
+        ctx.fillStyle = '#0d1520';
+        ctx.beginPath();
+        ctx.arc(cx, cy, r + 8, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.strokeStyle = '#2a4060';
+        ctx.lineWidth = 3;
+        ctx.stroke();
+
+        // 球体コア
+        const sg = ctx.createRadialGradient(cx - r * 0.3, cy - r * 0.3, 2, cx, cy, r);
+        sg.addColorStop(0, '#ffffff');
+        sg.addColorStop(0.3, baseColor);
+        sg.addColorStop(0.8, glowColor);
+        sg.addColorStop(1, '#220000');
+        ctx.fillStyle = sg;
+        ctx.beginPath();
+        ctx.arc(cx, cy, r, 0, Math.PI * 2);
+        ctx.fill();
+
+        // 回転リング
+        ctx.save();
+        ctx.translate(cx, cy);
+        ctx.rotate(this.rotationAngle);
+        ctx.strokeStyle = `rgba(255,200,100,${0.45 * pulse})`;
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        for (let i = 0; i < 6; i++) {
+            const a = (Math.PI / 3) * i;
+            if (i === 0) ctx.moveTo(Math.cos(a) * r * 0.65, Math.sin(a) * r * 0.65);
+            else ctx.lineTo(Math.cos(a) * r * 0.65, Math.sin(a) * r * 0.65);
+        }
+        ctx.closePath();
+        ctx.stroke();
+        ctx.restore();
+
+        ctx.shadowBlur = 0;
+        ctx.fillStyle = `rgba(255,255,255,${0.55 * pulse})`;
+        ctx.beginPath();
+        ctx.ellipse(cx - r * 0.3, cy - r * 0.3, r * 0.4, r * 0.2, -Math.PI / 4, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.restore();
+    }
+
+    _drawShieldCores(ctx, cy) {
+        ctx.save();
+        for (let i = 0; i < this.shieldCores.length; i++) {
+            const core = this.shieldCores[i];
+            if (!core.active) continue;
+
+            const scx = this._getShieldCoreX(i);
+            const scy = cy;
+            const r = 13;
+            const pulse = Math.sin(Date.now() * 0.010 + i * 1.5) * 0.2 + 0.8;
+            const isFlash = core.flashTimer > 0;
+            const hpRatio = core.hp / core.maxHp;
+            const coreColor = isFlash ? '#ffffff' : (hpRatio > 0.5 ? '#00ffee' : '#ffaa00');
+
+            ctx.shadowColor = coreColor;
+            ctx.shadowBlur = 16 * pulse;
+
+            // 外枠
+            ctx.strokeStyle = isFlash ? '#ffffff' : '#2a4a6a';
+            ctx.lineWidth = 3;
+            ctx.beginPath();
+            ctx.arc(scx, scy, r + 4, 0, Math.PI * 2);
+            ctx.stroke();
+
+            // コア球体
+            const grad = ctx.createRadialGradient(scx - 3, scy - 3, 1, scx, scy, r);
+            grad.addColorStop(0, '#ffffff');
+            grad.addColorStop(0.4, coreColor);
+            grad.addColorStop(1, '#001020');
+            ctx.fillStyle = grad;
+            ctx.beginPath();
+            ctx.arc(scx, scy, r, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.shadowBlur = 0;
+        }
+        ctx.restore();
+    }
+}
+
+window.BigCoreBoss = BigCoreBoss;

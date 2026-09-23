@@ -2054,6 +2054,86 @@ class SoundManager {
             }
         });
     }
+
+    playStage3Bgm() {
+        if (this.currentBgm === 'STAGE3') return;
+        this.currentBgm = 'STAGE3';
+
+        const bpm = 132;
+        const totalSteps = 128; // 8小節ループ
+
+        // 1. ミステリアスなドラム（控えめでスペーシーなビート）
+        const dStg3_A = [
+            1,3,3,3, 2,3,3,3, 1,3,3,3, 2,3,4,3
+        ];
+        const dStg3_B = [
+            1,3,3,3, 2,3,1,3, 3,3,1,3, 2,3,3,4
+        ];
+        const drums = [
+            dStg3_A, dStg3_A, dStg3_B, dStg3_B,
+            dStg3_A, dStg3_A, dStg3_B, dStg3_B
+        ].flat();
+
+        // 2. 深海のような低いベース（Aマイナー）
+        const bStg3_1 = [A1,_,_,A1, C2,_,E2,_, A1,_,_,A1, G2,_,F2,_];
+        const bStg3_2 = [F1,_,_,F1, A1,_,C2,_, F1,_,_,F1, E2,_,D2,_];
+        const bStg3_3 = [C2,_,_,C2, E2,_,G2,_, C2,_,_,C2, B2,_,A2,_];
+        const bStg3_4 = [E1,_,_,E1, G1,_,B1,_, E2,E2,E2,E2, A2,G2,F2,E2];
+        const bass = [
+            bStg3_1, bStg3_2, bStg3_3, bStg3_4,
+            bStg3_1, bStg3_2, bStg3_3, bStg3_4
+        ].flat();
+
+        // 3. 神秘的なアルペジオ（ハープ風）
+        const aStg3_1 = [A4,E5,A5,C6, E6,C6,A5,E5, A4,E5,A5,C6, E6,C6,A5,E5];
+        const aStg3_2 = [F4,C5,F5,A5, C6,A5,F5,C5, F4,C5,F5,A5, C6,A5,F5,C5];
+        const aStg3_3 = [C4,G4,C5,E5, G5,E5,C5,G4, E4,B4,E5,G5, B5,G5,E5,B4];
+        const aStg3_4 = [E4,B4,E5,G5, B5,G5,E5,B4, A4,E5,A5,C6, E6,C6,A5,E5];
+        const arpeggio = [
+            aStg3_1, aStg3_2, aStg3_3, aStg3_4,
+            aStg3_1, aStg3_2, aStg3_3, aStg3_4
+        ].flat();
+
+        // 4. 古代遺跡の神秘を表すメロディ（モアイ面）
+        const lead = [
+            // 0-3: Aメロ（神秘的・浮遊感）
+            A5,_,_,_, C6,_,B5,_, A5,_,_,G5, E5,_,_,_,
+            F5,_,_,_, A5,_,G5,_, F5,_,_,E5, C5,_,_,_,
+            E5,_,_,_, G5,_,A5,_, B5,_,_,D6, C6,_,B5,_,
+            A5,_,_,_, E5,_,_,_, A5,_,_,_,  _,_,_,_,
+
+            // 4-7: Bメロ（緊張感・壮大な古代文明）
+            C6,_,_,_, B5,_,A5,_, G5,_,_,_, F5,_,E5,_,
+            D5,_,F5,_, A5,_,C6,_, B5,_,_,_, A5,_,G5,_,
+            F5,_,G5,_, A5,_,B5,_, C6,_,_,_, D6,_,C6,_,
+            B5,_,_,_, A5,_,G5,_, A5,_,_,_,  _,_,_,_
+        ];
+
+        this.startScheduler(bpm, totalSteps, (step, time, stepDur) => {
+            const d = drums[step];
+            if (d === 1) this.triggerKick(time);
+            else if (d === 2) this.triggerSnare(time);
+            else if (d === 3) this.triggerHiHat(time, false);
+            else if (d === 4) this.triggerHiHat(time, true);
+
+            const b = bass[step];
+            if (b > 0) this.triggerBass(b, time, stepDur * 1.5, 0.32);
+
+            const a = arpeggio[step];
+            if (a > 0) this.triggerArp(a, time, stepDur * 0.8, 0.12);
+
+            const l = lead[step];
+            if (l > 0) {
+                let lLen = 1;
+                for (let k = 1; k < 6; k++) {
+                    if (lead[(step + k) % totalSteps] === 0) lLen++;
+                    else break;
+                }
+                const dur = stepDur * lLen * 0.90;
+                this.triggerLead(l, time, dur, 0.30);
+            }
+        });
+    }
 }
 
 // グローバルサウンドインスタンス

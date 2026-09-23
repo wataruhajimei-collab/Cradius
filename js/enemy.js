@@ -2300,3 +2300,180 @@ class WarpSphereEnemy extends Enemy {
     }
 }
 
+
+// ==========================================
+// STAGE 3: モアイ像の敵 (MoaiEnemy)
+// 宇宙空間を漂う古代石像。口からリング弾を3方向に発射！
+// 地形に埋め込まれたモアイと浮遊モアイの共通基底クラス
+// ==========================================
+class MoaiEnemy {
+    constructor(x, y, facingUp = false, isRed = false) {
+        this.x = x;
+        this.y = y;
+        this.width = 52;
+        this.height = 70;
+        this.facingUp = facingUp; // true: 下向き（天井配置）, false: 上向き（地面配置）or 空中浮遊
+        this.isRed = isRed;
+        this.hp = 3;
+        this.active = true;
+        this.shootTimer = Math.floor(Math.random() * 80); // 発射タイマー（初期オフセット）
+        this.shootInterval = 110;
+        this.mouthOpenTimer = 0;
+        this.mouthOpen = false;
+        this.flashTimer = 0;
+        this.scrollSpeed = 1.8; // 地形スクロールに合わせた横移動速度
+        this.formation = null;
+    }
+
+    update() {
+        this.x -= this.scrollSpeed;
+        if (this.flashTimer > 0) this.flashTimer--;
+
+        // 口の開閉アニメーション
+        this.shootTimer++;
+        if (this.shootTimer >= this.shootInterval - 20) {
+            this.mouthOpen = true;
+        }
+        if (this.shootTimer >= this.shootInterval) {
+            this.shootTimer = 0;
+            this.mouthOpen = false;
+            this._shoot();
+        }
+    }
+
+    _shoot() {
+        if (typeof enemyBullets === 'undefined') return;
+        // 口の位置から左方向に3way リング弾発射
+        const mx = this.x + (this.facingUp ? this.width / 2 : this.width / 2);
+        const my = this.y + (this.facingUp ? this.height * 0.85 : this.height * 0.15);
+        const spd = 3.5;
+        const color = this.isRed ? '#ff6644' : '#38bdf8';
+        if (typeof RingBullet !== 'undefined') {
+            enemyBullets.push(new RingBullet(mx, my, -spd, -1.4, color));
+            enemyBullets.push(new RingBullet(mx, my, -spd, 0, color));
+            enemyBullets.push(new RingBullet(mx, my, -spd, 1.4, color));
+        }
+        if (typeof Sound !== 'undefined' && typeof Sound.playBossHit === 'function') Sound.playBossHit();
+    }
+
+    draw(ctx) {
+        if (!this.active) return;
+        ctx.save();
+
+        const x = this.x;
+        const y = this.y;
+        const w = this.width;
+        const h = this.height;
+        const isFlash = this.flashTimer > 0;
+
+        ctx.shadowColor = 'rgba(0,0,0,0.7)';
+        ctx.shadowBlur = 8;
+        ctx.shadowOffsetX = -3;
+        ctx.shadowOffsetY = 4;
+
+        // モアイ像の胴体グラデーション（石像らしい灰青色）
+        const stoneGrad = ctx.createLinearGradient(x, y, x + w, y + h);
+        if (isFlash) {
+            stoneGrad.addColorStop(0, '#ffffff');
+            stoneGrad.addColorStop(0.5, '#ccddff');
+            stoneGrad.addColorStop(1, '#ffffff');
+        } else if (this.isRed) {
+            stoneGrad.addColorStop(0, '#cc5544');
+            stoneGrad.addColorStop(0.4, '#882233');
+            stoneGrad.addColorStop(1, '#441122');
+        } else {
+            stoneGrad.addColorStop(0, '#8a9aaa');
+            stoneGrad.addColorStop(0.35, '#627080');
+            stoneGrad.addColorStop(0.7, '#3a4a58');
+            stoneGrad.addColorStop(1, '#1e2a34');
+        }
+        ctx.fillStyle = stoneGrad;
+
+        // 天井向き（facingUp=true）は上下反転して描画
+        ctx.save();
+        if (this.facingUp) {
+            ctx.translate(x + w / 2, y + h / 2);
+            ctx.scale(1, -1);
+            ctx.translate(-(x + w / 2), -(y + h / 2));
+        }
+
+        // 頭部（大きな台形）
+        ctx.beginPath();
+        ctx.moveTo(x + 8, y);
+        ctx.lineTo(x + w - 8, y);
+        ctx.lineTo(x + w - 2, y + h * 0.45);
+        ctx.lineTo(x + 2, y + h * 0.45);
+        ctx.closePath();
+        ctx.fill();
+
+        ctx.shadowBlur = 0;
+        ctx.shadowOffsetX = 0;
+        ctx.shadowOffsetY = 0;
+
+        // 胴体下部
+        ctx.beginPath();
+        ctx.moveTo(x + 2, y + h * 0.45);
+        ctx.lineTo(x + w - 2, y + h * 0.45);
+        ctx.lineTo(x + w - 5, y + h);
+        ctx.lineTo(x + 5, y + h);
+        ctx.closePath();
+        ctx.fill();
+
+        // 目（シアン発光）
+        const eyeY = y + h * 0.2;
+        const eyeColor = isFlash ? '#ffffff' : (this.isRed ? '#ffaa00' : '#00ffee');
+        ctx.shadowColor = eyeColor;
+        ctx.shadowBlur = 10;
+        ctx.fillStyle = eyeColor;
+        // 左目
+        ctx.beginPath();
+        ctx.ellipse(x + w * 0.3, eyeY, 5, 4, 0, 0, Math.PI * 2);
+        ctx.fill();
+        // 右目
+        ctx.beginPath();
+        ctx.ellipse(x + w * 0.7, eyeY, 5, 4, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.shadowBlur = 0;
+
+        // 鼻の隆起
+        ctx.fillStyle = 'rgba(0,0,0,0.3)';
+        ctx.fillRect(x + w * 0.4, y + h * 0.28, w * 0.2, h * 0.08);
+
+        // 口（開閉アニメーション）
+        const mouthY = y + h * 0.38;
+        const mouthOpen = this.mouthOpen ? h * 0.09 : h * 0.025;
+        const mouthColor = this.mouthOpen ? (this.isRed ? '#ff4400' : '#00ccff') : '#1a2530';
+        ctx.shadowColor = this.mouthOpen ? mouthColor : 'transparent';
+        ctx.shadowBlur = this.mouthOpen ? 14 : 0;
+        ctx.fillStyle = mouthColor;
+        ctx.beginPath();
+        ctx.ellipse(x + w / 2, mouthY, w * 0.28, mouthOpen, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.shadowBlur = 0;
+
+        // 耳（横の突起）
+        ctx.fillStyle = isFlash ? '#ccddee' : '#4a5a6a';
+        ctx.fillRect(x - 4, y + h * 0.08, 6, h * 0.2);
+        ctx.fillRect(x + w - 2, y + h * 0.08, 6, h * 0.2);
+
+        // 石像のクラック（表面傷）
+        ctx.strokeStyle = 'rgba(0,0,0,0.35)';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(x + w * 0.35, y + h * 0.12);
+        ctx.lineTo(x + w * 0.42, y + h * 0.26);
+        ctx.moveTo(x + w * 0.6, y + h * 0.08);
+        ctx.lineTo(x + w * 0.55, y + h * 0.22);
+        ctx.stroke();
+
+        // HP インジケーター（小さな点）
+        for (let i = 0; i < this.hp; i++) {
+            ctx.fillStyle = this.isRed ? '#ff4444' : '#00ffee';
+            ctx.fillRect(x + 6 + i * 10, y + h + 3, 7, 3);
+        }
+
+        ctx.restore(); // scale restore
+
+        ctx.restore(); // save restore
+    }
+}

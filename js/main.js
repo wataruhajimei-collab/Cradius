@@ -232,6 +232,12 @@ function handleCollisions() {
         stonehengeStage.handleBulletCollisions(playerBullets);
     }
 
+    // ステージ3: モアイ地形のモアイ像への弾当たり判定
+    const st3 = window.stage3 || (typeof stage3 !== 'undefined' ? stage3 : null);
+    if (levelManager.stage === 3 && st3) {
+        st3.handleBulletCollisions(playerBullets);
+    }
+
     // プレイヤーの弾と敵の当たり判定
     playerBullets.forEach(bullet => {
         // 弾と地形・浮遊大陸（ステージ1）
@@ -333,9 +339,10 @@ function handleCollisions() {
         }
     });
 
-    // ボス戦の当たり判定（ステージ1ボス または ステージ2ボス）
+    // ボス戦の当たり判定（ステージ1ボス または ステージ2ボス または ステージ3ボス）
     const currentBoss = (levelManager.stage === 1 && levelManager.state === 'BOSS') ? levelManager.boss :
-                        (levelManager.stage === 2 && typeof stonehengeStage !== 'undefined' && stonehengeStage && stonehengeStage.boss) ? stonehengeStage.boss : null;
+                        (levelManager.stage === 2 && typeof stonehengeStage !== 'undefined' && stonehengeStage && stonehengeStage.boss) ? stonehengeStage.boss :
+                        (levelManager.stage === 3 && (window.stage3 || (typeof stage3 !== 'undefined' ? stage3 : null)) && (window.stage3 || stage3).boss) ? (window.stage3 || stage3).boss : null;
 
     if (currentBoss && currentBoss.active) {
         const boss = currentBoss;

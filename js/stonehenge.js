@@ -271,15 +271,22 @@ class StonehengeStage {
             if (this.boss) {
                 this.boss.update();
                 if (!this.boss.active) {
-                    this.state = 'ALL_CLEAR';
+                    this.state = 'STAGE_CLEAR';
                     this.stageClearTimer = 0;
                     if (typeof Sound !== 'undefined') Sound.playStageBgm();
                 }
             }
-        } else if (this.state === 'ALL_CLEAR') {
+        } else if (this.state === 'STAGE_CLEAR' || this.state === 'ALL_CLEAR') {
             this.stageClearTimer += dt;
             if (typeof player !== 'undefined') {
                 player.x += 3.8; // 自機が右へ疾走離脱
+            }
+            // 約3秒後にステージ3（モアイ面）へシームレス突入！
+            if (this.stageClearTimer > 3000) {
+                this.active = false;
+                if (typeof levelManager !== 'undefined' && typeof levelManager.startStage3 === 'function') {
+                    levelManager.startStage3();
+                }
             }
         }
     }
@@ -568,8 +575,8 @@ class StonehengeStage {
             ctx.fillText('SPHERE WARP WEAPONS INCOMING!', this.width / 2, this.height / 2 + 10);
         }
 
-        // 6. ALL CLEAR（全ステージクリア）栄光のエンディング演出！
-        if (this.state === 'ALL_CLEAR') {
+        // 6. ステージクリア演出！
+        if (this.state === 'STAGE_CLEAR' || this.state === 'ALL_CLEAR') {
             ctx.save();
             ctx.textAlign = 'center';
 
@@ -577,19 +584,13 @@ class StonehengeStage {
             ctx.fillStyle = '#ffea00';
             ctx.shadowColor = '#ff6600';
             ctx.shadowBlur = 18;
-            ctx.fillText('STAGE 2 ALL CLEAR!', this.width / 2, this.height / 2 - 80);
+            ctx.fillText('STAGE 2 CLEAR', this.width / 2, this.height / 2 - 40);
 
-            ctx.font = 'bold 26px "Courier New", monospace';
+            ctx.font = 'bold 20px "Courier New", monospace';
             ctx.fillStyle = '#00ffff';
             ctx.shadowColor = '#0088ff';
-            ctx.shadowBlur = 12;
-            ctx.fillText('CONGRATULATIONS!', this.width / 2, this.height / 2 - 20);
-
-            ctx.font = 'bold 18px "Courier New", monospace';
-            ctx.fillStyle = '#ffffff';
-            ctx.shadowBlur = 0;
-            ctx.fillText('ALL MISSIONS COMPLETED!', this.width / 2, this.height / 2 + 30);
-            ctx.fillText('SPECIAL MISSION BONUS : 100,000 PTS', this.width / 2, this.height / 2 + 70);
+            ctx.shadowBlur = 10;
+            ctx.fillText('ANCIENT RUINS PURIFIED - WARPING TO STAGE 3', this.width / 2, this.height / 2 + 10);
 
             ctx.restore();
         }

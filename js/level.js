@@ -508,6 +508,20 @@ class LevelManager {
             // ステージ2: ストーンヘンジ面の更新
             if (typeof stonehengeStage !== 'undefined' && stonehengeStage) {
                 stonehengeStage.update(dt);
+                // STAGE_CLEAR / ALL_CLEAR 後 3 秒でステージ3へ遷移（バックアップガード）
+                if (stonehengeStage.state === 'STAGE_CLEAR' || stonehengeStage.state === 'ALL_CLEAR') {
+                    if (!this.stage2ClearTimer) this.stage2ClearTimer = 0;
+                    this.stage2ClearTimer += dt;
+                    if (this.stage2ClearTimer > 3000 && this.stage === 2) {
+                        this.stage2ClearTimer = 0;
+                        this.startStage3();
+                    }
+                }
+            }
+        } else if (this.stage === 3) {
+            // ステージ3: モアイ面の更新
+            if (window.stage3) {
+                window.stage3.update(dt);
             }
         }
     }
@@ -537,6 +551,44 @@ class LevelManager {
         }
     }
 
+    startStage3() {
+        if (this.stage === 3 && window.stage3 && window.stage3.active) return; // 二重呼び出し防止
+        this.stage = 3;
+        this.state = 'STAGE3';
+        this.time = 0;
+        this.boss = null;
+
+        // ステージ2の残骸を完全クリア
+        if (typeof stonehengeStage !== 'undefined' && stonehengeStage) {
+            stonehengeStage.active = false;
+        }
+
+        // 敵・弾をリセット
+        if (typeof enemies !== 'undefined') enemies.length = 0;
+        if (typeof enemyBullets !== 'undefined') enemyBullets.length = 0;
+
+        // 自機を画面左から颯爽と登場させる
+        if (typeof player !== 'undefined') {
+            player.x = 80;
+            player.y = this.starfield.height / 2 - 10;
+            if (typeof player.vx !== 'undefined') player.vx = 0;
+            if (typeof player.vy !== 'undefined') player.vy = 0;
+        }
+
+        const stage3Class = (typeof Stage3 !== 'undefined') ? Stage3 : window.Stage3;
+        if (stage3Class) {
+            const st3 = new stage3Class(this.starfield.width, this.starfield.height);
+            window.stage3 = st3;
+            if (typeof stage3 !== 'undefined') {
+                try { stage3 = st3; } catch (e) {}
+            }
+            st3.start();
+        }
+        if (typeof Sound !== 'undefined' && typeof Sound.playStage3Bgm === 'function') {
+            Sound.playStage3Bgm();
+        }
+    }
+
     checkCollision(rect) {
         if (this.stage === 1) {
             // 地形との衝突
@@ -550,6 +602,10 @@ class LevelManager {
         } else if (this.stage === 2) {
             if (typeof stonehengeStage !== 'undefined' && stonehengeStage) {
                 return stonehengeStage.checkCollision(rect);
+            }
+        } else if (this.stage === 3) {
+            if (window.stage3) {
+                return window.stage3.checkCollision(rect);
             }
         }
         return false;
@@ -619,6 +675,10 @@ class LevelManager {
         } else if (this.stage === 2) {
             if (typeof stonehengeStage !== 'undefined' && stonehengeStage) {
                 stonehengeStage.draw(ctx);
+            }
+        } else if (this.stage === 3) {
+            if (window.stage3) {
+                window.stage3.draw(ctx);
             }
         }
     }

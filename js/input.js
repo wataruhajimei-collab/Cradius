@@ -29,6 +29,26 @@ class InputManager {
                     levelManager.startStage2();
                     console.log('Shortcut: Warped to Stage 2 Stonehenge');
                 }
+            } else if (e.code === 'Digit3') {
+                // 3面（モアイ面）へワープ
+                if (typeof levelManager !== 'undefined') {
+                    levelManager.startStage3();
+                    console.log('Shortcut: Warped to Stage 3 Moai');
+                }
+            } else if (e.code === 'KeyM') {
+                // 3面ボス ビッグコア戦へワープ
+                if (typeof levelManager !== 'undefined') {
+                    if (levelManager.stage !== 3) {
+                        levelManager.startStage3();
+                    }
+                    const st3 = window.stage3 || (typeof stage3 !== 'undefined' ? stage3 : null);
+                    if (st3) {
+                        st3.state = 'PRE_BOSS';
+                        st3.preBossTimer = 3400; // すぐにボス登場
+                        if (st3.terrain) st3.terrain.wallActive = false;
+                        console.log('Shortcut: Warped to Stage 3 Big Core Boss');
+                    }
+                }
             } else if (e.code === 'KeyW') {
                 // 2面 宇宙空間・丸型ワープ兵器フェーズへワープ
                 if (typeof stonehengeStage !== 'undefined' && stonehengeStage) {
