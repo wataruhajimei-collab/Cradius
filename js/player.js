@@ -195,8 +195,12 @@ class Player {
                 const laser = new Laser(originOwner, offsetY, originX, 20, '#00ffff');
                 addPlayerBullet(laser);
             } else if (this.weaponType === 'DOUBLE') {
-                addPlayerBullet(new Bullet(originX, originY, 10, 0));
-                addPlayerBullet(new Bullet(originX, originY - 5, 8, -5));
+                const b1 = new Bullet(originX, originY, 10, 0);
+                const b2 = new Bullet(originX, originY - 5, 8, -5);
+                b1.isDouble = true;
+                b2.isDouble = true;
+                addPlayerBullet(b1);
+                addPlayerBullet(b2);
             } else {
                 addPlayerBullet(new Bullet(originX, originY, 10, 0));
             }

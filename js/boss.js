@@ -1,21 +1,24 @@
 class Boss {
     constructor(x, y) {
-        this.scale = 2; // ユーザー要望によりボスの大きさを元の2倍（幅160px、高さ200px）に最適化！
-        this.width = 80 * this.scale;   // 160px
-        this.height = 100 * this.scale; // 200px
-        this.x = x + 150; // 画面外右側から登場
-        this.targetX = x - 200; // 画面右端（800px中 600〜760px）に堂々陣取る定位置
-        this.y = 200;
+        this.scale = 2; // 2倍スケール
+        this.drawW = 270;
+        this.drawH = 270;
+        this.width = 240;
+        this.height = 200;
+        this.x = (x || 800) + 150; // 950 (画面外右側から登場)
+        this.targetX = 640; // 画面内に全体像が100%美しく収まる定位置 (中心X: 640)
+        this.baseY = 300; // 中心Y
+        this.y = 300;
         this.maxHp = 35;
         this.hp = 35;
         this.active = true;
         this.isEntering = true; // 登場中は完全無敵
         this.color = '#aa4444';
         
-        // 遮蔽板: 5枚の金属風シールドプレート (各8発耐久、合計40発)
+        // 遮蔽板: 5枚の金属風シールドプレート (各4発耐久、ダブル弾なら2発で粉砕)
         this.maxShields = 5;
         this.shields = 5;
-        this.shieldHpPerPlate = 8; // レーザーで一瞬で溶けないよう十分な耐久力
+        this.shieldHpPerPlate = 4; // ダブルや通常弾でもサクサク壊せる爽快バランス！
         this.currentShieldHp = this.shieldHpPerPlate;
         this.shieldHitCooldown = 0; // 連続多重ヒット抑制用クールダウン
         this.shieldFlashTimer = 0;
@@ -41,8 +44,8 @@ class Boss {
         this.isEntering = false; // 定位置に到着して戦闘開始
 
         this.moveTimer += 0.02; // スムーズな上下浮動
-        // 高さ200pxのボスが画面中央付近（Y: 80〜320、下端: 280〜520）を美しく移動
-        this.y = 200 + Math.sin(this.moveTimer) * 120;
+        // 振幅 ±80px（中心Y: 300、範囲: 220〜380）。画面上下に絶対に干渉しない安全領域
+        this.y = this.baseY + Math.sin(this.moveTimer) * 80;
         this.rotationAngle += 0.04; // コア内部の回転
 
         if (this.shieldHitCooldown > 0) this.shieldHitCooldown--;
@@ -73,29 +76,35 @@ class Boss {
     }
 
     shoot() {
-        // ビッグコア伝統の4連レーザー・スプレッドショット！
-        const startX = this.x - 15;
-        const coreCenterY = this.y + 100;
+        // 艦首アーム先端（左向き）から自機方向へ4連レーザー発射！
+        const startX = this.x - 110;
+        const coreCenterY = this.y;
         
         // 上下アーム砲台から2門ずつ、計4連ビーム
-        this.bullets.push(new Bullet(startX, coreCenterY - 48, -7.0, 0, '#00ffff'));
-        this.bullets.push(new Bullet(startX, coreCenterY - 16, -7.0, 0, '#ffaa00'));
-        this.bullets.push(new Bullet(startX, coreCenterY + 16, -7.0, 0, '#ffaa00'));
-        this.bullets.push(new Bullet(startX, coreCenterY + 48, -7.0, 0, '#00ffff'));
+        this.bullets.push(new Bullet(startX, coreCenterY - 48, -7.0, 0, '#00ffff', true));
+        this.bullets.push(new Bullet(startX, coreCenterY - 16, -7.0, 0, '#ffaa00', true));
+        this.bullets.push(new Bullet(startX, coreCenterY + 16, -7.0, 0, '#ffaa00', true));
+        this.bullets.push(new Bullet(startX, coreCenterY + 48, -7.0, 0, '#00ffff', true));
     }
 
-    // 遮蔽板ダメージ処理（レーザーの瞬間多重ヒットを抑止）
-    hitShield() {
+    // 遮蔽板ダメージ処理（ダブル弾ボーナス対応＆クールダウン短縮）
+    hitShield(damage = 1) {
         if (this.shieldHitCooldown > 0) return false;
-        this.shieldHitCooldown = 3; // 約50msのヒット間隔
+        this.shieldHitCooldown = 1; // 軽快に連射を受け付ける
         this.shieldFlashTimer = 5;
-        this.currentShieldHp--;
-        if (this.currentShieldHp <= 0) {
+        this.currentShieldHp -= damage;
+        let destroyedAny = false;
+        while (this.currentShieldHp <= 0 && this.shields > 0) {
             this.shields--;
-            this.currentShieldHp = this.shieldHpPerPlate;
-            return true; // 1枚破壊
+            destroyedAny = true;
+            if (this.shields > 0) {
+                this.currentShieldHp += this.shieldHpPerPlate;
+            } else {
+                this.currentShieldHp = 0;
+                break;
+            }
         }
-        return false;
+        return destroyedAny;
     }
 
     // コアダメージ処理
@@ -122,13 +131,17 @@ class Boss {
             bullet.bossHitCooldown = 4;
         }
 
+        // ダブル弾の判定（ダブル弾なら遮蔽板に2ダメージ！）
+        const isDouble = bullet.isDouble || (typeof player !== 'undefined' && player.weaponType === 'DOUBLE');
+        const shieldDamage = isDouble ? 2 : 1;
+
         // 1. 遮蔽板への命中判定（遮蔽板が1枚でも残っていれば絶対にコアには当たらない！）
         if (this.shields > 0 && shieldBounds && checkCollision(bullet, shieldBounds)) {
             if (!(bullet instanceof Laser)) {
                 bullet.active = false;
             }
             const hitX = Math.min(bullet.x + bullet.width, shieldBounds.x);
-            const destroyed = this.hitShield();
+            const destroyed = this.hitShield(shieldDamage);
             if (destroyed) {
                 createExplosion(hitX, bullet.y, '#99b3cc');
                 createExplosion(hitX, bullet.y, '#ffaa00');
@@ -182,33 +195,34 @@ class Boss {
             }
         }
 
-        // 1. ボス本体の描画 (2倍スケール)
+        // 1. ボス本体の描画 (水平反転！艦首が自機・左側を向き、炎が右・後方を向く！)
         if (typeof images !== 'undefined' && images.boss && images.boss.complete) {
+            ctx.save();
+            ctx.translate(this.x, this.y);
+            ctx.scale(-1, 1); // ★★★ 水平反転！自機（画面左）に艦首を向ける！ ★★★
+
             ctx.shadowColor = 'rgba(0, 0, 0, 0.75)';
             ctx.shadowBlur = 16;
-            ctx.shadowOffsetX = -8;
+            ctx.shadowOffsetX = 8;
             ctx.shadowOffsetY = 8;
 
-            // 400px × 400px の2倍スケール画像描画
-            ctx.drawImage(images.boss, this.x - 120, this.y - 100, 400, 400);
-
-            ctx.shadowBlur = 0;
-            ctx.shadowOffsetX = 0;
-            ctx.shadowOffsetY = 0;
+            // 270px × 270px の適正2倍スケールで中心に綺麗に描画
+            ctx.drawImage(images.boss, -this.drawW / 2, -this.drawH / 2, this.drawW, this.drawH);
+            ctx.restore();
         } else {
             // 代替メカニカル描画
             this.drawMechanicalHull(ctx);
         }
 
-        // 2倍スケールのコア中心と半径
-        const coreX = this.x + 72;
-        const coreY = this.y + 100;
-        const coreR = 32;
+        // 2倍スケールのコア中心と半径（リアクター中心に完全一致）
+        const coreX = this.x - 5;
+        const coreY = this.y;
+        const coreR = 26;
 
         // 2. 立体感と輝きのある2倍ハイテク・クリスタルコア
         this.drawHighTechCore(ctx, coreX, coreY, coreR);
 
-        // 3. 2倍サイズの5枚の金属風遮蔽板（シールドプレート）
+        // 3. コア前方（左側）に並ぶ5枚の金属風遮蔽板（シールドプレート）
         this.drawShieldPlates(ctx, coreX, coreY);
 
         ctx.restore();
@@ -344,10 +358,10 @@ class Boss {
     drawShieldPlates(ctx, coreX, coreY) {
         if (this.shields <= 0) return;
 
-        const plateW = 10;
-        const plateH = 76;
-        const spacing = 14;
-        const startX = coreX - 36;
+        const plateW = 9;
+        const plateH = 72;
+        const spacing = 13;
+        const startX = coreX - 32;
 
         for (let i = 0; i < this.shields; i++) {
             const px = startX - (this.shields - 1 - i) * spacing;
@@ -386,8 +400,8 @@ class Boss {
 
             // 上下リベットボルト
             ctx.fillStyle = isFlashing ? '#ffffff' : '#222d38';
-            ctx.fillRect(px + 2, py + 4, 6, 4);
-            ctx.fillRect(px + 2, py + plateH - 8, 6, 4);
+            ctx.fillRect(px + 2, py + 4, 5, 4);
+            ctx.fillRect(px + 2, py + plateH - 8, 5, 4);
 
             // 冷却エナジーライン
             ctx.fillStyle = isFlashing ? '#ffaa00' : '#00ffee';
@@ -402,12 +416,12 @@ class Boss {
     // 遮蔽板の当たり判定バウンディングボックス (2倍スケール)
     getShieldBounds() {
         if (this.shields <= 0) return null;
-        const coreX = this.x + 72;
-        const coreY = this.y + 100;
-        const plateW = 10;
-        const plateH = 76;
-        const spacing = 14;
-        const startX = coreX - 36;
+        const coreX = this.x - 5;
+        const coreY = this.y;
+        const plateW = 9;
+        const plateH = 72;
+        const spacing = 13;
+        const startX = coreX - 32;
         const frontX = startX - (this.shields - 1) * spacing;
         const totalW = (this.shields - 1) * spacing + plateW;
 
@@ -421,9 +435,9 @@ class Boss {
 
     // コアの当たり判定バウンディングボックス (2倍スケール)
     getCoreBounds() {
-        const coreX = this.x + 72;
-        const coreY = this.y + 100;
-        const r = 32;
+        const coreX = this.x - 5;
+        const coreY = this.y;
+        const r = 26;
         return {
             x: coreX - r,
             y: coreY - r,
@@ -435,20 +449,20 @@ class Boss {
     // 上部ハル（無敵装甲アーム）の当たり判定 (2倍スケール)
     getTopHullBounds() {
         return {
-            x: this.x - 30,
-            y: this.y,
-            width: this.width + 30,
-            height: 64
+            x: this.x - 120,
+            y: this.y - 105,
+            width: 230,
+            height: 68
         };
     }
 
     // 下部ハル（無敵装甲アーム）の当たり判定 (2倍スケール)
     getBottomHullBounds() {
         return {
-            x: this.x - 30,
-            y: this.y + 136,
-            width: this.width + 30,
-            height: 64
+            x: this.x - 120,
+            y: this.y + 37,
+            width: 230,
+            height: 68
         };
     }
 }
@@ -476,10 +490,10 @@ class GolemBoss {
         this.core2MaxHp = 25;
         this.hp = 50; // 合計HP
 
-        // 各コアを守る古代石板シールド（上下各3枚、耐久力各8発）
+        // 各コアを守る古代石板シールド（上下各3枚、耐久力各3発、ダブルなら2発で粉砕）
         this.shields1 = 3;
         this.shields2 = 3;
-        this.shieldHpPerPlate = 8;
+        this.shieldHpPerPlate = 3; // 8から3へ大幅緩和しダブル等でもテンポ良く破壊可能に
         this.currentShieldHp1 = this.shieldHpPerPlate;
         this.currentShieldHp2 = this.shieldHpPerPlate;
         this.shieldHitCooldown = 0;
@@ -554,31 +568,43 @@ class GolemBoss {
     shootLasers() {
         const startX = this.x - 20;
         // 上下ホーン砲門から高速ビーム
-        this.bullets.push(new Bullet(startX, this.y + 20, -7.5, 0, '#00ffff'));
-        this.bullets.push(new Bullet(startX, this.y + this.height - 20, -7.5, 0, '#00ffff'));
+        this.bullets.push(new Bullet(startX, this.y + 20, -7.5, 0, '#00ffff', true));
+        this.bullets.push(new Bullet(startX, this.y + this.height - 20, -7.5, 0, '#00ffff', true));
     }
 
-    hitShield(isCore1) {
+    hitShield(isCore1, damage = 1) {
         if (this.shieldHitCooldown > 0) return false;
-        this.shieldHitCooldown = 3;
+        this.shieldHitCooldown = 1;
+        let destroyedAny = false;
         if (isCore1) {
             this.shieldFlashTimer1 = 5;
-            this.currentShieldHp1--;
-            if (this.currentShieldHp1 <= 0) {
+            this.currentShieldHp1 -= damage;
+            while (this.currentShieldHp1 <= 0 && this.shields1 > 0) {
                 this.shields1--;
-                this.currentShieldHp1 = this.shieldHpPerPlate;
-                return true;
+                destroyedAny = true;
+                if (this.shields1 > 0) {
+                    this.currentShieldHp1 += this.shieldHpPerPlate;
+                } else {
+                    this.currentShieldHp1 = 0;
+                    break;
+                }
             }
+            return destroyedAny;
         } else {
             this.shieldFlashTimer2 = 5;
-            this.currentShieldHp2--;
-            if (this.currentShieldHp2 <= 0) {
+            this.currentShieldHp2 -= damage;
+            while (this.currentShieldHp2 <= 0 && this.shields2 > 0) {
                 this.shields2--;
-                this.currentShieldHp2 = this.shieldHpPerPlate;
-                return true;
+                destroyedAny = true;
+                if (this.shields2 > 0) {
+                    this.currentShieldHp2 += this.shieldHpPerPlate;
+                } else {
+                    this.currentShieldHp2 = 0;
+                    break;
+                }
             }
+            return destroyedAny;
         }
-        return false;
     }
 
     hitCore(isCore1, damage = 1) {
@@ -618,6 +644,9 @@ class GolemBoss {
             bullet.bossHitCooldown = 4;
         }
 
+        const isDouble = bullet.isDouble || (typeof player !== 'undefined' && player.weaponType === 'DOUBLE');
+        const shieldDmg = isDouble ? 2 : 1;
+
         const core1Bounds = { x: this.x + 40, y: this.y + 40, width: 44, height: 44 };
         const core2Bounds = { x: this.x + 40, y: this.y + 150, width: 44, height: 44 };
 
@@ -628,7 +657,7 @@ class GolemBoss {
         if (this.shields1 > 0 && shield1Bounds && checkCollision(bullet, shield1Bounds)) {
             if (!(bullet instanceof Laser)) bullet.active = false;
             const hitX = Math.min(bullet.x + bullet.width, shield1Bounds.x);
-            const destroyed = this.hitShield(true);
+            const destroyed = this.hitShield(true, shieldDmg);
             createExplosion(hitX, bullet.y, destroyed ? '#ffaa00' : '#ffffaa');
             if (typeof Sound !== 'undefined' && typeof Sound.playBossHit === 'function') Sound.playBossHit();
             return;
@@ -638,7 +667,7 @@ class GolemBoss {
         if (this.shields2 > 0 && shield2Bounds && checkCollision(bullet, shield2Bounds)) {
             if (!(bullet instanceof Laser)) bullet.active = false;
             const hitX = Math.min(bullet.x + bullet.width, shield2Bounds.x);
-            const destroyed = this.hitShield(false);
+            const destroyed = this.hitShield(false, shieldDmg);
             createExplosion(hitX, bullet.y, destroyed ? '#ffaa00' : '#ffffaa');
             if (typeof Sound !== 'undefined' && typeof Sound.playBossHit === 'function') Sound.playBossHit();
             return;
