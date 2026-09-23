@@ -354,14 +354,14 @@ class Boss {
         ctx.restore();
     }
 
-    // 2倍サイズの5枚の金属風遮蔽板（シールドプレート: 上下をスリムにして機体構造を見せる）
+    // 2倍サイズの5枚の金属風遮蔽板（シールドプレート: 元の1/3の上下幅24pxに超スリム化し機体構造を全面露出）
     drawShieldPlates(ctx, coreX, coreY) {
         if (this.shields <= 0) return;
 
-        const plateW = 8;
-        const plateH = 46; // 上下に短くしてボスの機体やアームのディテールを美しく露出
-        const spacing = 11;
-        const startX = coreX - 30;
+        const plateW = 5;
+        const plateH = 24; // 元(72px)の1/3！中央ラインのみをカバーし機体やアームを贅沢に見せる
+        const spacing = 8;
+        const startX = coreX - 22;
 
         for (let i = 0; i < this.shields; i++) {
             const px = startX - (this.shields - 1 - i) * spacing;
@@ -373,7 +373,7 @@ class Boss {
             ctx.save();
 
             ctx.shadowColor = 'rgba(0, 0, 0, 0.65)';
-            ctx.shadowBlur = 5;
+            ctx.shadowBlur = 4;
             ctx.shadowOffsetX = -2;
             ctx.shadowOffsetY = 2;
 
@@ -395,33 +395,33 @@ class Boss {
 
             // 金属ベベル枠
             ctx.strokeStyle = isFlashing ? '#ffffff' : '#99b3cc';
-            ctx.lineWidth = 1.5;
+            ctx.lineWidth = 1;
             ctx.strokeRect(px, py, plateW, plateH);
 
             // 上下リベットボルト
             ctx.fillStyle = isFlashing ? '#ffffff' : '#222d38';
-            ctx.fillRect(px + 1.5, py + 3, 5, 3);
-            ctx.fillRect(px + 1.5, py + plateH - 6, 5, 3);
+            ctx.fillRect(px + 1, py + 2, 3, 2);
+            ctx.fillRect(px + 1, py + plateH - 4, 3, 2);
 
             // 冷却エナジーライン
             ctx.fillStyle = isFlashing ? '#ffaa00' : '#00ffee';
             ctx.shadowColor = ctx.fillStyle;
-            ctx.shadowBlur = 5;
-            ctx.fillRect(px + 2.5, py + plateH * 0.3, 3, plateH * 0.4);
+            ctx.shadowBlur = 4;
+            ctx.fillRect(px + 1.5, py + 6, 2, plateH - 12);
 
             ctx.restore();
         }
     }
 
-    // 遮蔽板の当たり判定バウンディングボックス (2倍スケール)
+    // 遮蔽板の当たり判定バウンディングボックス (2倍スケール: 高さ24px)
     getShieldBounds() {
         if (this.shields <= 0) return null;
         const coreX = this.x - 5;
         const coreY = this.y;
-        const plateW = 8;
-        const plateH = 46;
-        const spacing = 11;
-        const startX = coreX - 30;
+        const plateW = 5;
+        const plateH = 24;
+        const spacing = 8;
+        const startX = coreX - 22;
         const frontX = startX - (this.shields - 1) * spacing;
         const totalW = (this.shields - 1) * spacing + plateW;
 
@@ -490,10 +490,10 @@ class GolemBoss {
         this.core2MaxHp = 25;
         this.hp = 50; // 合計HP
 
-        // 各コアを守る古代石板シールド（上下各3枚、耐久力各3発、ダブルなら2発で粉砕）
+        // 各コアを守る古代石板シールド（上下各3枚、耐久力各8発）
         this.shields1 = 3;
         this.shields2 = 3;
-        this.shieldHpPerPlate = 3; // 8から3へ大幅緩和しダブル等でもテンポ良く破壊可能に
+        this.shieldHpPerPlate = 8; // 元の重厚な耐久力（1枚あたり8発、3枚で24発）に完全復帰！
         this.currentShieldHp1 = this.shieldHpPerPlate;
         this.currentShieldHp2 = this.shieldHpPerPlate;
         this.shieldHitCooldown = 0;
@@ -574,7 +574,7 @@ class GolemBoss {
 
     hitShield(isCore1, damage = 1) {
         if (this.shieldHitCooldown > 0) return false;
-        this.shieldHitCooldown = 1;
+        this.shieldHitCooldown = 3; // 元のヒットクールダウン3に戻す
         let destroyedAny = false;
         if (isCore1) {
             this.shieldFlashTimer1 = 5;
@@ -644,8 +644,7 @@ class GolemBoss {
             bullet.bossHitCooldown = 4;
         }
 
-        const isDouble = bullet.isDouble || (typeof player !== 'undefined' && player.weaponType === 'DOUBLE');
-        const shieldDmg = isDouble ? 2 : 1;
+        const shieldDmg = 1; // 元の硬さに復帰（1発1ダメージ）
 
         // 1. 上コア・下コアの遮蔽板当たり判定（グラフィック最前線と完全に同期し、弾を確実に受け止める）
         let shield1Bounds = null;
