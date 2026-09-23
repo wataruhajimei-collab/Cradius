@@ -196,7 +196,7 @@ class Player {
                 addPlayerBullet(laser);
             } else if (this.weaponType === 'DOUBLE') {
                 const b1 = new Bullet(originX, originY, 10, 0);
-                const b2 = new Bullet(originX, originY - 5, 8, -5);
+                const b2 = new Bullet(originX, originY - 5, 9.5, -4.0); // 前方にしっかり伸びてボスや上下の標的を捉える最適弾道
                 b1.isDouble = true;
                 b2.isDouble = true;
                 addPlayerBullet(b1);

@@ -354,14 +354,14 @@ class Boss {
         ctx.restore();
     }
 
-    // 2倍サイズの5枚の金属風遮蔽板（シールドプレート）
+    // 2倍サイズの5枚の金属風遮蔽板（シールドプレート: 上下をスリムにして機体構造を見せる）
     drawShieldPlates(ctx, coreX, coreY) {
         if (this.shields <= 0) return;
 
-        const plateW = 9;
-        const plateH = 72;
-        const spacing = 13;
-        const startX = coreX - 32;
+        const plateW = 8;
+        const plateH = 46; // 上下に短くしてボスの機体やアームのディテールを美しく露出
+        const spacing = 11;
+        const startX = coreX - 30;
 
         for (let i = 0; i < this.shields; i++) {
             const px = startX - (this.shields - 1 - i) * spacing;
@@ -373,9 +373,9 @@ class Boss {
             ctx.save();
 
             ctx.shadowColor = 'rgba(0, 0, 0, 0.65)';
-            ctx.shadowBlur = 6;
-            ctx.shadowOffsetX = -3;
-            ctx.shadowOffsetY = 3;
+            ctx.shadowBlur = 5;
+            ctx.shadowOffsetX = -2;
+            ctx.shadowOffsetY = 2;
 
             // チタングラデーション
             const metalGrad = ctx.createLinearGradient(px, py, px + plateW, py);
@@ -400,14 +400,14 @@ class Boss {
 
             // 上下リベットボルト
             ctx.fillStyle = isFlashing ? '#ffffff' : '#222d38';
-            ctx.fillRect(px + 2, py + 4, 5, 4);
-            ctx.fillRect(px + 2, py + plateH - 8, 5, 4);
+            ctx.fillRect(px + 1.5, py + 3, 5, 3);
+            ctx.fillRect(px + 1.5, py + plateH - 6, 5, 3);
 
             // 冷却エナジーライン
             ctx.fillStyle = isFlashing ? '#ffaa00' : '#00ffee';
             ctx.shadowColor = ctx.fillStyle;
-            ctx.shadowBlur = 6;
-            ctx.fillRect(px + 3, py + plateH * 0.35, 3, plateH * 0.3);
+            ctx.shadowBlur = 5;
+            ctx.fillRect(px + 2.5, py + plateH * 0.3, 3, plateH * 0.4);
 
             ctx.restore();
         }
@@ -418,10 +418,10 @@ class Boss {
         if (this.shields <= 0) return null;
         const coreX = this.x - 5;
         const coreY = this.y;
-        const plateW = 9;
-        const plateH = 72;
-        const spacing = 13;
-        const startX = coreX - 32;
+        const plateW = 8;
+        const plateH = 46;
+        const spacing = 11;
+        const startX = coreX - 30;
         const frontX = startX - (this.shields - 1) * spacing;
         const totalW = (this.shields - 1) * spacing + plateW;
 
@@ -647,33 +647,54 @@ class GolemBoss {
         const isDouble = bullet.isDouble || (typeof player !== 'undefined' && player.weaponType === 'DOUBLE');
         const shieldDmg = isDouble ? 2 : 1;
 
-        const core1Bounds = { x: this.x + 40, y: this.y + 40, width: 44, height: 44 };
-        const core2Bounds = { x: this.x + 40, y: this.y + 150, width: 44, height: 44 };
+        // 1. 上コア・下コアの遮蔽板当たり判定（グラフィック最前線と完全に同期し、弾を確実に受け止める）
+        let shield1Bounds = null;
+        if (this.shields1 > 0) {
+            const frontX1 = (this.x + 16) - (this.shields1 - 1) * 12;
+            shield1Bounds = {
+                x: frontX1 - 6,
+                y: this.y + 32,
+                width: (this.x + 36) - (frontX1 - 6),
+                height: 60
+            };
+        }
 
-        const shield1Bounds = this.shields1 > 0 ? { x: this.x + 10, y: this.y + 35, width: 30, height: 54 } : null;
-        const shield2Bounds = this.shields2 > 0 ? { x: this.x + 10, y: this.y + 145, width: 30, height: 54 } : null;
+        let shield2Bounds = null;
+        if (this.shields2 > 0) {
+            const frontX2 = (this.x + 16) - (this.shields2 - 1) * 12;
+            shield2Bounds = {
+                x: frontX2 - 6,
+                y: this.y + 142,
+                width: (this.x + 36) - (frontX2 - 6),
+                height: 60
+            };
+        }
 
-        // 1. 上コアの遮蔽板
+        // コア当たり判定（遮蔽板全滅後に開口部から奥のコアへスムーズに着弾）
+        const core1Bounds = { x: this.x + 30, y: this.y + 35, width: 56, height: 54 };
+        const core2Bounds = { x: this.x + 30, y: this.y + 145, width: 56, height: 54 };
+
+        // A. 上コアの遮蔽板への着弾判定
         if (this.shields1 > 0 && shield1Bounds && checkCollision(bullet, shield1Bounds)) {
             if (!(bullet instanceof Laser)) bullet.active = false;
-            const hitX = Math.min(bullet.x + bullet.width, shield1Bounds.x);
+            const hitX = Math.min(bullet.x + bullet.width, shield1Bounds.x + 10);
             const destroyed = this.hitShield(true, shieldDmg);
             createExplosion(hitX, bullet.y, destroyed ? '#ffaa00' : '#ffffaa');
             if (typeof Sound !== 'undefined' && typeof Sound.playBossHit === 'function') Sound.playBossHit();
             return;
         }
 
-        // 2. 下コアの遮蔽板
+        // B. 下コアの遮蔽板への着弾判定
         if (this.shields2 > 0 && shield2Bounds && checkCollision(bullet, shield2Bounds)) {
             if (!(bullet instanceof Laser)) bullet.active = false;
-            const hitX = Math.min(bullet.x + bullet.width, shield2Bounds.x);
+            const hitX = Math.min(bullet.x + bullet.width, shield2Bounds.x + 10);
             const destroyed = this.hitShield(false, shieldDmg);
             createExplosion(hitX, bullet.y, destroyed ? '#ffaa00' : '#ffffaa');
             if (typeof Sound !== 'undefined' && typeof Sound.playBossHit === 'function') Sound.playBossHit();
             return;
         }
 
-        // 3. 上コアへの直撃（遮蔽板全滅後）
+        // C. 上コアへの直撃（遮蔽板全滅後）
         if (this.shields1 === 0 && this.core1Hp > 0 && checkCollision(bullet, core1Bounds)) {
             if (!(bullet instanceof Laser)) bullet.active = false;
             this.hitCore(true, 1);
@@ -683,7 +704,7 @@ class GolemBoss {
             return;
         }
 
-        // 4. 下コアへの直撃（遮蔽板全滅後）
+        // D. 下コアへの直撃（遮蔽板全滅後）
         if (this.shields2 === 0 && this.core2Hp > 0 && checkCollision(bullet, core2Bounds)) {
             if (!(bullet instanceof Laser)) bullet.active = false;
             this.hitCore(false, 1);
@@ -693,12 +714,22 @@ class GolemBoss {
             return;
         }
 
-        // 5. 外装玄武岩アーマーへの弾かれ
-        const hullBounds = { x: this.x - 20, y: this.y, width: this.width + 20, height: this.height };
-        if (checkCollision(bullet, hullBounds)) {
-            bullet.active = false;
-            createExplosion(bullet.x, bullet.y, '#556677');
-            if (typeof Sound !== 'undefined') Sound.playBossHit();
+        // E. 外装玄武岩アーマーへの弾かれ判定
+        // ★重要: シールドやコアの手前（左側）には絶対にアーマーを置かない！開口部は完全に開放！
+        const armorParts = [
+            { x: this.x + 25, y: this.y, width: this.width - 25, height: 32 },       // 頭部
+            { x: this.x + 25, y: this.y + 92, width: this.width - 25, height: 50 },  // 上下コア中間壁
+            { x: this.x + 25, y: this.y + 202, width: this.width - 25, height: 28 }, // 底部
+            { x: this.x + 90, y: this.y, width: this.width - 90, height: this.height } // 背面メインボディ
+        ];
+
+        for (const armor of armorParts) {
+            if (checkCollision(bullet, armor)) {
+                bullet.active = false;
+                createExplosion(bullet.x, bullet.y, '#556677');
+                if (typeof Sound !== 'undefined') Sound.playBossHit();
+                return;
+            }
         }
     }
 

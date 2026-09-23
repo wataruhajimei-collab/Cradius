@@ -459,7 +459,7 @@ class StonehengeStage {
 
     // プレイヤーの弾との当たり判定処理（石ブロックの掘削）
     handleBulletCollisions(playerBullets) {
-        if (!this.active) return;
+        if (!this.active || this.state === 'BOSS') return;
 
         playerBullets.forEach(bullet => {
             if (!bullet.active) return;
