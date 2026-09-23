@@ -50,24 +50,31 @@ class InputManager {
                     }
                 }
             } else if (e.code === 'KeyW') {
-                // 2面 宇宙空間・丸型ワープ兵器フェーズへワープ
+                // 2面 宇宙空間・名物ザブ地帯（ザブラッシュ）へワープ
+                if (typeof levelManager !== 'undefined' && levelManager.stage !== 2) {
+                    levelManager.startStage2();
+                }
                 if (typeof stonehengeStage !== 'undefined' && stonehengeStage) {
                     stonehengeStage.blocks = [];
                     stonehengeStage.generating = false;
-                    stonehengeStage.state = 'WARP_SPACE';
-                    stonehengeStage.warpSpaceTimer = 0;
-                    stonehengeStage.warpWaveTimer = 0;
-                    console.log('Shortcut: Warped to Warp Sphere Phase');
+                    stonehengeStage.state = 'ZAB_RUSH';
+                    stonehengeStage.zabTimer = 0;
+                    stonehengeStage.zabWaveTimer = 0;
+                    console.log('Shortcut: Warped to Stage 2 Zab Rush');
                 }
             } else if (e.code === 'KeyG') {
-                // 2面ボス 古代守護神ゴーレムコア戦へワープ
+                // 2面ボス ビッグコア戦へワープ
+                if (typeof levelManager !== 'undefined' && levelManager.stage !== 2) {
+                    levelManager.startStage2();
+                }
                 if (typeof stonehengeStage !== 'undefined' && stonehengeStage) {
                     stonehengeStage.blocks = [];
                     stonehengeStage.generating = false;
                     stonehengeStage.state = 'BOSS';
-                    if (typeof Sound !== 'undefined') Sound.playBossBgm();
-                    if (typeof GolemBoss !== 'undefined') stonehengeStage.boss = new GolemBoss(stonehengeStage.width, 185);
-                    console.log('Shortcut: Warped to Golem Boss');
+                    if (typeof Sound !== 'undefined' && typeof Sound.playBossBgm === 'function') Sound.playBossBgm();
+                    const bossClass = (typeof BigCoreBoss !== 'undefined') ? BigCoreBoss : Boss;
+                    stonehengeStage.boss = new bossClass(stonehengeStage.width, stonehengeStage.height / 2);
+                    console.log('Shortcut: Warped to Stage 2 Big Core Boss');
                 }
             } else if (e.code === 'KeyP') {
                 // フルパワーアップチート

@@ -651,8 +651,17 @@ class DuckerEnemy extends Enemy {
     }
 
     update() {
-        if (typeof levelManager !== 'undefined' && levelManager.terrain && levelManager.terrain.active) {
-            const terrainScroll = levelManager.terrain.scrollSpeed;
+        let activeTerrain = null;
+        if (typeof levelManager !== 'undefined') {
+            if (levelManager.stage === 3 && window.stage3 && window.stage3.terrain && window.stage3.terrain.wallActive) {
+                activeTerrain = window.stage3.terrain;
+            } else if (levelManager.terrain && levelManager.terrain.active) {
+                activeTerrain = levelManager.terrain;
+            }
+        }
+
+        if (activeTerrain) {
+            const terrainScroll = activeTerrain.scrollSpeed;
             
             this.stopTimer++;
             if (this.stopTimer > 180 && this.stopTimer < 250) {
@@ -674,16 +683,16 @@ class DuckerEnemy extends Enemy {
             const sampleDist = 16;
 
             if (this.isCeiling) {
-                const yL = levelManager.terrain.getTopY(centerX - sampleDist);
-                const yR = levelManager.terrain.getTopY(centerX + sampleDist);
-                const yC = levelManager.terrain.getTopY(centerX);
+                const yL = activeTerrain.getTopY(centerX - sampleDist);
+                const yR = activeTerrain.getTopY(centerX + sampleDist);
+                const yC = activeTerrain.getTopY(centerX);
                 this.slopeAngle = Math.atan2(yR - yL, sampleDist * 2);
                 this.groundY = yC;
                 this.y = yC;
             } else {
-                const yL = levelManager.terrain.getBottomY(centerX - sampleDist);
-                const yR = levelManager.terrain.getBottomY(centerX + sampleDist);
-                const yC = levelManager.terrain.getBottomY(centerX);
+                const yL = activeTerrain.getBottomY(centerX - sampleDist);
+                const yR = activeTerrain.getBottomY(centerX + sampleDist);
+                const yC = activeTerrain.getBottomY(centerX);
                 this.slopeAngle = Math.atan2(yR - yL, sampleDist * 2);
                 this.groundY = yC;
                 this.y = yC - this.height;
@@ -844,7 +853,9 @@ class HatcherEnemy extends Enemy {
     }
 
     update() {
-        if (typeof levelManager !== 'undefined' && levelManager.terrain && levelManager.terrain.active) {
+        if (typeof levelManager !== 'undefined' && levelManager.stage === 2 && typeof stonehengeStage !== 'undefined' && stonehengeStage && stonehengeStage.active) {
+            this.x -= stonehengeStage.scrollSpeed;
+        } else if (typeof levelManager !== 'undefined' && levelManager.terrain && levelManager.terrain.active) {
             this.x -= levelManager.terrain.scrollSpeed;
             const centerX = this.x + this.width / 2;
             if (this.isCeiling) {
@@ -1532,7 +1543,9 @@ class TurretEnemy extends Enemy {
     }
 
     update() {
-        if (typeof levelManager !== 'undefined' && levelManager.terrain && levelManager.terrain.active) {
+        if (typeof levelManager !== 'undefined' && levelManager.stage === 2 && typeof stonehengeStage !== 'undefined' && stonehengeStage && stonehengeStage.active) {
+            this.x -= stonehengeStage.scrollSpeed;
+        } else if (typeof levelManager !== 'undefined' && levelManager.terrain && levelManager.terrain.active) {
             this.x -= levelManager.terrain.scrollSpeed;
             const centerX = this.x + this.width / 2;
             const sampleDist = 18;

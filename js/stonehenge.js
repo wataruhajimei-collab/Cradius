@@ -1,9 +1,11 @@
 // ==========================================
 // CRADIUS STAGE 2: STONEHENGE STAGE (ストーンヘンジ面)
-// 破壊できる石（掘削ブロック）と破壊できない石（古代モノリス）
-// 壊れない石の上に既存敵（砲台・ダッカー）と新キャラ（ルーンタレット）を配置！
-// 飛ぶ敵（編隊・新キャラストーンアイ）がドンドン出現！
-// 掘削しないとスクロールに挟まれて行き詰まるオリジナルグラディウスの完全再現！
+// 1985年アーケード版『グラディウス』完全再現！
+// 1. 開幕・宇宙空中戦（編隊とカプセル補給）
+// 2. 赤茶色の丸い細胞状の掘削石ブロック群＆古代巨石柱
+// 3. 砲台・ダッカー・敵を生み出すハッチ基地
+// 4. 四方からワープ強襲する伝説の「ザブ地帯（ザブラッシュ）」
+// 5. 伝統の機械要塞「ビッグコア」とのボス決戦！
 // ==========================================
 
 class StoneBlock {
@@ -29,19 +31,19 @@ class StoneBlock {
 
     hit(damage = 1) {
         if (!this.isDestructible) {
-            // 破壊不能石: 火花が散るだけ
+            // 破壊不能石柱: 火花が散る
             return false;
         }
 
         this.hp -= damage;
-        this.flashTimer = 4;
+        this.flashTimer = 5;
 
         if (this.hp <= 0) {
             this.active = false;
-            // 石が砕け散る迫力の破片エフェクト
-            if (typeof particles !== 'undefined') {
-                for (let i = 0; i < 8; i++) {
-                    const color = Math.random() < 0.5 ? '#d4b483' : '#a08050';
+            // アーケード版準拠：赤茶色の岩石破片が飛び散るエフェクト
+            if (typeof Particle !== 'undefined' && typeof particles !== 'undefined') {
+                for (let i = 0; i < 9; i++) {
+                    const color = (Math.random() < 0.45) ? '#c24b38' : ((Math.random() < 0.5) ? '#e06b58' : '#7a2b1f');
                     particles.push(new Particle(
                         this.x + this.width / 2 + (Math.random() - 0.5) * 20,
                         this.y + this.height / 2 + (Math.random() - 0.5) * 20,
@@ -64,39 +66,87 @@ class StoneBlock {
         const isFlashing = this.flashTimer > 0;
 
         if (this.isDestructible) {
-            // --- 破壊できる石（砂岩・古代石英ブロック） ---
-            const grad = ctx.createLinearGradient(this.x, this.y, this.x + this.width, this.y + this.height);
+            // --- アーケード版再現：赤茶色・丸みを帯びた細胞状の石ブロック ---
+            const r = 6; // 丸みを持たせた角
+            const bx = this.x + 1;
+            const by = this.y + 1;
+            const bw = this.width - 2;
+            const bh = this.height - 2;
+
+            ctx.beginPath();
+            ctx.moveTo(bx + r, by);
+            ctx.lineTo(bx + bw - r, by);
+            ctx.quadraticCurveTo(bx + bw, by, bx + bw, by + r);
+            ctx.lineTo(bx + bw, by + bh - r);
+            ctx.quadraticCurveTo(bx + bw, by + bh, bx + bw - r, by + bh);
+            ctx.lineTo(bx + r, by + bh);
+            ctx.quadraticCurveTo(bx, by + bh, bx, by + bh - r);
+            ctx.lineTo(bx, by + r);
+            ctx.quadraticCurveTo(bx, by, bx + r, by);
+            ctx.closePath();
+
+            const grad = ctx.createRadialGradient(bx + bw * 0.35, by + bh * 0.35, 2, bx + bw * 0.5, by + bh * 0.5, bw * 0.65);
             if (isFlashing) {
                 grad.addColorStop(0.0, '#ffffff');
-                grad.addColorStop(0.5, '#ffeecc');
+                grad.addColorStop(0.5, '#ffbbbb');
                 grad.addColorStop(1.0, '#ffffff');
             } else {
                 const hpRatio = this.hp / this.maxHp;
-                if (hpRatio > 0.66) {
-                    grad.addColorStop(0.0, '#e5c392'); // 明るい砂岩
-                    grad.addColorStop(0.5, '#b8935f');
-                    grad.addColorStop(1.0, '#7c5e37');
-                } else if (hpRatio > 0.33) {
-                    grad.addColorStop(0.0, '#c7a372'); // やや風化した砂岩
-                    grad.addColorStop(0.5, '#9a7543');
-                    grad.addColorStop(1.0, '#5e421d');
+                if (hpRatio > 0.5) {
+                    grad.addColorStop(0.0, '#e06b58'); // 赤茶色ハイライト
+                    grad.addColorStop(0.45, '#c24b38'); // テラコッタレッド
+                    grad.addColorStop(0.85, '#943828');
+                    grad.addColorStop(1.0, '#662418');  // 深い影
                 } else {
-                    grad.addColorStop(0.0, '#a88556'); // 激しくひび割れた砂岩
-                    grad.addColorStop(0.5, '#7b582b');
-                    grad.addColorStop(1.0, '#422c10');
+                    grad.addColorStop(0.0, '#c75645'); // ひび割れ被弾色
+                    grad.addColorStop(0.5, '#a63d2e');
+                    grad.addColorStop(1.0, '#4a170f');
                 }
             }
+            ctx.fillStyle = grad;
+            ctx.fill();
 
+            // 外枠エッジ
+            ctx.strokeStyle = isFlashing ? '#ffffff' : '#3d140e';
+            ctx.lineWidth = 1.6;
+            ctx.stroke();
+
+            // 細胞状ストーンの立体ハイライトライン
+            ctx.strokeStyle = 'rgba(255, 220, 200, 0.4)';
+            ctx.lineWidth = 1.2;
+            ctx.beginPath();
+            ctx.arc(bx + bw * 0.38, by + bh * 0.35, bw * 0.22, Math.PI * 0.8, Math.PI * 1.8);
+            ctx.stroke();
+
+            // クラック（ひび割れ模様：耐久力減少時）
+            if (this.hp <= 1) {
+                ctx.strokeStyle = isFlashing ? '#ffffff' : 'rgba(30, 8, 4, 0.8)';
+                ctx.lineWidth = 1.2;
+                ctx.beginPath();
+                ctx.moveTo(bx + 8, by + 12);
+                ctx.lineTo(bx + 20, by + 24);
+                ctx.lineTo(bx + 32, by + 18);
+                ctx.moveTo(bx + 20, by + 24);
+                ctx.lineTo(bx + 16, by + 34);
+                ctx.stroke();
+            }
+
+        } else {
+            // --- 破壊不能な古代巨石柱（スレートグレーのストーンヘンジモノリス） ---
+            const grad = ctx.createLinearGradient(this.x, this.y, this.x + this.width, this.y + this.height);
+            grad.addColorStop(0.0, '#64748b'); // スレートグレー
+            grad.addColorStop(0.35, '#475569');
+            grad.addColorStop(0.75, '#334155');
+            grad.addColorStop(1.0, '#1e293b'); // 玄武岩
             ctx.fillStyle = grad;
             ctx.fillRect(this.x, this.y, this.width, this.height);
 
-            // ブロック外枠（切り石の陰影エッジ）
-            ctx.strokeStyle = isFlashing ? '#ffffff' : '#3d2b14';
-            ctx.lineWidth = 1.5;
+            ctx.strokeStyle = '#0f172a';
+            ctx.lineWidth = 2;
             ctx.strokeRect(this.x, this.y, this.width, this.height);
 
-            // 切り石のハイライトライン
-            ctx.strokeStyle = 'rgba(255, 255, 255, 0.4)';
+            // 切り石のエッジハイライト
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.25)';
             ctx.lineWidth = 1;
             ctx.beginPath();
             ctx.moveTo(this.x + 1, this.y + this.height - 1);
@@ -104,42 +154,10 @@ class StoneBlock {
             ctx.lineTo(this.x + this.width - 1, this.y + 1);
             ctx.stroke();
 
-            // クラック（ひび割れ模様: 耐久力に応じて増加）
-            ctx.strokeStyle = isFlashing ? '#ffaa00' : 'rgba(40, 25, 10, 0.7)';
+            // 古代の石柱刻印ライン
+            ctx.strokeStyle = 'rgba(56, 189, 248, 0.3)';
             ctx.lineWidth = 1.2;
             ctx.beginPath();
-            ctx.moveTo(this.x + 8, this.y + 10);
-            ctx.lineTo(this.x + 22, this.y + 24);
-            ctx.lineTo(this.x + 32, this.y + 20);
-            if (this.hp <= 2) {
-                ctx.moveTo(this.x + 22, this.y + 24);
-                ctx.lineTo(this.x + 16, this.y + 36);
-            }
-            if (this.hp <= 1) {
-                ctx.moveTo(this.x + 4, this.y + 28);
-                ctx.lineTo(this.x + 16, this.y + 36);
-                ctx.lineTo(this.x + 36, this.y + 32);
-            }
-            ctx.stroke();
-        } else {
-            // --- 破壊できない石（巨大玄武岩モノリス・ストーンヘンジ巨石柱） ---
-            const grad = ctx.createLinearGradient(this.x, this.y, this.x + this.width, this.y + this.height);
-            grad.addColorStop(0.0, '#64748b'); // 重厚なスレートブルー
-            grad.addColorStop(0.3, '#334155');
-            grad.addColorStop(0.7, '#1e293b');
-            grad.addColorStop(1.0, '#0f172a');
-            ctx.fillStyle = grad;
-            ctx.fillRect(this.x, this.y, this.width, this.height);
-
-            ctx.strokeStyle = '#020617';
-            ctx.lineWidth = 2;
-            ctx.strokeRect(this.x, this.y, this.width, this.height);
-
-            // 古代の神秘的なルーン紋様（シアン微発光）
-            ctx.strokeStyle = 'rgba(56, 189, 248, 0.45)';
-            ctx.lineWidth = 1.5;
-            ctx.beginPath();
-            ctx.arc(this.x + this.width / 2, this.y + this.height / 2, 8, 0, Math.PI * 2);
             ctx.moveTo(this.x + this.width / 2, this.y + 6);
             ctx.lineTo(this.x + this.width / 2, this.y + this.height - 6);
             ctx.stroke();
@@ -149,36 +167,49 @@ class StoneBlock {
     }
 }
 
+// ==========================================
+// StonehengeStage クラス（2面全体統括）
+// ==========================================
 class StonehengeStage {
     constructor(canvasWidth, canvasHeight) {
         this.width = canvasWidth;
         this.height = canvasHeight;
-        this.scrollSpeed = 1.5;
+        this.scrollSpeed = 1.6;
+
         this.blocks = [];
         this.distance = 0;
-        this.spawnColumnX = canvasWidth + 40;
         this.columnWidth = 40;
         this.active = false;
         this.stageTime = 0;
-        this.state = 'STAGE'; // STAGE -> BOSS -> ALL_CLEAR
-        this.generating = true;
+
+        // ステートマシン:
+        // OPENING（空中戦・カプセル補給）
+        // -> STONEHENGE（石掘削・砲台・ハッチ・ダッカー）
+        // -> ZAB_RUSH（四方からの真のザブ地帯）
+        // -> PRE_BOSS（ボス前警報）
+        // -> BOSS（ビッグコア決戦）
+        // -> STAGE_CLEAR
+        this.state = 'OPENING';
+        this.generating = false;
         this.boss = null;
         this.stageClearTimer = 0;
         this.totalColumnsGenerated = 0;
-        
-        // 飛ぶ敵のスポーンタイマー（1秒強の間隔でドンドン出す！）
+
+        // 空中敵スポーンタイマー
         this.flyingEnemyTimer = 0;
-        this.flyingEnemyInterval = 1100;
-        
-        // 遠景パララックス用ストーンヘンジ巨石シルエット
-        this.bgMonoliths = [];
-        for (let i = 0; i < 16; i++) {
-            this.bgMonoliths.push({
-                x: (canvasWidth / 14) * i,
-                y: canvasHeight - (90 + Math.random() * 90),
-                w: 32 + Math.random() * 28,
-                h: 130 + Math.random() * 100,
-                speed: 0.4
+        this.zabTimer = 0;
+        this.zabWaveTimer = 0;
+        this.preBossTimer = 0;
+
+        // 星空（背景用：深淵の宇宙）
+        this.stars = [];
+        for (let i = 0; i < 90; i++) {
+            this.stars.push({
+                x: Math.random() * canvasWidth,
+                y: Math.random() * canvasHeight,
+                speed: Math.random() * 2.2 + 0.6,
+                size: Math.random() * 2.0 + 0.6,
+                brightness: Math.random() * 0.7 + 0.3
             });
         }
     }
@@ -188,30 +219,29 @@ class StonehengeStage {
         this.blocks = [];
         this.distance = 0;
         this.stageTime = 0;
-        this.state = 'STAGE';
-        this.generating = true;
+        this.state = 'OPENING'; // 原作通りまずは宇宙空中戦から！
+        this.generating = false;
         this.boss = null;
         this.stageClearTimer = 0;
         this.flyingEnemyTimer = 0;
         this.totalColumnsGenerated = 0;
-
-        // ステージ開幕直後から画面全域に石ブロック群がびっしり広がるよう先行生成！
-        this.spawnColumnX = 240;
-        while (this.spawnColumnX < this.width + 120) {
-            this.generateColumn(this.spawnColumnX);
-            this.spawnColumnX += this.columnWidth;
-        }
+        this.zabTimer = 0;
+        this.zabWaveTimer = 0;
+        this.preBossTimer = 0;
+        this.spawnColumnX = this.width + 40;
     }
 
     update(dt) {
         if (!this.active) return;
+        this.stageTime += dt;
         this.distance += this.scrollSpeed;
 
-        // 1. 遠景シルエットのスクロール
-        this.bgMonoliths.forEach(m => {
-            m.x -= m.speed;
-            if (m.x + m.w < 0) {
-                m.x = this.width + Math.random() * 60;
+        // 1. 星空のスクロール（常時稼働）
+        this.stars.forEach(s => {
+            s.x -= s.speed;
+            if (s.x < 0) {
+                s.x = this.width;
+                s.y = Math.random() * this.height;
             }
         });
 
@@ -219,70 +249,101 @@ class StonehengeStage {
         this.blocks.forEach(b => b.update(this.scrollSpeed));
         this.blocks = this.blocks.filter(b => b.active);
 
-        if (this.state === 'STAGE') {
-            this.stageTime += dt;
+        // ==========================================
+        // ステート別進行管理
+        // ==========================================
+        if (this.state === 'OPENING') {
+            // --- フェーズ1: 開幕・宇宙空中戦（0〜12秒） ---
+            this.updateOpeningAirEnemies(dt);
 
-            // 3. 新しい石ブロック列の生成（スクロールに合わせて絶え間なく密集して出現！）
+            // 12秒経過でストーンヘンジ巨石地帯へ突入！
+            if (this.stageTime >= 12000) {
+                this.state = 'STONEHENGE';
+                this.generating = true;
+                this.spawnColumnX = this.width + 20;
+            }
+
+        } else if (this.state === 'STONEHENGE') {
+            // --- フェーズ2: ストーンヘンジ石掘削地帯（12秒〜55秒） ---
+            // 52秒経過で石地帯の生成を終了（約40秒間の掘削体験）
+            if (this.stageTime >= 52000 && this.generating) {
+                this.generating = false;
+            }
+
             if (this.generating) {
-                this.spawnColumnX -= this.scrollSpeed; // 毎フレームのスクロール追従
-                while (this.spawnColumnX < this.width + 120) {
+                this.spawnColumnX -= this.scrollSpeed;
+                while (this.spawnColumnX < this.width + 80) {
                     this.generateColumn(this.spawnColumnX);
                     this.spawnColumnX += this.columnWidth;
                 }
             }
 
-            // 4. 飛ぶ敵をドンドン出すシステム！
-            this.updateFlyingEnemies(dt);
+            // 空中敵の編隊飛行（カプセル供給＆スリル）
+            this.updateStonehengeEnemies(dt);
 
-            // 約50秒経過で石地帯の生成を終了し、宇宙空間ワープフェーズへの準備
-            if (this.stageTime > 50000 && this.generating) {
-                this.generating = false;
-            }
-
-            // 石ブロックが画面左へ抜けたらボスの前の宇宙空間「丸型ワープ兵器」フェーズへ移行！
-            if (this.stageTime > 55000 && this.blocks.length < 5) {
-                this.state = 'WARP_SPACE';
+            // 石ブロックが完全に画面左へ抜けたら「ザブ地帯」へ突入！
+            if (this.stageTime >= 56000 && this.blocks.length < 5) {
+                this.state = 'ZAB_RUSH';
                 this.blocks = [];
-                this.warpSpaceTimer = 0;
-                this.warpWaveTimer = 0;
+                this.zabTimer = 0;
+                this.zabWaveTimer = 0;
             }
-        } else if (this.state === 'WARP_SPACE') {
-            this.stageTime += dt;
-            this.warpSpaceTimer += dt;
-            this.warpWaveTimer += dt;
 
-            // 丸型ワープ兵器の小隊（WarpSquad）が空間から次々とワープアウト！
-            if (this.warpWaveTimer > 1800) {
-                this.warpWaveTimer = 0;
-                if (typeof WarpSquad !== 'undefined') {
-                    new WarpSquad(Math.floor(Math.random() * 2) + 4);
+        } else if (this.state === 'ZAB_RUSH') {
+            // --- フェーズ3: 名物「ザブ地帯」（約20秒間） ---
+            this.zabTimer += dt;
+            this.zabWaveTimer += dt;
+
+            // 約1.0秒ごとに四方（前・後・上・下）からザブ小隊がワープ強襲！
+            if (this.zabWaveTimer >= 1050) {
+                this.zabWaveTimer = 0;
+                if (typeof ZabSquad !== 'undefined') {
+                    const sides = ['FRONT', 'BACK', 'TOP', 'BOTTOM'];
+                    // 自機の現在Yに合わせて上下や前後から挟み撃ち！
+                    const side = sides[Math.floor(Math.random() * sides.length)];
+                    const curPlayerY = (typeof player !== 'undefined') ? player.y : 300;
+                    const safeY = Math.max(120, Math.min(this.height - 120, curPlayerY + (Math.random() - 0.5) * 120));
+                    new ZabSquad(side, safeY, 3);
                 }
             }
 
-            // 約28秒間のワープ強襲を耐え抜いたら2面ボス（古代守護神ゴーレムコア）が登場！
-            if (this.warpSpaceTimer > 28000) {
+            // 約20秒間の猛烈なザブラッシュを耐え抜いたらボス前へ移行！
+            if (this.zabTimer >= 20000) {
+                this.state = 'PRE_BOSS';
+                this.preBossTimer = 0;
+                if (typeof Sound !== 'undefined' && typeof Sound.playBossBgm === 'function') {
+                    Sound.playBossBgm();
+                }
+            }
+
+        } else if (this.state === 'PRE_BOSS') {
+            // --- フェーズ4: ボス前静寂＆警告（約3.5秒） ---
+            this.preBossTimer += dt;
+            if (this.preBossTimer >= 3500) {
                 this.state = 'BOSS';
-                if (typeof Sound !== 'undefined') Sound.playBossBgm();
-                if (typeof GolemBoss !== 'undefined') {
-                    this.boss = new GolemBoss(this.width, 185);
-                }
+                this._spawnBoss();
             }
+
         } else if (this.state === 'BOSS') {
+            // --- フェーズ5: ビッグコア戦 ---
             if (this.boss) {
                 this.boss.update();
                 if (!this.boss.active) {
                     this.state = 'STAGE_CLEAR';
                     this.stageClearTimer = 0;
-                    if (typeof Sound !== 'undefined') Sound.playStageBgm();
+                    if (typeof Sound !== 'undefined' && typeof Sound.playStageBgm === 'function') {
+                        Sound.playStageBgm();
+                    }
                 }
             }
+
         } else if (this.state === 'STAGE_CLEAR' || this.state === 'ALL_CLEAR') {
+            // --- フェーズ6: ステージクリア＆3面ワープ ---
             this.stageClearTimer += dt;
             if (typeof player !== 'undefined') {
-                player.x += 3.8; // 自機が右へ疾走離脱
+                player.x += 4.2; // 自機が右へ疾走離脱
             }
-            // 約3秒後にステージ3（モアイ面）へシームレス突入！
-            if (this.stageClearTimer > 3000) {
+            if (this.stageClearTimer > 3500) {
                 this.active = false;
                 if (typeof levelManager !== 'undefined' && typeof levelManager.startStage3 === 'function') {
                     levelManager.startStage3();
@@ -291,68 +352,75 @@ class StonehengeStage {
         }
     }
 
-    // 飛ぶ敵をドンドン出す処理（編隊全滅時や赤色敵撃破でカプセル大量ドロップ！）
-    updateFlyingEnemies(dt) {
-        if (typeof enemies === 'undefined') return;
+    _spawnBoss() {
+        const bossClass = (typeof BigCoreBoss !== 'undefined') ? BigCoreBoss :
+                          (typeof window.BigCoreBoss !== 'undefined') ? window.BigCoreBoss :
+                          (typeof Boss !== 'undefined') ? Boss : null;
+        if (bossClass) {
+            this.boss = new bossClass(this.width, this.height / 2);
+        }
+    }
 
+    // 開幕・宇宙空中戦（ファン／ガルン編隊によるカプセル補給）
+    updateOpeningAirEnemies(dt) {
         this.flyingEnemyTimer += dt;
-        if (this.flyingEnemyTimer > this.flyingEnemyInterval) {
-            this.flyingEnemyTimer = 0;
-            this.flyingEnemyInterval = 900 + Math.random() * 400; // 0.9〜1.3秒のハイテンポ！
+        if (this.flyingEnemyTimer < 1400) return;
+        this.flyingEnemyTimer = 0;
 
-            const spawnRoll = Math.random();
+        const startY = 140 + Math.random() * (this.height - 280);
+        if (Math.random() < 0.6) {
+            if (typeof Formation !== 'undefined') {
+                new Formation(startY, 4); // 赤編隊（全滅でカプセル！）
+            }
+        } else {
+            if (typeof GarunFormation !== 'undefined') {
+                new GarunFormation(startY, Math.random() < 0.5, 4);
+            }
+        }
+    }
 
-            if (spawnRoll < 0.38) {
-                // パターンA: 新キャラ「古代ストーンアイ（StoneEyeEnemy）」イオンリング弾放射（40%で赤色＝カプセル！）
-                const spawnY = 120 + Math.random() * 360;
-                if (typeof StoneEyeEnemy !== 'undefined') {
-                    const eye = new StoneEyeEnemy(this.width + 50, spawnY);
-                    if (Math.random() < 0.40) eye.isRed = true;
-                    enemies.push(eye);
-                }
-            } else if (spawnRoll < 0.72) {
-                // パターンB: 5機編隊（Formation）サイン波で飛来（全滅でカプセル確定ドロップ！）
-                const startY = 120 + Math.random() * 360;
-                if (typeof Formation !== 'undefined') {
-                    new Formation(startY, 5);
-                }
-            } else {
-                // パターンC: ザブ小隊（ZabSquad）奇襲編隊（全滅でカプセル確定ドロップ！）
-                const startY = 140 + Math.random() * 320;
-                if (typeof ZabSquad !== 'undefined') {
-                    new ZabSquad('FRONT', startY, 4);
-                }
+    // ストーンヘンジ道中の空中編隊
+    updateStonehengeEnemies(dt) {
+        this.flyingEnemyTimer += dt;
+        if (this.flyingEnemyTimer < 1600) return;
+        this.flyingEnemyTimer = 0;
+
+        const startY = 160 + Math.random() * (this.height - 320);
+        if (Math.random() < 0.55) {
+            if (typeof Formation !== 'undefined') {
+                new Formation(startY, 4);
+            }
+        } else {
+            if (typeof GarunFormation !== 'undefined') {
+                new GarunFormation(startY, Math.random() < 0.5, 4);
             }
         }
     }
 
     // =========================================================================
-    // ストーンヘンジ面 複雑・多層古代遺跡迷路レイアウト生成
-    // 単純な上半分埋めを全廃！S字ジグザグ・古代門・ピラミッド階段・中央要塞島・チェッカー
+    // ストーンヘンジ面 レイアウト生成
+    // 原作アーケード版準拠：赤丸掘削ブロック＋巨石柱＋砲台＋ハッチ＋ダッカー
     // =========================================================================
     generateColumn(colX) {
         const totalRows = Math.floor(this.height / this.columnWidth); // 600 / 40 = 15行 (r = 0〜14)
-        const colIndex = this.totalColumnsGenerated++; // 正しい進行列インデックス！
+        const colIndex = this.totalColumnsGenerated++;
 
-        // 1. 最外郭境界: 天井（行0）と地面（行14）は1ブロック分の古代モノリス
+        // 1. 最外郭境界: 天井（行0）と地面（行14）は古代巨石モノリス
         this.blocks.push(new StoneBlock(colX, 0, this.columnWidth, this.columnWidth, false));
         this.blocks.push(new StoneBlock(colX, (totalRows - 1) * this.columnWidth, this.columnWidth, this.columnWidth, false));
 
-        // 2. 36列ごとの古代遺跡迷路サイクル（余裕のある配置・詰みポイント完全排除）
+        // 2. 36列周期の古代遺跡迷路パターン
         const phase = colIndex % 36;
-        let indestructibleRows = []; // この列で壊れない石を配置する行番号（最大3ブロックまでに厳格制限！）
+        let indestructibleRows = []; // 壊れない石柱の行番号
         let enemySpawns = []; // { row, isCeil, type }
 
-        // --- ゾーン1: 天井・床の古代モノリスピラー (phase: 0〜7) ---
-        // 画面半分を塞ぐ巨大壁を完全廃止！最大3ブロック厚の適度なアクセント＋砲台台座
+        // --- ゾーン1: 天井・床の巨石ピラー (phase: 1〜7) ---
         if (phase >= 1 && phase <= 3) {
-            // 天井から突き出す巨石柱 (r: 1〜3) -> 残り10ブロック (r: 4〜13) は広大な空間！
             for (let r = 1; r <= 3; r++) indestructibleRows.push(r);
             if (phase === 2) {
-                enemySpawns.push({ row: 4, isCeil: true, type: 'RUNE' }); // 柱の下端に下向きルーン砲台
+                enemySpawns.push({ row: 4, isCeil: true, type: 'TURRET' }); // 柱の下端に下向き砲台
             }
         } else if (phase >= 5 && phase <= 7) {
-            // 地面から突き出す巨石台座 (r: 11〜13) -> 残り10ブロック (r: 1〜10) は広大な空間！
             for (let r = 11; r <= 13; r++) indestructibleRows.push(r);
             if (phase === 6) {
                 enemySpawns.push({ row: 10, isCeil: false, type: 'TURRET' }); // 台座の上端に上向き砲台
@@ -361,41 +429,40 @@ class StonehengeStage {
 
         // --- ゾーン2: 古代アーチゲート門 & 中央浮島 (phase: 8〜14) ---
         else if (phase === 9) {
-            // 対向ピラー (上 r: 1〜2, 下 r: 12〜13) -> 中央 (r: 3〜11: 9ブロック分) が大開口！
             indestructibleRows.push(1, 2, 12, 13);
             enemySpawns.push({ row: 3, isCeil: true, type: 'DUCKER' });
             enemySpawns.push({ row: 11, isCeil: false, type: 'TURRET' });
         } else if (phase >= 11 && phase <= 13) {
-            // 中央浮島モノリス (r: 6〜7: わずか2ブロック厚！) -> 上 (r: 1〜5: 5ブロック) と下 (r: 8〜13: 6ブロック) の両方が通過可能！
+            // 中央浮島モノリス (r: 6〜7)
             indestructibleRows.push(6, 7);
             if (phase === 11) {
-                enemySpawns.push({ row: 5, isCeil: false, type: 'TURRET' }); // 浮島上面に上向き砲台
+                enemySpawns.push({ row: 5, isCeil: false, type: 'HATCHER' }); // ★浮島に敵基地ハッチ！
             } else if (phase === 13) {
-                enemySpawns.push({ row: 8, isCeil: true, type: 'RUNE' }); // 浮島下面に下向きルーン砲台
+                enemySpawns.push({ row: 8, isCeil: true, type: 'TURRET' });
             }
         }
 
         // --- ゾーン3: ピラミッド階段テラス (phase: 15〜22) ---
         else if (phase === 16) {
-            indestructibleRows.push(13); // 下側 1段目
+            indestructibleRows.push(13);
         } else if (phase === 17) {
-            indestructibleRows.push(12, 13); // 下側 2段目
+            indestructibleRows.push(12, 13);
         } else if (phase === 18) {
-            indestructibleRows.push(11, 12, 13); // 下側 3段目 (最大でも3段！)
-            enemySpawns.push({ row: 10, isCeil: false, type: 'TURRET' }); // 赤砲台テラス！
+            indestructibleRows.push(11, 12, 13);
+            enemySpawns.push({ row: 10, isCeil: false, type: 'TURRET' });
         } else if (phase === 20) {
-            indestructibleRows.push(1, 2); // 上側 2段
+            indestructibleRows.push(1, 2);
             enemySpawns.push({ row: 3, isCeil: true, type: 'DUCKER' });
         } else if (phase === 21) {
-            indestructibleRows.push(1, 2, 3); // 上側 3段 (最大でも3段！)
+            indestructibleRows.push(1, 2, 3);
+            enemySpawns.push({ row: 4, isCeil: true, type: 'HATCHER' }); // ★天井ハッチ基地！
         }
 
         // --- ゾーン4: 回廊アイランド要塞 (phase: 23〜29) ---
         else if (phase >= 25 && phase <= 27) {
-            // 中央浮島 (r: 6〜7: わずか2ブロック厚！)
             indestructibleRows.push(6, 7);
             if (phase === 25) {
-                enemySpawns.push({ row: 5, isCeil: false, type: 'RUNE' });
+                enemySpawns.push({ row: 5, isCeil: false, type: 'TURRET' });
             } else if (phase === 27) {
                 enemySpawns.push({ row: 8, isCeil: true, type: 'TURRET' });
             }
@@ -403,14 +470,14 @@ class StonehengeStage {
 
         // --- ゾーン5: チェッカー障害物 (phase: 30〜35) ---
         else if (phase === 31) {
-            indestructibleRows.push(2, 3, 11, 12); // 上下各2ブロック
-            enemySpawns.push({ row: 4, isCeil: true, type: 'TURRET' });
+            indestructibleRows.push(2, 3, 11, 12);
+            enemySpawns.push({ row: 4, isCeil: true, type: 'DUCKER' });
         } else if (phase === 33) {
-            indestructibleRows.push(5, 6); // 中段上寄り 2ブロック
-            enemySpawns.push({ row: 7, isCeil: false, type: 'DUCKER' });
-        } else if (phase === 35) {
-            indestructibleRows.push(8, 9); // 中段下寄り 2ブロック
+            indestructibleRows.push(5, 6);
             enemySpawns.push({ row: 7, isCeil: false, type: 'TURRET' });
+        } else if (phase === 35) {
+            indestructibleRows.push(8, 9);
+            enemySpawns.push({ row: 7, isCeil: false, type: 'HATCHER' }); // ★ハッチ基地！
         }
 
         // 3. 壊れない石（古代モノリスブロック）の配置
@@ -418,15 +485,15 @@ class StonehengeStage {
             this.blocks.push(new StoneBlock(colX, r * this.columnWidth, this.columnWidth, this.columnWidth, false));
         });
 
-        // 4. 壊れない石の上に敵（砲台・ルーン砲台・ダッカー）を高密度配置（赤色確率40%！）
+        // 4. 巨石柱の上に敵（砲台・ダッカー・ハッチ）を配置
         if (typeof enemies !== 'undefined') {
             enemySpawns.forEach(sp => {
-                const isRed = Math.random() < 0.40; // 40%で赤色＝カプセル確定ドロップ！
+                const isRed = Math.random() < 0.45; // 45%で赤色＝カプセル確定ドロップ！
                 const spawnX = colX + 1;
                 const spawnY = sp.row * this.columnWidth;
 
-                if (sp.type === 'RUNE' && typeof RuneTurret !== 'undefined') {
-                    enemies.push(new RuneTurret(spawnX, spawnY, sp.isCeil, isRed));
+                if (sp.type === 'HATCHER' && typeof HatcherEnemy !== 'undefined') {
+                    enemies.push(new HatcherEnemy(spawnX, spawnY, sp.isCeil));
                 } else if (sp.type === 'DUCKER' && typeof DuckerEnemy !== 'undefined') {
                     enemies.push(new DuckerEnemy(spawnX, spawnY, sp.isCeil, isRed));
                 } else if (typeof TurretEnemy !== 'undefined') {
@@ -435,38 +502,30 @@ class StonehengeStage {
             });
         }
 
-        // 5. 破壊できる石（砂岩ブロック）の面積を大幅増加！（本家グラディウス2面の再現）
-        // 画面全体の約70%を壊れる石で充填し、バリバリ掘進する快感を最大化！
-        // 安全な開口トンネル（幅3ブロック）は緩やかなS字サイン波で必ず確保し、詰みや圧死を完全防止！
-        const waveCenter = Math.round(7 + Math.sin(colIndex * 0.22) * 3.2); // r: 4〜10 の間をゆったり波打つ
-        const isTunnelRow = (r) => {
-            return (r >= waveCenter - 1 && r <= waveCenter + 1); // 幅3ブロック分の開口トンネル
-        };
+        // 5. 破壊できる石（赤丸掘削ブロック）の充填
+        // 安全な開口トンネル（幅3ブロック）は緩やかなS字サイン波で必ず確保し、掘削の快感と回避を両立！
+        const waveCenter = Math.round(7 + Math.sin(colIndex * 0.22) * 3.2); // r: 4〜10
+        const isTunnelRow = (r) => (r >= waveCenter - 1 && r <= waveCenter + 1);
 
         for (let r = 1; r < totalRows - 1; r++) {
-            // すでに壊れない石がある行はスキップ
             if (indestructibleRows.includes(r)) continue;
 
-            // 開口トンネル部分:
-            // 75%の列では完全に空洞（幅3マスの安全な通り道）、
-            // 25%の列（4列に1列）では掘削ターゲット（砂岩）を1マスだけ配置
+            // トンネル部分は空間をあける
             if (isTunnelRow(r)) {
-                if (colIndex % 4 === 0 && r === waveCenter) {
+                // ごく稀に単独の掘削ブロックを配置してアクセント
+                if (Math.random() < 0.08) {
                     this.blocks.push(new StoneBlock(colX, r * this.columnWidth, this.columnWidth, this.columnWidth, true));
                 }
-                continue;
+            } else {
+                // トンネル外は赤丸掘削ブロックで密集充填！
+                this.blocks.push(new StoneBlock(colX, r * this.columnWidth, this.columnWidth, this.columnWidth, true));
             }
-
-            // それ以外の行（画面の上下・周囲）は全て「壊れる石（砂岩ブロック）」でぎっしり敷き詰める！
-            // プレイヤーは自由意志で上下を掘り進んで広い空間を作ったり、
-            // 奥の赤敵（カプセル持ち砲台）を掘り出して破壊できる！
-            this.blocks.push(new StoneBlock(colX, r * this.columnWidth, this.columnWidth, this.columnWidth, true));
         }
     }
 
-    // プレイヤーの弾との当たり判定処理（石ブロックの掘削）
+    // プレイヤーの弾と石ブロックの当たり判定（掘削処理）
     handleBulletCollisions(playerBullets) {
-        if (!this.active || this.state === 'BOSS') return;
+        if (!this.active) return;
 
         playerBullets.forEach(bullet => {
             if (!bullet.active) return;
@@ -475,23 +534,24 @@ class StonehengeStage {
                 const b = this.blocks[i];
                 if (!b.active) continue;
 
-                // 弾とブロックの矩形交差判定
                 if (
                     bullet.x < b.x + b.width &&
                     bullet.x + bullet.width > b.x &&
                     bullet.y < b.y + b.height &&
                     bullet.y + bullet.height > b.y
                 ) {
-                    // レーザーなら貫通しながら大ダメージ（石を一気にぶち抜く快感！）
+                    // レーザーは石を貫通しながら複数ブロックを一度に掘削！
                     if (typeof Laser !== 'undefined' && bullet instanceof Laser) {
                         b.hit(2);
                     } else if (typeof Missile !== 'undefined' && bullet instanceof Missile) {
                         bullet.active = false;
-                        b.hit(3);
+                        b.hit(2);
                     } else {
-                        // 通常ショット・ダブル
                         bullet.active = false;
                         b.hit(1);
+                    }
+                    if (typeof Sound !== 'undefined' && typeof Sound.playBossHit === 'function') {
+                        Sound.playBossHit();
                     }
                     break;
                 }
@@ -499,7 +559,7 @@ class StonehengeStage {
         });
     }
 
-    // プレイヤーや敵弾との矩形衝突判定（自機が挟まれる・激突する判定）
+    // 自機や敵弾との矩形衝突判定（挟まれ・激突死）
     checkCollision(rect) {
         if (!this.active) return false;
 
@@ -523,59 +583,100 @@ class StonehengeStage {
         if (!this.active) return;
         ctx.save();
 
-        // 1. ストーンヘンジ面専用の紫紺の宇宙背景
+        // 1. 深淵の宇宙背景（アーケード版準拠の濃紺〜ブラック）
         const spaceGrad = ctx.createLinearGradient(0, 0, 0, this.height);
-        spaceGrad.addColorStop(0.0, '#0a0518');
-        spaceGrad.addColorStop(0.4, '#170c32');
-        spaceGrad.addColorStop(0.7, '#24144a');
-        spaceGrad.addColorStop(1.0, '#0d0720');
+        spaceGrad.addColorStop(0.0, '#030514');
+        spaceGrad.addColorStop(0.5, '#070c24');
+        spaceGrad.addColorStop(1.0, '#02030d');
         ctx.fillStyle = spaceGrad;
         ctx.fillRect(0, 0, this.width, this.height);
 
-        // 2. 遠景のストーンヘンジ巨石群シルエット（パララックス深景）
-        ctx.fillStyle = 'rgba(20, 10, 40, 0.85)';
-        this.bgMonoliths.forEach(m => {
-            ctx.fillRect(m.x, m.y, m.w, m.h);
-            ctx.fillRect(m.x - 8, m.y - 12, m.w + 16, 14);
+        // 2. 星々
+        this.stars.forEach(s => {
+            ctx.globalAlpha = s.brightness;
+            ctx.fillStyle = '#ffffff';
+            ctx.fillRect(s.x, s.y, s.size, s.size);
         });
+        ctx.globalAlpha = 1.0;
 
         // 3. 全ての石ブロックの描画
         this.blocks.forEach(b => b.draw(ctx));
 
-        // 4. ステージ2ボスの描画
+        // 4. ボスの描画（ビッグコア）
         if (this.state === 'BOSS' && this.boss) {
             this.boss.draw(ctx);
         }
 
-        // 5. ステージ2開幕インジケーター（開始から約3.5秒間）
-        if (this.state === 'STAGE' && this.stageTime < 3500) {
-            const alpha = Math.min(1, Math.sin((this.stageTime / 3500) * Math.PI));
+        // 5. ステージ開幕インジケーター（開始から約3.5秒間）
+        if (this.state === 'OPENING' && this.stageTime < 3800) {
+            const alpha = Math.min(1, Math.sin((this.stageTime / 3800) * Math.PI));
+            ctx.save();
+            ctx.textAlign = 'center';
             ctx.font = 'bold 36px "Courier New", monospace';
             ctx.fillStyle = `rgba(0, 255, 255, ${alpha})`;
-            ctx.textAlign = 'center';
             ctx.shadowColor = '#0088ff';
             ctx.shadowBlur = 14;
-            ctx.fillText('STAGE 2 : STONEHENGE', this.width / 2, this.height / 2 - 50);
+            ctx.fillText('STAGE 2 : STONEHENGE', this.width / 2, this.height / 2 - 40);
             ctx.font = 'bold 18px "Courier New", monospace';
             ctx.fillStyle = `rgba(255, 230, 150, ${alpha})`;
-            ctx.fillText('BREAK THE STONES TO CARVE YOUR PATH!', this.width / 2, this.height / 2);
+            ctx.shadowColor = '#ff8800';
+            ctx.shadowBlur = 8;
+            ctx.fillText('EXCAVATE THE ANCIENT RUINS!', this.width / 2, this.height / 2 + 10);
+            ctx.restore();
         }
 
-        // 6. 宇宙空間ワープ強襲インジケーター（開始から約3.8秒間）
-        if (this.state === 'WARP_SPACE' && this.warpSpaceTimer < 3800) {
-            const alpha = Math.min(1, Math.sin((this.warpSpaceTimer / 3800) * Math.PI));
+        // 6. 巨石地帯突入警告（10〜12秒）
+        if (this.state === 'OPENING' && this.stageTime >= 10000 && this.stageTime < 12000) {
+            const pulse = (Math.floor(Date.now() / 200) % 2 === 0);
+            if (pulse) {
+                ctx.save();
+                ctx.textAlign = 'center';
+                ctx.font = 'bold 22px "Courier New", monospace';
+                ctx.fillStyle = '#ffaa00';
+                ctx.shadowColor = '#ff6600';
+                ctx.shadowBlur = 12;
+                ctx.fillText('WARNING : STONEHENGE APPROACHING!', this.width / 2, 50);
+                ctx.restore();
+            }
+        }
+
+        // 7. ザブ地帯突入インジケーター（開始から約3.5秒間）
+        if (this.state === 'ZAB_RUSH' && this.zabTimer < 3500) {
+            const alpha = Math.min(1, Math.sin((this.zabTimer / 3500) * Math.PI));
+            ctx.save();
+            ctx.textAlign = 'center';
             ctx.font = 'bold 32px "Courier New", monospace';
             ctx.fillStyle = `rgba(0, 255, 255, ${alpha})`;
-            ctx.textAlign = 'center';
             ctx.shadowColor = '#0088ff';
-            ctx.shadowBlur = 14;
-            ctx.fillText('WARNING : WARP ATTACK DETECTED!', this.width / 2, this.height / 2 - 40);
+            ctx.shadowBlur = 16;
+            ctx.fillText('WARNING : ZAB ATTACK DETECTED!', this.width / 2, this.height / 2 - 40);
             ctx.font = 'bold 18px "Courier New", monospace';
             ctx.fillStyle = `rgba(255, 200, 100, ${alpha})`;
-            ctx.fillText('SPHERE WARP WEAPONS INCOMING!', this.width / 2, this.height / 2 + 10);
+            ctx.shadowColor = '#ff8800';
+            ctx.shadowBlur = 8;
+            ctx.fillText('HOLD OFF THE WARPING SWARM!', this.width / 2, this.height / 2 + 10);
+            ctx.restore();
         }
 
-        // 6. ステージクリア演出！
+        // 8. ボス前警告演出
+        if (this.state === 'PRE_BOSS') {
+            const pulse = (Math.floor(Date.now() / 180) % 2 === 0);
+            if (pulse) {
+                ctx.save();
+                ctx.textAlign = 'center';
+                ctx.font = 'bold 28px "Courier New", monospace';
+                ctx.fillStyle = '#ff3300';
+                ctx.shadowColor = '#ff0000';
+                ctx.shadowBlur = 16;
+                ctx.fillText('WARNING : BIG CORE APPROACHING!', this.width / 2, this.height / 2 - 30);
+                ctx.font = 'bold 18px "Courier New", monospace';
+                ctx.fillStyle = '#ffcc00';
+                ctx.fillText('DESTROY 4 SHIELD BARRIERS TO EXPOSE REACTOR!', this.width / 2, this.height / 2 + 15);
+                ctx.restore();
+            }
+        }
+
+        // 9. ステージクリア演出
         if (this.state === 'STAGE_CLEAR' || this.state === 'ALL_CLEAR') {
             ctx.save();
             ctx.textAlign = 'center';
@@ -599,6 +700,8 @@ class StonehengeStage {
     }
 }
 
-// グローバルインスタンス
+// グローバル公開
+window.StoneBlock = StoneBlock;
+window.StonehengeStage = StonehengeStage;
 let stonehengeStage = null;
 window.stonehengeStage = stonehengeStage;

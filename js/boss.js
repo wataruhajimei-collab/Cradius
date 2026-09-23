@@ -941,7 +941,6 @@ class BigCoreBoss {
             { hp: 8, maxHp: 8, flashTimer: 0, active: true },
         ];
 
-        this.coreOpen = false;
         this.hitFlashTimer = 0;
         this.moveTimer = 0;
         this.rotationAngle = 0;
@@ -951,6 +950,10 @@ class BigCoreBoss {
 
     get allShieldsDestroyed() {
         return this.shieldCores.every(c => !c.active);
+    }
+
+    get coreOpen() {
+        return this.allShieldsDestroyed;
     }
 
     update() {
@@ -970,8 +973,6 @@ class BigCoreBoss {
         this.shieldCores.forEach(c => { if (c.flashTimer > 0) c.flashTimer--; });
         if (this.hitFlashTimer > 0) this.hitFlashTimer--;
 
-        this.coreOpen = this.allShieldsDestroyed;
-
         this.fireTimer++;
         const interval = this.coreOpen ? 70 : 95;
         if (this.fireTimer >= interval) {
@@ -987,43 +988,48 @@ class BigCoreBoss {
         const bx = this.x - this.width / 2 + 10;
         const by = this.y;
         const spd = this.coreOpen ? -8.5 : -7.0;
-        this.bullets.push(new Bullet(bx, by - 54, spd, 0, '#00ffff', true));
-        this.bullets.push(new Bullet(bx, by - 18, spd, 0, '#ffaa00', true));
-        this.bullets.push(new Bullet(bx, by + 18, spd, 0, '#ffaa00', true));
-        this.bullets.push(new Bullet(bx, by + 54, spd, 0, '#00ffff', true));
+        const LaserClass = (typeof EnemyLaser !== 'undefined') ? EnemyLaser : Bullet;
+        this.bullets.push(new LaserClass(bx, by - 54, spd, 0, '#00ffff'));
+        this.bullets.push(new LaserClass(bx, by - 18, spd, 0, '#00d4ff'));
+        this.bullets.push(new LaserClass(bx, by + 18, spd, 0, '#00d4ff'));
+        this.bullets.push(new LaserClass(bx, by + 54, spd, 0, '#00ffff'));
+        if (typeof Sound !== 'undefined' && typeof Sound.playLaser === 'function') {
+            Sound.playLaser();
+        }
     }
 
     _getShieldCoreX(index) {
-        const leftEdge = this.x - this.width / 2;
-        return leftEdge + 22 + index * 38;
+        return this.x - 96 + index * 22;
     }
 
     _getShieldCoreBounds(index) {
         const cx = this._getShieldCoreX(index);
-        const r = 15;
+        const r = 14;
         return { x: cx - r, y: this.y - r, width: r * 2, height: r * 2 };
     }
 
-    hitShieldCore(damage) {
-        for (let i = 0; i < this.shieldCores.length; i++) {
-            const core = this.shieldCores[i];
-            if (core.active) {
-                core.hp -= damage;
-                core.flashTimer = 8;
-                if (core.hp <= 0) {
-                    core.active = false;
-                    const scx = this._getShieldCoreX(i);
-                    if (typeof createExplosion === 'function') {
-                        createExplosion(scx, this.y, '#00ffff');
-                        createExplosion(scx, this.y, '#ffaa00');
-                    }
-                    if (typeof Sound !== 'undefined' && typeof Sound.playExplosion === 'function') Sound.playExplosion();
-                }
-                return true;
-            }
-            break; // 最前列のみ受け付ける
+    hitShieldCore(index, damage = 1) {
+        if (index === undefined || index === null) {
+            index = this.shieldCores.findIndex(c => c.active);
         }
-        return false;
+        if (index < 0 || index >= this.shieldCores.length) return false;
+        const core = this.shieldCores[index];
+        if (!core || !core.active) return false;
+
+        core.hp -= damage;
+        core.flashTimer = 8;
+        if (core.hp <= 0) {
+            core.active = false;
+            const scx = this._getShieldCoreX(index);
+            if (typeof createExplosion === 'function') {
+                createExplosion(scx, this.y, '#00ffff');
+                createExplosion(scx, this.y, '#ffaa00');
+            }
+            if (typeof Sound !== 'undefined' && typeof Sound.playExplosion === 'function') {
+                Sound.playExplosion();
+            }
+        }
+        return true;
     }
 
     hitCore(damage) {
@@ -1039,22 +1045,24 @@ class BigCoreBoss {
                 bullet.bossHitCooldown--;
                 return;
             }
-            bullet.bossHitCooldown = 18;
+            bullet.bossHitCooldown = 12;
         }
 
-        // シールドコア判定（最前列のアクティブなコアを探す）
+        // シールドコア判定（最前列＝最も左側のアクティブなコアを探す）
         for (let i = 0; i < this.shieldCores.length; i++) {
             const core = this.shieldCores[i];
             if (!core.active) continue;
             const bounds = this._getShieldCoreBounds(i);
             if (checkCollision(bullet, bounds)) {
                 if (!(bullet instanceof Laser)) bullet.active = false;
-                this.hitShieldCore(1);
+                this.hitShieldCore(i, 1);
                 createExplosion(bullet.x, bullet.y, '#ffffaa');
-                if (typeof Sound !== 'undefined' && typeof Sound.playBossHit === 'function') Sound.playBossHit();
+                if (typeof Sound !== 'undefined' && typeof Sound.playBossHit === 'function') {
+                    Sound.playBossHit();
+                }
                 return;
             }
-            break; // 最前列のみ
+            break; // 最前列のみ被弾（背後のコアは保護される）
         }
 
         // 中央コア判定（全シールド破壊後のみ）
