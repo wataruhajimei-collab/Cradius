@@ -1318,22 +1318,37 @@ class SuperVolcano extends Enemy {
     }
 
     update() {
-        if (typeof levelManager !== 'undefined' && levelManager.terrain && levelManager.terrain.active) {
-            if (!this.positioned) {
-                this.x -= levelManager.terrain.scrollSpeed;
+        let scrollSpeed = 0;
+        if (typeof levelManager !== 'undefined' && levelManager.terrain && levelManager.terrain.scrollSpeed > 0) {
+            scrollSpeed = levelManager.terrain.scrollSpeed;
+        }
+
+        if (!this.positioned) {
+            const speed = scrollSpeed > 0 ? scrollSpeed : 2.5;
+            this.x -= speed;
+            if (typeof levelManager !== 'undefined' && levelManager.terrain && levelManager.terrain.active) {
                 this.groundY = levelManager.terrain.getBottomY(this.x + this.width / 2);
-                this.y = this.groundY - this.height;
-                if (this.x <= this.targetX) {
-                    this.x = this.targetX;
-                    this.positioned = true;
-                }
-            } else if (!this.erupting && levelManager.terrain.scrollSpeed > 0) {
-                // サバイバル終了後にスクロール再開したら、左へ流れて画面外へ
-                this.x -= levelManager.terrain.scrollSpeed;
+            }
+            this.y = this.groundY - this.height;
+            if (this.x <= this.targetX) {
+                this.x = this.targetX;
+                this.positioned = true;
+            }
+        } else if (!this.erupting) {
+            // サバイバル終了後・退場フェーズ: 地形停止やボス戦に関わらず確実に左へ流して退場
+            let exitSpeed = Math.max(scrollSpeed, 4.5);
+            if (typeof levelManager !== 'undefined' && (levelManager.state === 'BOSS' || levelManager.state === 'STAGE_CLEAR')) {
+                exitSpeed = Math.max(exitSpeed, 6.0);
+            }
+            this.x -= exitSpeed;
+            if (typeof levelManager !== 'undefined' && levelManager.terrain && levelManager.terrain.active) {
                 this.groundY = levelManager.terrain.getBottomY(this.x + this.width / 2);
-                this.y = this.groundY - this.height;
-                if (this.x + this.width < -100) {
-                    this.active = false;
+            }
+            this.y = this.groundY - this.height;
+            if (this.x + this.width < -50) {
+                this.active = false;
+                if (typeof levelManager !== 'undefined' && levelManager.superVolcano === this) {
+                    levelManager.superVolcano = null;
                 }
             }
         }

@@ -468,7 +468,7 @@ class LevelManager {
                     if (this.superVolcano) {
                         this.superVolcano.stopEruption();
                     }
-                    this.terrain.scrollSpeed = 2.5; // スクロール再開（スムーズに火山を画面外へ）
+                    this.terrain.scrollSpeed = 4.0; // スクロール再開（スムーズかつ確実に火山を画面外へ）
                     this.terrain.stopGenerating(); // 新規地形生成を終了
                     this.state = 'POST_VOLCANO';
                     this.postVolcanoTimer = 0;
@@ -480,17 +480,29 @@ class LevelManager {
                     this.state = 'BOSS';
                     this.time = 0;
                     this.terrain.active = false;
+                    if (this.superVolcano && this.superVolcano.x + this.superVolcano.width < 0) {
+                        this.superVolcano.active = false;
+                        this.superVolcano = null;
+                    }
                     if (typeof Sound !== 'undefined') Sound.playBossBgm();
                     if (typeof Boss !== 'undefined') {
                         this.boss = new Boss(this.starfield.width, 200);
                     }
                 }
             } else if (this.state === 'BOSS') {
+                if (this.superVolcano && (!this.superVolcano.active || this.superVolcano.x + this.superVolcano.width < 0)) {
+                    this.superVolcano.active = false;
+                    this.superVolcano = null;
+                }
                 if (this.boss) {
                     this.boss.update();
                     if (!this.boss.active) {
                         this.state = 'STAGE_CLEAR';
                         this.stageClearTimer = 0;
+                        if (this.superVolcano) {
+                            this.superVolcano.active = false;
+                            this.superVolcano = null;
+                        }
                     }
                 }
             } else if (this.state === 'STAGE_CLEAR') {
@@ -531,10 +543,24 @@ class LevelManager {
         this.state = 'STAGE2';
         this.time = 0;
         this.boss = null;
+        if (this.superVolcano) {
+            this.superVolcano.active = false;
+            this.superVolcano = null;
+        }
         this.floatingIslands = [];
         this.terrain.active = false;
         this.terrain.topPoints = [];
         this.terrain.bottomPoints = [];
+
+        // 1面の火山や火山弾、残存敵を一掃
+        if (typeof enemies !== 'undefined' && Array.isArray(enemies)) {
+            enemies = enemies.filter(e => {
+                if (typeof SuperVolcano !== 'undefined' && e instanceof SuperVolcano) return false;
+                if (typeof VolcanoRock !== 'undefined' && e instanceof VolcanoRock) return false;
+                return e.active;
+            });
+            window.enemies = enemies;
+        }
 
         if (typeof player !== 'undefined') {
             player.x = 80;

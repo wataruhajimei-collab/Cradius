@@ -9,16 +9,16 @@ class Boss {
         this.targetX = 640; // 画面内に全体像が100%美しく収まる定位置 (中心X: 640)
         this.baseY = 300; // 中心Y
         this.y = 300;
-        this.maxHp = 35;
-        this.hp = 35;
+        this.maxHp = 7; // 1/5の強さに調整 (35 -> 7)
+        this.hp = 7;
         this.active = true;
         this.isEntering = true; // 登場中は完全無敵
         this.color = '#aa4444';
         
-        // 遮蔽板: 5枚の金属風シールドプレート (各36発耐久、ダブル弾なら18発で破壊)
-        this.maxShields = 5;
-        this.shields = 5;
-        this.shieldHpPerPlate = 36; // 硬め（1枚あたり36発耐久）
+        // 遮蔽板: アーケード準拠の4枚シールドプレート (各7発耐久、ダブル弾なら4発で破壊)
+        this.maxShields = 4;
+        this.shields = 4;
+        this.shieldHpPerPlate = 7; // 1/5の強さに調整 (36 -> 7)
         this.currentShieldHp = this.shieldHpPerPlate;
         this.shieldHitCooldown = 0; // 連続多重ヒット抑制用クールダウン
         this.shieldFlashTimer = 0;
@@ -56,7 +56,7 @@ class Boss {
         if (this.shields > 0) {
             this.coreOpen = false;
             this.coreTimer++;
-            if (this.coreTimer > 100) {
+            if (this.coreTimer > 120) {
                 this.coreTimer = 0;
                 this.shoot();
             }
@@ -64,7 +64,7 @@ class Boss {
             // 遮蔽板全滅時はコアが完全に露出し猛攻モード
             this.coreOpen = true;
             this.coreTimer++;
-            if (this.coreTimer > 75) {
+            if (this.coreTimer > 95) {
                 this.coreTimer = 0;
                 this.shoot();
             }
@@ -76,15 +76,16 @@ class Boss {
     }
 
     shoot() {
-        // 艦首アーム先端（左向き）から自機方向へ4連レーザー発射！
+        // 艦首アーム先端（左向き）から自機方向へ4連レーザー発射（適度な速度で回避可能）
         const startX = this.x - 110;
         const coreCenterY = this.y;
+        const laserSpeed = -4.8;
         
         // 上下アーム砲台から2門ずつ、計4連ビーム
-        this.bullets.push(new Bullet(startX, coreCenterY - 48, -7.0, 0, '#00ffff', true));
-        this.bullets.push(new Bullet(startX, coreCenterY - 16, -7.0, 0, '#ffaa00', true));
-        this.bullets.push(new Bullet(startX, coreCenterY + 16, -7.0, 0, '#ffaa00', true));
-        this.bullets.push(new Bullet(startX, coreCenterY + 48, -7.0, 0, '#00ffff', true));
+        this.bullets.push(new Bullet(startX, coreCenterY - 48, laserSpeed, 0, '#00ffff', true));
+        this.bullets.push(new Bullet(startX, coreCenterY - 16, laserSpeed, 0, '#ffaa00', true));
+        this.bullets.push(new Bullet(startX, coreCenterY + 16, laserSpeed, 0, '#ffaa00', true));
+        this.bullets.push(new Bullet(startX, coreCenterY + 48, laserSpeed, 0, '#00ffff', true));
     }
 
     // 遮蔽板ダメージ処理（ダブル弾ボーナス対応＆クールダウン短縮）
