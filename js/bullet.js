@@ -26,8 +26,7 @@ class Bullet {
             const cx = this.x + r;
             const cy = this.y + r;
 
-            ctx.shadowColor = 'rgba(255, 255, 255, 0.45)';
-            ctx.shadowBlur = 4;
+            // Fast draw
 
             const grad = ctx.createRadialGradient(cx - 1.5, cy - 1.5, 0.5, cx, cy, r);
             grad.addColorStop(0.0, '#ffffff'); // 超高輝度ハイライト

@@ -38,10 +38,7 @@ class Enemy {
         ctx.translate(this.x + this.width / 2, this.y + this.height / 2);
 
         // 機体下面の立体シャドウ
-        ctx.shadowColor = 'rgba(0, 0, 0, 0.65)';
-        ctx.shadowBlur = 6;
-        ctx.shadowOffsetX = -3;
-        ctx.shadowOffsetY = 3;
+        // Fast draw
 
         // 上半身 (光を受けるメタリックシルバー)
         const gradTop = ctx.createLinearGradient(0, -13, 0, 0);
@@ -224,10 +221,7 @@ class FanEnemy extends Enemy {
         ctx.rotate(this.tilt);
 
         // 立体ドロップシャドウ
-        ctx.shadowColor = 'rgba(0, 0, 0, 0.65)';
-        ctx.shadowBlur = 6;
-        ctx.shadowOffsetX = -2;
-        ctx.shadowOffsetY = 3;
+        // Fast draw
 
         // 3D球面メタリック・アウターソーサー (金属円盤)
         const outerGrad = ctx.createRadialGradient(-5, -5, 2, 0, 0, 19);
@@ -366,10 +360,7 @@ class GarunEnemy extends Enemy {
         ctx.rotate(Math.atan2(this.speedY, this.speedX) + Math.PI);
 
         // 立体シャドウ
-        ctx.shadowColor = 'rgba(0, 0, 0, 0.6)';
-        ctx.shadowBlur = 6;
-        ctx.shadowOffsetX = -2;
-        ctx.shadowOffsetY = 2;
+        // Fast draw
 
         // 上部主翼 (光面デルタ: シルバー〜スレート)
         const wingTopGrad = ctx.createLinearGradient(0, -11, 0, 0);
@@ -768,10 +759,7 @@ class DuckerEnemy extends Enemy {
         ctx.fill();
 
         // --- 3D球面装甲ポッド胴体 ---
-        ctx.shadowColor = 'rgba(0, 0, 0, 0.65)';
-        ctx.shadowBlur = 6;
-        ctx.shadowOffsetX = -2;
-        ctx.shadowOffsetY = 3;
+        // Fast draw
 
         const bodyGrad = ctx.createRadialGradient(-4, -23, 2, 0, -18, 14);
         if (this.isRed) {

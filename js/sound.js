@@ -134,6 +134,26 @@ class SoundManager {
         return this.ctx.createPeriodicWave(real, imag, { disableNormalization: false });
     }
 
+    // 自動ノード切断・GC回収ヘルパー（オーディオグラフの肥大化・音飛び・CPU負荷を完全防止）
+    autoClean(primaryNode, durationSec, ...extraNodes) {
+        if (!primaryNode) return;
+        let cleaned = false;
+        const cleanup = () => {
+            if (cleaned) return;
+            cleaned = true;
+            try { primaryNode.disconnect(); } catch (e) {}
+            if (extraNodes) {
+                for (let i = 0; i < extraNodes.length; i++) {
+                    try { if (extraNodes[i]) extraNodes[i].disconnect(); } catch (e) {}
+                }
+            }
+        };
+        try {
+            primaryNode.onended = cleanup;
+        } catch (e) {}
+        setTimeout(cleanup, Math.max(10, Math.ceil((durationSec + 0.08) * 1000)));
+    }
+
     // --- 効果音 (SE) ---
 
     // 通常ショット: ピピッ！(高音矩形波の急ピッチダウン)
@@ -155,6 +175,7 @@ class SoundManager {
 
         osc.start(now);
         osc.stop(now + 0.08);
+        this.autoClean(osc, 0.08, gain);
     }
 
     // レーザー: グラディウス象徴の「みーーーーん！」
@@ -196,6 +217,7 @@ class SoundManager {
 
         osc.start(now);
         osc.stop(now + duration);
+        this.autoClean(osc, duration, filter, gain);
     }
 
     // ミサイル: ヒュオオ… (下降音)
@@ -217,6 +239,7 @@ class SoundManager {
 
         osc.start(now);
         osc.stop(now + 0.15);
+        this.autoClean(osc, 0.15, gain);
     }
 
     // カプセル取得音: ティロリン♪ (上昇アルペジオ)
@@ -240,6 +263,7 @@ class SoundManager {
 
             osc.start(now + i * 0.05);
             osc.stop(now + i * 0.05 + 0.08);
+            this.autoClean(osc, i * 0.05 + 0.08, gain);
         });
     }
 
@@ -264,6 +288,7 @@ class SoundManager {
 
             osc.start(now + i * 0.035);
             osc.stop(now + i * 0.035 + 0.07);
+            this.autoClean(osc, i * 0.035 + 0.07, gain);
         });
     }
 
@@ -334,6 +359,7 @@ class SoundManager {
             osc1.stop(noteStart + dur);
             osc2.start(noteStart);
             osc2.stop(noteStart + dur);
+            this.autoClean(osc1, dur, osc2, gainNode);
         });
 
         // 最後のハイノート (E6) にキラキラした高域ベルチャイムの倍音 (B6 & E7) を付加
@@ -353,6 +379,7 @@ class SoundManager {
 
         chimeOsc.start(chimeStart);
         chimeOsc.stop(chimeStart + 0.40);
+        this.autoClean(chimeOsc, 0.40, chimeGain);
     }
 
     // 敵爆発音: ドカーン！ (ホワイトノイズ + 低域ピッチダウン)
@@ -379,6 +406,7 @@ class SoundManager {
         gain.connect(this.seGain);
 
         noise.start(now);
+        this.autoClean(noise, duration, filter, gain);
     }
 
     // 敵・遮蔽板破壊音（playExplosionのエイリアス＆金属破砕音）
@@ -409,6 +437,7 @@ class SoundManager {
 
         osc.start(now);
         osc.stop(now + 0.04);
+        this.autoClean(osc, 0.04, gain);
     }
 
     // ボス大爆発音: グラディウス風 超ド級・重低音連続爆発（ズドドドド…ドッカーン！）
@@ -437,6 +466,8 @@ class SoundManager {
                     filter.connect(gain);
                     gain.connect(this.seGain);
                     noise.start(now);
+                    noise.stop(now + 0.35);
+                    this.autoClean(noise, 0.35, filter, gain);
                 }
                 const sub = this.ctx.createOscillator();
                 const subGain = this.ctx.createGain();
@@ -449,6 +480,7 @@ class SoundManager {
                 subGain.connect(this.seGain);
                 sub.start(now);
                 sub.stop(now + 0.3);
+                this.autoClean(sub, 0.3, subGain);
             }, i * 90);
         }
 
@@ -484,6 +516,7 @@ class SoundManager {
             boomGain.connect(this.seGain);
             boom.start(now);
             boom.stop(now + 1.0);
+            this.autoClean(boom, 1.0, boomGain);
         }, 850);
     }
 
@@ -500,6 +533,13 @@ class SoundManager {
         }
         this.currentBgm = null;
         this.bgmStep = 0;
+        if (this.bgmGain && this.ctx) {
+            try {
+                this.bgmGain.gain.cancelScheduledValues(this.ctx.currentTime);
+                this.bgmGain.gain.setValueAtTime(0, this.ctx.currentTime);
+                this.bgmGain.gain.setValueAtTime(0.70, this.ctx.currentTime + 0.05);
+            } catch (e) {}
+        }
     }
 
     // 高精度 Lookahead オーディオスケジューラー (タイミングのズレがゼロ)
@@ -549,7 +589,7 @@ class SoundManager {
             }
 
             // 先読みウィンドウ（260ms）
-            while (nextStepTime < this.ctx.currentTime + 0.26) {
+            while (nextStepTime < this.ctx.currentTime + 0.15) {
                 try {
                     scheduleCallback(currentStep, nextStepTime, stepDuration);
                 } catch (e) {
@@ -558,7 +598,7 @@ class SoundManager {
                 currentStep = (currentStep + 1) % totalSteps;
                 nextStepTime += stepDuration;
             }
-        }, 20);
+        }, 35);
     }
 
     // --- シンセサイズ発音系 ---
@@ -576,10 +616,11 @@ class SoundManager {
 
         osc.frequency.setValueAtTime(freq, time);
 
+        let vib = null, vibGain = null;
         // ロングトーンには伸びやかなビブラートを付与
         if (dur > 0.22) {
-            const vib = this.ctx.createOscillator();
-            const vibGain = this.ctx.createGain();
+            vib = this.ctx.createOscillator();
+            vibGain = this.ctx.createGain();
             vib.frequency.setValueAtTime(5.8, time);
             vibGain.gain.setValueAtTime(0, time);
             vibGain.gain.setValueAtTime(0, time + 0.12);
@@ -601,6 +642,7 @@ class SoundManager {
 
         osc.start(time);
         osc.stop(time + dur);
+        this.autoClean(osc, dur, gain, vib, vibGain);
     }
 
     // ハーモニー / 対旋律 (12.5%パルス波)
@@ -627,6 +669,7 @@ class SoundManager {
 
         osc.start(time);
         osc.stop(time + dur);
+        this.autoClean(osc, dur, gain);
     }
 
     // アルペジオ (16分音符クリスタルパルス)
@@ -651,6 +694,7 @@ class SoundManager {
 
         osc.start(time);
         osc.stop(time + dur);
+        this.autoClean(osc, dur, gain);
     }
 
     // オーケストラ金管ブラス (デチューンSawtooth × 2 + フィルターエンベロープ)
@@ -689,6 +733,7 @@ class SoundManager {
         osc1.stop(time + dur);
         osc2.start(time);
         osc2.stop(time + dur);
+        this.autoClean(osc1, dur, osc2, filter, gain);
     }
 
     // オーケストラ弦楽器ストリングス (Sawtooth + Triangle + ソフトアタック)
@@ -724,6 +769,7 @@ class SoundManager {
         osc1.stop(time + dur);
         osc2.start(time);
         osc2.stop(time + dur);
+        this.autoClean(osc1, dur, osc2, filter, gain);
     }
 
     // ディストーション・エレキギター (Sawtooth + Overdrive + キャビネットEQ + チョーキング/ビブラート)
@@ -746,10 +792,11 @@ class SoundManager {
             osc.frequency.setValueAtTime(freq, time);
         }
 
+        let vib = null, vibGain = null;
         // ロングトーンには激しく熱いギタービブラート (6.5Hz)
         if (dur > 0.20) {
-            const vib = this.ctx.createOscillator();
-            const vibGain = this.ctx.createGain();
+            vib = this.ctx.createOscillator();
+            vibGain = this.ctx.createGain();
             vib.frequency.setValueAtTime(6.5, time);
             vibGain.gain.setValueAtTime(0, time);
             vibGain.gain.setValueAtTime(0, time + 0.10);
@@ -768,8 +815,9 @@ class SoundManager {
         filter.gain.setValueAtTime(7, time);
 
         // オーバードライブ歪み
+        let dist = null;
         if (this.distortionCurve) {
-            const dist = this.ctx.createWaveShaper();
+            dist = this.ctx.createWaveShaper();
             dist.curve = this.distortionCurve;
             dist.oversample = 'none'; // 高速軽量化（CPU負荷激減で音飛び防止）
             osc.connect(dist);
@@ -789,6 +837,7 @@ class SoundManager {
 
         osc.start(time);
         osc.stop(time + dur);
+        this.autoClean(osc, dur, gain, filter, dist, vib, vibGain);
     }
 
     // ディストーション・パワーコード (ルート + 完全5度)
@@ -831,6 +880,7 @@ class SoundManager {
         oscTri.stop(time + dur);
         oscPulse.start(time);
         oscPulse.stop(time + dur);
+        this.autoClean(oscTri, dur, oscPulse, pulseGain, gain);
     }
 
     // ドラム: パンチのあるサイン波キック
@@ -850,6 +900,7 @@ class SoundManager {
 
         osc.start(time);
         osc.stop(time + 0.10);
+        this.autoClean(osc, 0.10, gain);
     }
 
     // ドラム: 切れ味鋭いノイズ+トーンスネア
@@ -887,6 +938,7 @@ class SoundManager {
 
         noise.start(time);
         noise.stop(time + 0.14);
+        this.autoClean(noise, 0.14, filter, gain, osc, oscGain);
     }
 
     // ドラム: ハイハット (クローズ / オープン)
@@ -910,6 +962,7 @@ class SoundManager {
 
         noise.start(time);
         noise.stop(time + dur);
+        this.autoClean(noise, dur, filter, gain);
     }
 
     // triggerHiHatのエイリアス
@@ -933,14 +986,15 @@ class SoundManager {
         gain.gain.linearRampToValueAtTime(gainVal, time + 0.008);
         gain.gain.exponentialRampToValueAtTime(0.001, time + dur);
 
+        let hit = null, hitFilter = null, hitGain = null;
         // マレット打撃の短いインパクト
         if (this.noiseBuffer) {
-            const hit = this.ctx.createBufferSource();
+            hit = this.ctx.createBufferSource();
             hit.buffer = this.noiseBuffer;
-            const hitFilter = this.ctx.createBiquadFilter();
+            hitFilter = this.ctx.createBiquadFilter();
             hitFilter.type = 'lowpass';
             hitFilter.frequency.setValueAtTime(550, time);
-            const hitGain = this.ctx.createGain();
+            hitGain = this.ctx.createGain();
             hitGain.gain.setValueAtTime(gainVal * 0.65, time);
             hitGain.gain.exponentialRampToValueAtTime(0.001, time + 0.04);
             hit.connect(hitFilter);
@@ -955,6 +1009,7 @@ class SoundManager {
 
         osc.start(time);
         osc.stop(time + dur);
+        this.autoClean(osc, dur, gain, hit, hitFilter, hitGain);
     }
 
     // オーケストラ打楽器: クラッシュ大シンバル (バシャァァァン！！)
@@ -979,6 +1034,7 @@ class SoundManager {
 
         noise.start(time);
         noise.stop(time + 0.95);
+        this.autoClean(noise, 0.95, filter, gain);
     }
 
     // 打楽器: ロートタム (トコトコピッチベンド)
@@ -999,6 +1055,7 @@ class SoundManager {
 
         osc.start(time);
         osc.stop(time + dur);
+        this.autoClean(osc, dur, gain);
     }
 
     // 空中戦BGM: 『BEGINNING OF THE HISTORY』(グラディウス伝統・宇宙出撃空中戦テーマ フルオーケストラ荘厳大音量版！)
@@ -1200,27 +1257,19 @@ class SoundManager {
                 this.triggerBass(b, time, stepDur * 1.5, 0.38);
             }
 
-            // 4. 弦楽器ストリングス (荘厳なオーケストラ3声コードパッド)
-            const s1 = strings1[step];
-            const s2 = strings2[step];
-            const s3 = strings3[step];
-            if (s1 > 0) this.triggerStrings(s1, time, stepDur * 7.8, 0.20);
-            if (s2 > 0) this.triggerStrings(s2, time, stepDur * 7.8, 0.17);
-            if (s3 > 0) this.triggerStrings(s3, time, stepDur * 7.8, 0.15);
-
-            // 5. 金管ブラスセクション (アクセント和音 & 出撃ファンファーレ)
-            const br1 = brass1[step];
-            const br2 = brass2[step];
-            if (br1 > 0) this.triggerBrass(br1, time, stepDur * 1.6, 0.22);
-            if (br2 > 0) this.triggerBrass(br2, time, stepDur * 1.6, 0.18);
-
-            // 6. きらめく16分アルペジオ
+                        // 4. Arpeggio
             const a = arp[step];
             if (a > 0) {
-                this.triggerArp(a, time, stepDur * 0.85, 0.16);
+                this.triggerArp(a, time, stepDur * 0.85, 0.14);
             }
 
-            // 7. 勇壮な主旋律 (PSGリード + 金管ブラスによるデュアル強力リード！)
+            // 5. Brass Accent
+            const br1 = brass1[step];
+            if (br1 > 0) {
+                this.triggerBrass(br1, time, stepDur * 1.4, 0.18);
+            }
+
+            // 6. Arcade Lead (25% pulse)
             const l = lead[step];
             if (l > 0) {
                 let lLen = 1;
@@ -1229,11 +1278,10 @@ class SoundManager {
                     else break;
                 }
                 const dur = stepDur * lLen * 0.95;
-                this.triggerLead(l, time, dur, 0.36);
-                this.triggerBrass(l, time, dur, 0.26);
+                this.triggerLead(l, time, dur, 0.38);
             }
 
-            // 8. 金管対旋律・ハーモニー
+            // 7. 金管対旋律・ハーモニー
             const h = harmony[step];
             if (h > 0) {
                 let hLen = 1;

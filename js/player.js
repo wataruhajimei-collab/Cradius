@@ -4,7 +4,7 @@ class Player {
         this.y = y;
         this.width = 40;
         this.height = 20;
-        this.speed = 2; // 初期スピード（4から半分に調整）
+        this.speed = 3.5; // Responsive arcade speed
         this.color = '#00ffff'; // 仮の色（ビックバイパー風の青系）
         this.lastShotTime = 0;
         this.shotDelay = 200; // 弾の発射間隔（ミリ秒）
@@ -160,7 +160,7 @@ class Player {
 
         switch (this.powerUpIndex) {
             case 0: // SPEED
-                if (this.speed < 8) this.speed += 1; // スピードアップ率を2から1（半分）に調整
+                if (this.speed < 8.5) this.speed += 1.2; // Speed up
                 break;
             case 1: // MISSILE
                 this.hasMissile = true;
@@ -259,19 +259,8 @@ class Player {
 
         ctx.save();
         if (typeof images !== 'undefined' && images.player && images.player.complete && images.player.naturalWidth > 0) {
-            // 立体感を高めるシャドウ
-            ctx.shadowColor = 'rgba(0, 0, 0, 0.6)';
-            ctx.shadowBlur = 6;
-            ctx.shadowOffsetX = -3;
-            ctx.shadowOffsetY = 3;
-
-            // 通常描画（ソリッド）
+            // 通常描画（高速・低負荷）
             ctx.drawImage(images.player, this.x - 8, this.y - 18, 56, 56);
-
-            // シャドウ解除
-            ctx.shadowBlur = 0;
-            ctx.shadowOffsetX = 0;
-            ctx.shadowOffsetY = 0;
 
             // 自機のエンジン噴射炎（上下2箇所または中央）
             const flameLen = 8 + (Math.sin(Date.now() * 0.02) * 3);
