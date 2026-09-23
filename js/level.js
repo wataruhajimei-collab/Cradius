@@ -577,15 +577,20 @@ class LevelManager {
 
         const stage3Class = (typeof Stage3 !== 'undefined') ? Stage3 : window.Stage3;
         if (stage3Class) {
-            const st3 = new stage3Class(this.starfield.width, this.starfield.height);
-            window.stage3 = st3;
-            if (typeof stage3 !== 'undefined') {
-                try { stage3 = st3; } catch (e) {}
+            try {
+                const st3 = new stage3Class(this.starfield.width, this.starfield.height);
+                window.stage3 = st3;
+                st3.start();
+            } catch (err) {
+                console.error('Stage3 initialization error:', err);
             }
-            st3.start();
         }
         if (typeof Sound !== 'undefined' && typeof Sound.playStage3Bgm === 'function') {
-            Sound.playStage3Bgm();
+            try {
+                Sound.playStage3Bgm();
+            } catch (serr) {
+                console.warn('Sound playStage3Bgm error:', serr);
+            }
         }
     }
 

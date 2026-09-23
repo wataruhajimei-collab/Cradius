@@ -258,7 +258,7 @@ class Player {
         this.options.forEach(opt => opt.draw(ctx));
 
         ctx.save();
-        if (typeof images !== 'undefined' && images.player && images.player.complete) {
+        if (typeof images !== 'undefined' && images.player && images.player.complete && images.player.naturalWidth > 0) {
             // 立体感を高めるシャドウ
             ctx.shadowColor = 'rgba(0, 0, 0, 0.6)';
             ctx.shadowBlur = 6;

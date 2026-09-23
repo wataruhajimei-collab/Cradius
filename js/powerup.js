@@ -18,7 +18,7 @@ class PowerUpCapsule {
 
     draw(ctx) {
         ctx.save();
-        if (typeof images !== 'undefined' && images.capsule && images.capsule.complete) {
+        if (typeof images !== 'undefined' && images.capsule && images.capsule.complete && images.capsule.naturalWidth > 0) {
             // パルス発光（グラディウスのカプセルらしい明滅感）
             const glow = Math.sin(Date.now() * 0.01) * 6 + 8;
             ctx.shadowColor = '#ff6600';

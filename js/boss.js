@@ -196,7 +196,7 @@ class Boss {
         }
 
         // 1. ボス本体の描画 (水平反転！艦首が自機・左側を向き、炎が右・後方を向く！)
-        if (typeof images !== 'undefined' && images.boss && images.boss.complete) {
+        if (typeof images !== 'undefined' && images.boss && images.boss.complete && images.boss.naturalWidth > 0) {
             ctx.save();
             ctx.translate(this.x, this.y);
             ctx.scale(-1, 1); // ★★★ 水平反転！自機（画面左）に艦首を向ける！ ★★★
