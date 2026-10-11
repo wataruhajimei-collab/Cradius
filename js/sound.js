@@ -533,26 +533,226 @@ class SoundManager {
         }, 1250);
     }
 
-    // 人間の声帯振動（Rosenberg声門パルスモデル）を再現するクリーンなカスタム周期波形
-    getHumanGlottalWave() {
+    // 物理モデル（LF声門パルス＋Klatt 4段直列カスケード声道共鳴＋声帯の苦悶かすれ・K.O.エコー）による断末魔PCMバッファ生成
+    getBossScreamBuffer() {
         if (!this.ctx) return null;
-        if (!this._humanGlottalWave) {
-            const harmonics = 36;
-            const real = new Float32Array(harmonics);
-            const imag = new Float32Array(harmonics);
-            for (let n = 1; n < harmonics; n++) {
-                // 人間の声帯特有の滑らかな倍音減衰 (-11dB/oct) でジリジリした高域ノイズを一切含まない
-                const amp = Math.pow(n, -1.18) * Math.exp(-0.022 * (n - 1));
-                const phase = -n * 0.18;
-                real[n] = amp * Math.sin(phase);
-                imag[n] = amp * Math.cos(phase);
+        if (this._bossScreamBuffer) return this._bossScreamBuffer;
+
+        const sr = this.ctx.sampleRate || 44100;
+        const totalDur = 2.15;
+        const voiceDur = 1.48;
+        const len = Math.floor(sr * totalDur);
+        const buf = this.ctx.createBuffer(1, len, sr);
+        const out = buf.getChannelData(0);
+        const dry = new Float32Array(len);
+
+        // 2レイヤーの声道（メイン声道＋わずかにデチューンした厚みレイヤー）を合成して圧倒的な肉声の迫力を出す
+        const voices = [
+            { pitchMult: 1.000, formantMult: 1.00, gain: 0.72 },
+            { pitchMult: 0.986, formantMult: 0.98, gain: 0.42 }
+        ];
+
+        for (let v = 0; v < voices.length; v++) {
+            const vm = voices[v];
+            let phase = 0;
+            let cycleCount = 0;
+            let jitterVal = 0;
+
+            // 直列4段カスケード・フォルマント共鳴器の内部状態 (y[n-1], y[n-2])
+            let y1_1 = 0, y1_2 = 0;
+            let y2_1 = 0, y2_2 = 0;
+            let y3_1 = 0, y3_2 = 0;
+            let y4_1 = 0, y4_2 = 0;
+            let prevGlottal = 0;
+
+            const voiceSamples = Math.floor(sr * voiceDur);
+            for (let i = 0; i < voiceSamples; i++) {
+                const t = i / sr;
+
+                // --- 1. 断末魔のピッチ推移 F0(t) ---
+                // 0.00〜0.09s: 「ウッ」(210Hz -> 260Hz)
+                // 0.09〜0.16s: 「ワァァーー！！」(一気に350Hzの悲鳴ピークへ跳ね上がる！)
+                // 0.16〜0.78s: 苦悶の絶叫維持 (350Hz -> 285Hz)
+                // 0.78〜1.48s: 力尽きて声が裏返りながら急降下 (285Hz -> 108Hz)
+                let f0;
+                if (t < 0.09) {
+                    f0 = 210 + (t / 0.09) * 50;
+                } else if (t < 0.16) {
+                    const p = (t - 0.09) / 0.07;
+                    f0 = 260 + p * 92;
+                } else if (t < 0.78) {
+                    const p = (t - 0.16) / 0.62;
+                    f0 = 352 - p * 68;
+                } else {
+                    const p = (t - 0.78) / (voiceDur - 0.78);
+                    // 断末魔の苦悶で声がガクッと落ちていく曲線
+                    f0 = 284 * Math.pow(108 / 284, Math.pow(p, 0.85));
+                }
+
+                // 苦悶の激しいビブラート（6.8Hz）＋声帯の 미세なランダム揺らぎ（Jitter）
+                const vibDepth = (t > 0.12) ? (11.5 + Math.sin(t * 9.0) * 3.5) : 4.0;
+                const vib = Math.sin(2 * Math.PI * 6.8 * t) * vibDepth;
+                // 崩れ落ちる瞬間の声の震え（0.75〜1.15s）
+                const agonyTremor = (t > 0.72 && t < 1.25) ? Math.sin(2 * Math.PI * 19.0 * t) * 9.0 : 0;
+
+                const instFreq = Math.max(75, (f0 + vib + agonyTremor) * vm.pitchMult * (1 + jitterVal));
+                phase += instFreq / sr;
+                if (phase >= 1.0) {
+                    phase -= 1.0;
+                    cycleCount++;
+                    // 周期ごとに微小なピッチ揺らぎを更新（電子音感を完全に消す人間の声帯特性）
+                    jitterVal = (Math.random() * 2 - 1) * 0.009;
+                }
+
+                // --- 2. LF声門パルスモデル（人間の声帯の開閉と断末魔の喉の張り詰めた声質） ---
+                const Oq = 0.50; // 声門開放率
+                let glottalFlow = 0;
+                if (phase < Oq) {
+                    const u = phase / Oq;
+                    // 非対称声門パルス（急峻な声門閉鎖が人間の叫び声特有の鋭い声圧を生む）
+                    glottalFlow = Math.sin(Math.PI * u) - 0.42 * Math.sin(2 * Math.PI * u);
+                    // 声門が開いている瞬間だけ混じる「必死の息づかい・かすれ声」成分
+                    const aspiration = (Math.random() * 2 - 1) * 0.16 * Math.sin(Math.PI * u);
+                    glottalFlow += aspiration;
+                } else {
+                    // 閉鎖期のわずかな残響減衰
+                    const c = (phase - Oq) / (1 - Oq);
+                    glottalFlow = -0.08 * Math.exp(-c * 6.0);
+                }
+
+                // 声門流量の微分（唇・声道励起信号）＋胸声の基本波成分ブレンド
+                let excitation = (glottalFlow - prevGlottal) * 0.65 + glottalFlow * 0.45;
+                prevGlottal = glottalFlow;
+
+                // 絶叫時の喉の張り裂けるようなサブハーモニック（周期交互の微細な強弱＝人間の悲鳴特有のガラつき）
+                const diplophonia = (cycleCount % 2 === 0) ? 1.0 : 0.84;
+                excitation *= diplophonia;
+
+                // --- 3. 母音推移「ウ (/u/)」→「ワァァァーー！！ (/waaaa/)」→「アァ… (/a->o/)」 ---
+                let F1, F2, F3, F4;
+                if (t < 0.08) {
+                    // 「ウ」
+                    const p = t / 0.08;
+                    F1 = 350 + p * 70;
+                    F2 = 760 + p * 90;
+                    F3 = 2320 + p * 80;
+                    F4 = 3320;
+                } else if (t < 0.15) {
+                    // 「ワ！」（顎がガッと開いて母音 /a/ へ急拡大）
+                    const p = (t - 0.08) / 0.07;
+                    F1 = 420 + p * 480; // -> 900Hz
+                    F2 = 850 + p * 560; // -> 1410Hz
+                    F3 = 2400 + p * 360; // -> 2760Hz
+                    F4 = 3320 + p * 180; // -> 3500Hz
+                } else if (t < 0.82) {
+                    // 「ァァァーー！！」（大開口の悲鳴ピーク＋顎の苦悶の震え）
+                    const p = (t - 0.15) / 0.67;
+                    const jawTremor = Math.sin(2 * Math.PI * 7.2 * t) * 28;
+                    F1 = 900 - p * 70 + jawTremor;
+                    F2 = 1410 - p * 110 + jawTremor * 1.4;
+                    F3 = 2760 - p * 120;
+                    F4 = 3500 - p * 80;
+                } else {
+                    // 「ーーーッ…」（力尽きて口が閉じていく断末魔の余韻）
+                    const p = (t - 0.82) / (voiceDur - 0.82);
+                    F1 = 830 - p * 340;
+                    F2 = 1300 - p * 380;
+                    F3 = 2640 - p * 260;
+                    F4 = 3420 - p * 200;
+                }
+
+                F1 *= vm.formantMult;
+                F2 *= vm.formantMult;
+                F3 *= vm.formantMult;
+                F4 *= vm.formantMult;
+
+                // --- 4. Klatt 4段直列（カスケード）声道デジタル共鳴器 ---
+                // Stage 1 (F1, BW1=68Hz)
+                const r1 = Math.exp(-Math.PI * 68 / sr);
+                const a1_1 = 2 * r1 * Math.cos(2 * Math.PI * F1 / sr);
+                const a1_2 = -r1 * r1;
+                const b1_0 = 1 - a1_1 - a1_2;
+                const s1 = b1_0 * excitation + a1_1 * y1_1 + a1_2 * y1_2;
+                y1_2 = y1_1; y1_1 = s1;
+
+                // Stage 2 (F2, BW2=98Hz)
+                const r2 = Math.exp(-Math.PI * 98 / sr);
+                const a2_1 = 2 * r2 * Math.cos(2 * Math.PI * F2 / sr);
+                const a2_2 = -r2 * r2;
+                const b2_0 = 1 - a2_1 - a2_2;
+                const s2 = b2_0 * s1 + a2_1 * y2_1 + a2_2 * y2_2;
+                y2_2 = y2_1; y2_1 = s2;
+
+                // Stage 3 (F3, BW3=155Hz)
+                const r3 = Math.exp(-Math.PI * 155 / sr);
+                const a3_1 = 2 * r3 * Math.cos(2 * Math.PI * F3 / sr);
+                const a3_2 = -r3 * r3;
+                const b3_0 = 1 - a3_1 - a3_2;
+                const s3 = b3_0 * s2 + a3_1 * y3_1 + a3_2 * y3_2;
+                y3_2 = y3_1; y3_1 = s3;
+
+                // Stage 4 (F4, BW4=220Hz)
+                const r4 = Math.exp(-Math.PI * 220 / sr);
+                const a4_1 = 2 * r4 * Math.cos(2 * Math.PI * F4 / sr);
+                const a4_2 = -r4 * r4;
+                const b4_0 = 1 - a4_1 - a4_2;
+                const s4 = b4_0 * s3 + a4_1 * y4_1 + a4_2 * y4_2;
+                y4_2 = y4_1; y4_1 = s4;
+
+                // --- 5. 音量エンベロープ（0秒から即座に立ち上がり、断末魔の2段のうねりを作る） ---
+                let env = 1.0;
+                if (t < 0.012) {
+                    env = t / 0.012;
+                } else if (t < 0.085) {
+                    // 「ウ」から「ワ」の瞬間にわずかな子音くびれを入れて「ウ・ワ」の二音節を鮮明化
+                    env = 0.88 + 0.12 * Math.sin(Math.PI * (t - 0.012) / 0.073);
+                } else if (t < 0.72) {
+                    env = 1.0;
+                } else if (t < 0.80) {
+                    // 断末魔の息継ぎ・声の裏返りアクセント
+                    env = 0.78 + 0.22 * Math.cos(Math.PI * (t - 0.72) / 0.08);
+                } else {
+                    const p = (t - 0.80) / (voiceDur - 0.80);
+                    env = Math.pow(1.0 - p, 1.45);
+                }
+
+                // カスケード出力＋第1・第2フォルマントの肉声ボディ補強
+                const sample = (s4 * 1.4 + s2 * 0.75 + s1 * 0.35) * env * vm.gain;
+                dry[i] += sample;
             }
-            this._humanGlottalWave = this.ctx.createPeriodicWave(real, imag, { disableNormalization: false });
         }
-        return this._humanGlottalWave;
+
+        // --- 6. アーケード格闘・シューティング風のドラマチックな断末魔K.O.エコー（「ウワァァーー！…ワァァーー…ァァ…」） ---
+        const d1 = Math.floor(0.23 * sr);
+        const d2 = Math.floor(0.46 * sr);
+        const d3 = Math.floor(0.69 * sr);
+        for (let i = 0; i < len; i++) {
+            let v = dry[i];
+            if (i >= d1) v += dry[i - d1] * 0.42;
+            if (i >= d2) v += dry[i - d2] * 0.22;
+            if (i >= d3) v += dry[i - d3] * 0.11;
+            out[i] = v;
+        }
+
+        // --- 7. ピーク正規化＋音割れゼロのウォーム・マキシマイズ（ノイズを出さずに最大音圧へ） ---
+        let maxPeak = 0.001;
+        for (let i = 0; i < len; i++) {
+            const a = Math.abs(out[i]);
+            if (a > maxPeak) maxPeak = a;
+        }
+        const normGain = 0.96 / maxPeak;
+        const drive = 1.65;
+        const tanhNorm = Math.tanh(drive);
+        for (let i = 0; i < len; i++) {
+            const x = out[i] * normGain;
+            out[i] = Math.tanh(x * drive) / tanhNorm * 0.96;
+        }
+
+        this._bossScreamBuffer = buf;
+        return buf;
     }
 
-    // ボス撃破時の断末魔の絶叫: ノイズや歪みを一切排除し、0秒からクリアな大声の人間ボイスで「ウワーーーー！」と叫ぶ
+    // ボス撃破時の断末魔の絶叫: 0秒から大迫力の断末魔「ウワァァァーー！！」を轟かせる
     playBossScream() {
         this.screamCount = (this.screamCount || 0) + 1;
         this.lastScreamText = 'ウワーーーー！';
@@ -562,179 +762,39 @@ class SoundManager {
             this.ctx.resume().catch(() => {});
         }
 
-        // 1. Web Speech API による自然な人間の肉声絶叫（ひらがな表記で自然かつ伸びやかな「うわあああああ！」を最大音量で発声）
-        if (!this.isMuted && typeof window !== 'undefined' && 'speechSynthesis' in window && typeof SpeechSynthesisUtterance !== 'undefined') {
-            try {
-                window.speechSynthesis.cancel();
-                const utter = new SpeechSynthesisUtterance('うわあああああ！');
-                utter.lang = 'ja-JP';
-                utter.volume = 1.0; // 最大音量
-                utter.rate = 0.92;  // 最初から遅れず自然に伸びる人間の叫び
-                utter.pitch = 0.85; // 不自然なロボット化を防ぐ自然な人間の声の高さ
-                window.speechSynthesis.speak(utter);
-            } catch (e) {}
-        }
-
-        // 2. Web Audio API クリーン声道フォルマント合成（ディストーションやFMノイズを完全撤廃し、純粋な人間の母音共鳴のみで大音量発声）
         if (!this.initialized || this.isMuted || !this.ctx) return;
         const now = this.ctx.currentTime;
-        const dur = 1.85;
+        const screamBuf = this.getBossScreamBuffer();
+        if (!screamBuf) return;
 
-        const glottalWave = this.getHumanGlottalWave();
-        const glottis1 = this.ctx.createOscillator();
-        const glottis2 = this.ctx.createOscillator();
-        const glottis3 = this.ctx.createOscillator();
-        const glottisSub = this.ctx.createOscillator();
+        const src = this.ctx.createBufferSource();
+        src.buffer = screamBuf;
 
-        [glottis1, glottis2, glottis3, glottisSub].forEach(osc => {
-            if (glottalWave) osc.setPeriodicWave(glottalWave);
-            else osc.type = 'triangle';
-        });
+        // 肉声の迫力をさらに引き立てる中域プレゼンスブースト＆クリーン出力
+        const presence = this.ctx.createBiquadFilter();
+        presence.type = 'peaking';
+        presence.frequency.setValueAtTime(1150, now);
+        presence.Q.setValueAtTime(1.0, now);
+        presence.gain.setValueAtTime(3.5, now);
 
-        // 人間の男性の自然な叫び声のピッチ推移:
-        // 0.00s「ウ」(215Hz) -> 0.06sで素早く「ワーーーー！」(275Hz)へ上がり、自然な声帯揺らぎを伴って130Hzへ落ちていく
-        const detunes = [1.0, 1.004, 0.996, 0.5];
-        [glottis1.frequency, glottis2.frequency, glottis3.frequency, glottisSub.frequency].forEach((freqParam, idx) => {
-            const d = detunes[idx];
-            freqParam.setValueAtTime(215 * d, now);
-            freqParam.linearRampToValueAtTime(275 * d, now + 0.065); // 0.065秒で「ウワーー！」のピークへ
-            freqParam.linearRampToValueAtTime(255 * d, now + 0.85);  // 「ーーーー！」伸びやかな肉声維持
-            freqParam.exponentialRampToValueAtTime(210 * d, now + 1.40);
-            freqParam.exponentialRampToValueAtTime(128 * d, now + dur);
-        });
+        const outGain = this.ctx.createGain();
+        outGain.gain.setValueAtTime(1.85, now);
 
-        // 自然な人間の声帯ビブラート（5.6Hz、深さ±5.5Hz：不自然なサイレン感を防ぎ人間らしさを出す）
-        const vib = this.ctx.createOscillator();
-        const vibGain = this.ctx.createGain();
-        vib.type = 'sine';
-        vib.frequency.setValueAtTime(5.6, now);
-        vibGain.gain.setValueAtTime(4.0, now);
-        vibGain.gain.linearRampToValueAtTime(6.5, now + 0.25);
-        vibGain.gain.linearRampToValueAtTime(5.0, now + dur);
-        vib.connect(vibGain);
-        vibGain.connect(glottis1.frequency);
-        vibGain.connect(glottis2.frequency);
-        vibGain.connect(glottis3.frequency);
+        src.connect(presence);
+        presence.connect(outGain);
+        outGain.connect(this.ctx.destination);
 
-        // 歪み(WaveShaper)を一切通さないクリーンな声帯ミックス
-        const sourceMix = this.ctx.createGain();
-        sourceMix.gain.setValueAtTime(0.55, now);
-        glottis1.connect(sourceMix);
-        glottis2.connect(sourceMix);
-        glottis3.connect(sourceMix);
-
-        const subGain = this.ctx.createGain();
-        subGain.gain.setValueAtTime(0.28, now); // 胸の響き（チェストボイス）
-        glottisSub.connect(subGain);
-        subGain.connect(sourceMix);
-
-        // 人間の声道の母音フォルマント共鳴器（F1, F2, F3）＋胸声ボディフィルター
-        // 0.00〜0.065s: 「ウ (/u/)」(F1=350Hz, F2=780Hz, F3=2350Hz)
-        // 0.065s〜: 「ワーーーー (/waaaa/)」(F1=800Hz, F2=1260Hz, F3=2650Hz)
-        const f1 = this.ctx.createBiquadFilter();
-        const f2 = this.ctx.createBiquadFilter();
-        const f3 = this.ctx.createBiquadFilter();
-        [f1, f2, f3].forEach(f => {
-            f.type = 'bandpass';
-        });
-
-        f1.Q.setValueAtTime(4.0, now);
-        f1.frequency.setValueAtTime(350, now);
-        f1.frequency.exponentialRampToValueAtTime(800, now + 0.065);
-        f1.frequency.setValueAtTime(780, now + 1.35);
-        f1.frequency.linearRampToValueAtTime(580, now + dur);
-
-        f2.Q.setValueAtTime(4.5, now);
-        f2.frequency.setValueAtTime(780, now);
-        f2.frequency.exponentialRampToValueAtTime(1260, now + 0.065);
-        f2.frequency.setValueAtTime(1220, now + 1.35);
-        f2.frequency.linearRampToValueAtTime(960, now + dur);
-
-        f3.Q.setValueAtTime(5.0, now);
-        f3.frequency.setValueAtTime(2350, now);
-        f3.frequency.linearRampToValueAtTime(2650, now + 0.065);
-        f3.frequency.setValueAtTime(2580, now + dur);
-
-        // 人間の声の太さ・肉声感を支えるローミッド・チェストフィルター
-        const chestFilter = this.ctx.createBiquadFilter();
-        chestFilter.type = 'lowpass';
-        chestFilter.frequency.setValueAtTime(520, now);
-        chestFilter.Q.setValueAtTime(1.0, now);
-
-        const f1Gain = this.ctx.createGain();
-        const f2Gain = this.ctx.createGain();
-        const f3Gain = this.ctx.createGain();
-        const chestGain = this.ctx.createGain();
-        f1Gain.gain.setValueAtTime(3.2, now);
-        f2Gain.gain.setValueAtTime(2.8, now);
-        f3Gain.gain.setValueAtTime(1.2, now);
-        chestGain.gain.setValueAtTime(0.85, now);
-
-        sourceMix.connect(f1);
-        sourceMix.connect(f2);
-        sourceMix.connect(f3);
-        sourceMix.connect(chestFilter);
-        f1.connect(f1Gain);
-        f2.connect(f2Gain);
-        f3.connect(f3Gain);
-        chestFilter.connect(chestGain);
-
-        // 0秒の頭からしっかり大声で立ち上がり、音割れしないクリーンなエンベロープ
-        const screamGain = this.ctx.createGain();
-        screamGain.gain.setValueAtTime(0.01, now);
-        screamGain.gain.linearRampToValueAtTime(1.35, now + 0.015); // 0.015秒で即座に大声の「ウ」
-        screamGain.gain.linearRampToValueAtTime(1.65, now + 0.065); // 「ワーーーー！」最大声量
-        screamGain.gain.setValueAtTime(1.55, now + 1.35);
-        screamGain.gain.exponentialRampToValueAtTime(0.001, now + dur);
-
-        f1Gain.connect(screamGain);
-        f2Gain.connect(screamGain);
-        f3Gain.connect(screamGain);
-        chestGain.connect(screamGain);
-
-        // 不快な高域のザラつき・デジタルノイズを完全に遮断するハイカットフィルター (3200Hz)
-        const highCut = this.ctx.createBiquadFilter();
-        highCut.type = 'lowpass';
-        highCut.frequency.setValueAtTime(3200, now);
-        highCut.Q.setValueAtTime(0.7, now);
-
-        // 音割れ（クリッピングノイズ）を完全に防ぎつつ声だけを大きく前に出すクリーンリミッター
-        const cleanLimiter = this.ctx.createDynamicsCompressor();
-        cleanLimiter.threshold.setValueAtTime(-6.0, now);
-        cleanLimiter.knee.setValueAtTime(6.0, now);
-        cleanLimiter.ratio.setValueAtTime(6.0, now);
-        cleanLimiter.attack.setValueAtTime(0.002, now);
-        cleanLimiter.release.setValueAtTime(0.08, now);
-
-        const outBoost = this.ctx.createGain();
-        outBoost.gain.setValueAtTime(1.75, now); // 歪まないクリアな最大音量
-
-        screamGain.connect(highCut);
-        highCut.connect(cleanLimiter);
-        cleanLimiter.connect(outBoost);
-        outBoost.connect(this.ctx.destination);
-
-        // 叫び声の間、BGMをミュートして人間の叫び声をクリアに際立たせる
+        // 叫び声の間、BGMを完全ミュートして断末魔を最前面に際立たせる
         if (this.bgmGain) {
             try {
                 this.bgmGain.gain.cancelScheduledValues(now);
                 this.bgmGain.gain.setValueAtTime(0.0, now);
-                this.bgmGain.gain.linearRampToValueAtTime(0.70, now + dur + 0.25);
+                this.bgmGain.gain.linearRampToValueAtTime(0.70, now + 2.2);
             } catch (e) {}
         }
 
-        glottis1.start(now);
-        glottis2.start(now);
-        glottis3.start(now);
-        glottisSub.start(now);
-        vib.start(now);
-        glottis1.stop(now + dur);
-        glottis2.stop(now + dur);
-        glottis3.stop(now + dur);
-        glottisSub.stop(now + dur);
-        vib.stop(now + dur);
-
-        this.autoClean(glottis1, dur, glottis2, glottis3, glottisSub, subGain, vib, vibGain, sourceMix, f1, f2, f3, chestFilter, f1Gain, f2Gain, f3Gain, chestGain, screamGain, highCut, cleanLimiter, outBoost);
+        src.start(now);
+        this.autoClean(src, 2.2, presence, outGain);
     }
 
     // --- BGM エンジン (本格 KONAMI 矩形波倶楽部スタイル) ---
