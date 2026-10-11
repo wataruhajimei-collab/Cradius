@@ -212,11 +212,13 @@ function update(dt) {
         return e.x < canvas.width + 300 && e.x + e.width > -100;
     });
 
-    enemyBullets.forEach(b => b.update());
-    enemyBullets = enemyBullets.filter(b => b.active && b.x > -50 && b.x < canvas.width && b.y > -50 && b.y < canvas.height);
+    enemyBullets.forEach(b => b.update(canvas.height));
+    enemyBullets = enemyBullets.filter(b => b.active && b.x > -80 && b.x < canvas.width + 80 && b.y > -60 && b.y < canvas.height + 60);
+    window.enemyBullets = enemyBullets;
 
     capsules.forEach(c => c.update());
     capsules = capsules.filter(c => c.active && c.x + c.width > 0);
+    window.capsules = capsules;
 
     particles.forEach(p => p.update());
     particles = particles.filter(p => p.active);
@@ -318,7 +320,8 @@ function handleCollisions() {
             }
         }
         
-        if (bullet.active && levelManager.checkCollision(bullet)) {
+        const isRingBullet = (typeof RingBullet !== 'undefined' && bullet instanceof RingBullet);
+        if (bullet.active && !isRingBullet && levelManager.checkCollision(bullet)) {
             bullet.active = false;
         }
     });

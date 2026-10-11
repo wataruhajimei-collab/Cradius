@@ -187,7 +187,8 @@ class MoaiEnemy {
 
     // モアイ全体の当たり判定（自機との衝突・口以外の弾弾き用）
     getBounds() {
-        const by = (this.side === 'top') ? this.y : this.y - this.height;
+        const isCeil = (this.side === 'top' || this.side === 'island_top');
+        const by = isCeil ? this.y : this.y - this.height;
         return {
             x: this.x + 6,
             y: by + 4,
@@ -198,7 +199,7 @@ class MoaiEnemy {
 
     // ★弱点である「口」の当たり判定（口を撃たないと壊れない設定）
     getMouthBounds() {
-        const isCeil = (this.side === 'top');
+        const isCeil = (this.side === 'top' || this.side === 'island_top');
         const isRight = (this.facing === 'right');
         const by = isCeil ? this.y : this.y - this.height;
 
@@ -229,7 +230,7 @@ class MoaiEnemy {
         if (!this.active) return;
         ctx.save();
 
-        const isCeil = (this.side === 'top');
+        const isCeil = (this.side === 'top' || this.side === 'island_top');
         const isRight = (this.facing === 'right');
         const isFlash = (this.flashTimer > 0);
 
@@ -682,19 +683,28 @@ class MoaiTerrain {
     checkCollision(rect) {
         if (!this.active || !this.wallActive || this.wallTransition < 0.3) return false;
 
+        // モアイが放つイオンリング弾（RingBullet）はモアイ自身や地形に消されず自機へ向かって飛来する（原作仕様）
+        if (typeof RingBullet !== 'undefined' && rect instanceof RingBullet) {
+            return false;
+        }
+
         const cx = rect.x + rect.width / 2;
+        const cy = rect.y + rect.height / 2;
         const topY = this.getTopY(cx);
-        if (rect.y < topY) return true;
+        if (rect.isEnemy ? (cy < topY) : (rect.y < topY)) return true;
 
         const bottomY = this.getBottomY(cx);
-        if (rect.y + rect.height > bottomY) return true;
+        if (rect.isEnemy ? (cy > bottomY) : (rect.y + rect.height > bottomY)) return true;
 
         // 浮島との衝突
         for (let i = 0; i < this.floatingIslands.length; i++) {
             if (this.floatingIslands[i].checkCollision(rect)) return true;
         }
 
-        // モアイ本体との衝突
+        // 敵弾（ダッカー弾など）はモアイ本体との衝突判定を行わない
+        if (rect.isEnemy) return false;
+
+        // モアイ本体との衝突（自機など）
         for (let i = 0; i < this.moais.length; i++) {
             const m = this.moais[i];
             if (!m.active) continue;
@@ -774,15 +784,40 @@ class MoaiTerrain {
             const topPosture = (Math.random() < 0.45) ? 'lying' : 'standing';
             // 島の上にモアイ
             this.moais.push(new MoaiEnemy(x + 20, y + 6, 'island', 'left', topPosture));
-            // 島の下に後ろ向き（背後急襲）天井モアイ
-            this.moais.push(new MoaiEnemy(x + w - 105, y + h - 6, 'top', 'right', 'standing'));
+            // 島の下に後ろ向き（背後急襲）逆さモアイ
+            this.moais.push(new MoaiEnemy(x + w - 105, y + h - 6, 'island_top', 'right', 'standing'));
         }
     }
 
     handleBulletCollisions(playerBullets) {
         if (!this.wallActive) return;
 
-        // 1. プレイヤー弾 vs モアイ像（★口を撃たないと壊れない設定！）
+        // 1. ★★★ 原作再現：自機弾 vs イオンリング弾（撃ち落とし可能！）★★★
+        if (typeof enemyBullets !== 'undefined') {
+            playerBullets.forEach(pBullet => {
+                if (!pBullet.active) return;
+
+                enemyBullets.forEach(eBullet => {
+                    if (!eBullet.active) return;
+                    if (typeof RingBullet !== 'undefined' && eBullet instanceof RingBullet) {
+                        if (checkCollision(pBullet, eBullet)) {
+                            eBullet.active = false;
+                            if (typeof Laser === 'undefined' || !(pBullet instanceof Laser)) {
+                                pBullet.active = false;
+                            }
+                            if (typeof createExplosion === 'function') {
+                                createExplosion(eBullet.x + eBullet.width / 2, eBullet.y + eBullet.height / 2, '#38bdf8');
+                            }
+                            if (typeof Sound !== 'undefined' && typeof Sound.playBossHit === 'function') {
+                                Sound.playBossHit();
+                            }
+                        }
+                    }
+                });
+            });
+        }
+
+        // 2. プレイヤー弾 vs モアイ像（★口を撃たないと壊れない設定！）
         playerBullets.forEach(bullet => {
             if (!bullet.active) return;
             const isLaser = (typeof Laser !== 'undefined' && bullet instanceof Laser);
@@ -825,31 +860,6 @@ class MoaiTerrain {
                 }
             }
         });
-
-        // 2. ★★★ 原作再現：自機弾 vs イオンリング弾（撃ち落とし可能！）★★★
-        if (typeof enemyBullets !== 'undefined') {
-            playerBullets.forEach(pBullet => {
-                if (!pBullet.active) return;
-
-                enemyBullets.forEach(eBullet => {
-                    if (!eBullet.active) return;
-                    if (typeof RingBullet !== 'undefined' && eBullet instanceof RingBullet) {
-                        if (checkCollision(pBullet, eBullet)) {
-                            eBullet.active = false;
-                            if (typeof Laser === 'undefined' || !(pBullet instanceof Laser)) {
-                                pBullet.active = false;
-                            }
-                            if (typeof createExplosion === 'function') {
-                                createExplosion(eBullet.x + eBullet.width / 2, eBullet.y + eBullet.height / 2, '#38bdf8');
-                            }
-                            if (typeof Sound !== 'undefined' && typeof Sound.playBossHit === 'function') {
-                                Sound.playBossHit();
-                            }
-                        }
-                    }
-                });
-            });
-        }
     }
 
     draw(ctx) {
