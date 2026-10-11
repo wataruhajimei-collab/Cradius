@@ -8,49 +8,68 @@
 // ==========================================
 
 class MoaiEnemy {
-    constructor(x, y, side = 'bottom', facing = 'left') {
+    constructor(x, y, side = 'bottom', facing = 'left', posture = 'standing') {
         this.x = x;
         this.y = y; // 接地面Y座標
-        this.side = side; // 'bottom' | 'top' | 'island'
-        this.facing = facing; // 'left' (前向き) | 'right' (後ろ向き：背後急襲)
-        
-        this.width = 54;
-        this.height = 76;
-        this.hp = 8;
-        this.maxHp = 8;
+        this.side = side;       // 'bottom' | 'top' | 'island'
+        this.facing = facing;   // 'left' (前向き) | 'right' (後ろ向き：背後急襲)
+        this.posture = posture; // 'standing' (立ち姿) | 'lying' (横たわり姿)
+
+        if (this.posture === 'lying') {
+            this.width = 138;
+            this.height = 88;
+        } else {
+            this.width = 92;
+            this.height = 134;
+        }
+
+        this.hp = 6;
+        this.maxHp = 6;
         this.active = true;
         this.flashTimer = 0;
+        this.laserHitCooldown = 0;
 
         // 口の開閉＆イオンリング連射制御
         this.mouthOpenProgress = 0; // 0 (閉じ) 〜 1 (全開)
         this.isFiring = false;
-        this.shootCooldown = 40 + Math.floor(Math.random() * 60);
+        this.shootCooldown = 35 + Math.floor(Math.random() * 55);
         this.burstLeft = 0;      // 1回の攻撃での残り連射数 (3〜4発)
         this.burstInterval = 0;  // 連射間のフレーム間隔
         this.chargeGlow = 0;     // 口内のエネルギーチャージ発光
     }
 
-    update(scrollSpeed, player) {
+    update(scrollSpeed, player, terrain) {
         this.x -= scrollSpeed;
         if (this.flashTimer > 0) this.flashTimer--;
+        if (this.laserHitCooldown > 0) this.laserHitCooldown--;
+
+        // 地形のスクロールに合わせて岩盤の接地面Y座標を追従
+        if (terrain && terrain.wallActive && (this.side === 'bottom' || this.side === 'top')) {
+            const centerX = this.x + this.width / 2;
+            if (this.side === 'top') {
+                this.y = terrain.getTopY(centerX);
+            } else {
+                this.y = terrain.getBottomY(centerX);
+            }
+        }
 
         // 画面外（左端より大きく通過）で消滅
-        if (this.x < -120) {
+        if (this.x + this.width < -140) {
             this.active = false;
             return;
         }
 
         // 自機との位置関係に応じた射撃AI
-        const isFacingPlayer = (this.facing === 'left' && player && player.x < this.x + 80) ||
-                               (this.facing === 'right' && player && player.x > this.x - 60);
+        const isFacingPlayer = (this.facing === 'left' && player && player.x < this.x + 140) ||
+                               (this.facing === 'right' && player && player.x > this.x - 100);
 
         if (!this.isFiring) {
             this.shootCooldown--;
             // 自機が射程内にいてクールダウン完了で口を開け始める
-            if (this.shootCooldown <= 0 && isFacingPlayer && this.x < 850 && this.x > -40) {
+            if (this.shootCooldown <= 0 && isFacingPlayer && this.x < 840 && this.x > -60) {
                 this.isFiring = true;
                 this.burstLeft = (Math.random() < 0.4) ? 4 : 3; // 3〜4連射！
-                this.burstInterval = 12;
+                this.burstInterval = 14;
             }
         }
 
@@ -63,13 +82,13 @@ class MoaiEnemy {
                 // 口全開：イオンリング弾の連射処理
                 this.burstInterval--;
                 if (this.burstInterval <= 0) {
-                    this.burstInterval = 13; // 次の弾までの間隔
+                    this.burstInterval = 15; // 次の弾までの間隔
                     this._fireIonRing(player);
                     this.burstLeft--;
 
                     if (this.burstLeft <= 0) {
                         this.isFiring = false;
-                        this.shootCooldown = 75 + Math.floor(Math.random() * 65);
+                        this.shootCooldown = 70 + Math.floor(Math.random() * 60);
                     }
                 }
             }
@@ -82,16 +101,22 @@ class MoaiEnemy {
         }
     }
 
+    _getMouthCenter() {
+        const mouthRect = this.getMouthBounds();
+        return {
+            x: mouthRect.x + mouthRect.width / 2,
+            y: mouthRect.y + mouthRect.height / 2
+        };
+    }
+
     _fireIonRing(player) {
         if (typeof enemyBullets === 'undefined') return;
 
-        // 口の中心座標を算出（開いた口の中央から飛び出す）
-        const isCeil = (this.side === 'top');
-        const jawOffset = this.mouthOpenProgress * 6;
-        const mouthX = (this.facing === 'left') ? this.x + 8 : this.x + this.width - 8;
-        const mouthY = isCeil ? this.y + 52 + jawOffset : this.y - (this.height - 52 - jawOffset);
+        const mouthPos = this._getMouthCenter();
+        const mouthX = mouthPos.x;
+        const mouthY = mouthPos.y;
 
-        // 自機への狙い撃ち＋スプレッド
+        // 自機への狙い撃ち
         let targetX = player ? player.x + player.width / 2 : mouthX - 300;
         let targetY = player ? player.y + player.height / 2 : mouthY;
 
@@ -103,11 +128,11 @@ class MoaiEnemy {
         if (this.facing === 'right' && dx < 20) dx = 120;
 
         const dist = Math.sqrt(dx * dx + dy * dy) || 1;
-        const speed = 4.3; // 鋭く迫るイオンリング弾
+        const speed = 4.0; // 迫力ある大きなイオンリング弾
         const vx = (dx / dist) * speed;
         const vy = (dy / dist) * speed;
 
-        const ringColor = (Math.random() < 0.25) ? '#00e5ff' : '#38bdf8';
+        const ringColor = (Math.random() < 0.3) ? '#00e5ff' : '#38bdf8';
 
         if (typeof RingBullet !== 'undefined') {
             enemyBullets.push(new RingBullet(mouthX, mouthY, vx, vy, ringColor));
@@ -126,16 +151,17 @@ class MoaiEnemy {
 
         if (this.hp <= 0) {
             this.active = false;
-            const cx = this.x + this.width / 2;
-            const cy = (this.side === 'top') ? this.y + this.height / 2 : this.y - this.height / 2;
+            const bounds = this.getBounds();
+            const cx = bounds.x + bounds.width / 2;
+            const cy = bounds.y + bounds.height / 2;
 
             // 豪快な岩石破片エフェクト（古代巨石が砕け散る！）
             if (typeof particles !== 'undefined') {
-                for (let i = 0; i < 16; i++) {
-                    const color = (Math.random() < 0.5) ? '#64748b' : ((Math.random() < 0.5) ? '#94a3b8' : '#334155');
+                for (let i = 0; i < 22; i++) {
+                    const color = (Math.random() < 0.5) ? '#8b7355' : ((Math.random() < 0.5) ? '#94a3b8' : '#475569');
                     particles.push(new Particle(
-                        cx + (Math.random() - 0.5) * 32,
-                        cy + (Math.random() - 0.5) * 32,
+                        cx + (Math.random() - 0.5) * 50,
+                        cy + (Math.random() - 0.5) * 50,
                         color
                     ));
                 }
@@ -150,8 +176,8 @@ class MoaiEnemy {
                 Sound.playExplosion();
             }
 
-            // 35%の確率でパワーアップカプセルをドロップ！
-            if (Math.random() < 0.35 && typeof capsules !== 'undefined' && typeof PowerUpCapsule !== 'undefined') {
+            // 40%の確率でパワーアップカプセルをドロップ！
+            if (Math.random() < 0.40 && typeof capsules !== 'undefined' && typeof PowerUpCapsule !== 'undefined') {
                 capsules.push(new PowerUpCapsule(cx, cy));
             }
             return true;
@@ -159,14 +185,44 @@ class MoaiEnemy {
         return false;
     }
 
+    // モアイ全体の当たり判定（自機との衝突・口以外の弾弾き用）
     getBounds() {
         const by = (this.side === 'top') ? this.y : this.y - this.height;
         return {
-            x: this.x,
-            y: by,
-            width: this.width,
-            height: this.height
+            x: this.x + 6,
+            y: by + 4,
+            width: this.width - 12,
+            height: this.height - 8
         };
+    }
+
+    // ★弱点である「口」の当たり判定（口を撃たないと壊れない設定）
+    getMouthBounds() {
+        const isCeil = (this.side === 'top');
+        const isRight = (this.facing === 'right');
+        const by = isCeil ? this.y : this.y - this.height;
+
+        if (this.posture === 'lying') {
+            // 横たわりモアイ：顔が上（天井時は下）を向き、顎・口が前方に位置する
+            const mx = isRight ? (this.x + this.width - 62) : (this.x + 8);
+            const my = isCeil ? (by + this.height - 52) : (by + 6);
+            return {
+                x: mx,
+                y: my,
+                width: 54,
+                height: 46
+            };
+        } else {
+            // 立ちモアイ：前方の口周辺エリア
+            const mx = isRight ? (this.x + this.width - 52) : (this.x - 4);
+            const my = isCeil ? (by + 16) : (by + this.height - 62);
+            return {
+                x: mx,
+                y: my,
+                width: 56,
+                height: 46
+            };
+        }
     }
 
     draw(ctx) {
@@ -183,113 +239,254 @@ class MoaiEnemy {
         const h = this.height;
 
         ctx.translate(bx + w / 2, by + h / 2);
-        // 上下反転（天井モアイ）＆ 左右反転（後ろ向きモアイ）
         ctx.scale(isRight ? -1 : 1, isCeil ? -1 : 1);
         ctx.translate(-(bx + w / 2), -(by + h / 2));
 
-        // 巨石グラデーション（重厚な石の陰影）
-        const stoneGrad = ctx.createLinearGradient(bx, by, bx + w, by + h);
-        if (isFlash) {
-            stoneGrad.addColorStop(0.0, '#ffffff');
-            stoneGrad.addColorStop(0.5, '#ff9999');
-            stoneGrad.addColorStop(1.0, '#ffffff');
+        if (this.posture === 'lying') {
+            this._drawLyingMoai(ctx, bx, by, w, h, isFlash);
         } else {
-            stoneGrad.addColorStop(0.0, '#94a3b8'); // ハイライト石肌
-            stoneGrad.addColorStop(0.35, '#64748b'); // スレートグレー
-            stoneGrad.addColorStop(0.75, '#475569');
-            stoneGrad.addColorStop(1.0, '#1e293b'); // 深い玄武岩影
-        }
-        ctx.fillStyle = stoneGrad;
-
-        // 1. モアイ頭部・後頭部ベースポリゴン
-        const jawDrop = this.mouthOpenProgress * 11;
-        ctx.beginPath();
-        ctx.moveTo(bx + w - 4, by + h);       // 首元後ろ
-        ctx.lineTo(bx + w - 4, by + 18);      // 後頭部
-        ctx.lineTo(bx + w - 14, by + 2);      // 頭頂部後ろ
-        ctx.lineTo(bx + 18, by + 2);          // 頭頂部前
-        ctx.lineTo(bx + 6, by + 16);          // 眉の上
-        ctx.lineTo(bx + 2, by + 24);          // 眉毛先端
-        ctx.lineTo(bx + 12, by + 26);         // 眉下のくぼみ（目の位置）
-        ctx.lineTo(bx + 2, by + 46);          // 鼻先（長く鋭い）
-        ctx.lineTo(bx + 12, by + 48);         // 鼻の下端
-        ctx.lineTo(bx + 14, by + 52);         // 上唇
-        ctx.lineTo(bx + 8, by + 55 + jawDrop); // 下唇
-        ctx.lineTo(bx + 8, by + 68 + jawDrop); // 顎先端
-        ctx.lineTo(bx + 20, by + h);           // 首元前
-        ctx.closePath();
-        ctx.fill();
-
-        // 輪郭線
-        ctx.strokeStyle = isFlash ? '#ffffff' : '#0f172a';
-        ctx.lineWidth = 2;
-        ctx.stroke();
-
-        // 2. 彫りの深い目（陰影）
-        ctx.fillStyle = '#0f172a';
-        ctx.beginPath();
-        ctx.moveTo(bx + 12, by + 25);
-        ctx.lineTo(bx + 28, by + 25);
-        ctx.lineTo(bx + 26, by + 32);
-        ctx.lineTo(bx + 13, by + 32);
-        ctx.closePath();
-        ctx.fill();
-
-        // 3. モアイの耳（側頭部の長い矩形石板）
-        ctx.fillStyle = isFlash ? '#ffffff' : '#475569';
-        ctx.fillRect(bx + w - 14, by + 22, 6, 26);
-        ctx.strokeStyle = isFlash ? '#ffffff' : '#1e293b';
-        ctx.lineWidth = 1.2;
-        ctx.strokeRect(bx + w - 14, by + 22, 6, 26);
-
-        // 4. 口の空洞＆イオンエネルギーチャージ発光（口の奥で凝縮！）
-        if (this.mouthOpenProgress > 0.05) {
-            const mouthH = Math.max(2, jawDrop);
-            // 口内の暗黒空洞
-            ctx.fillStyle = '#030712';
-            ctx.beginPath();
-            ctx.moveTo(bx + 14, by + 52);
-            ctx.lineTo(bx + 28, by + 52);
-            ctx.lineTo(bx + 28, by + 54 + mouthH);
-            ctx.lineTo(bx + 8, by + 54 + mouthH);
-            ctx.closePath();
-            ctx.fill();
-
-            // 口内の凝縮されたイオンリングエネルギー球
-            const glowR = 2 + this.chargeGlow * 5;
-            ctx.save();
-            ctx.shadowColor = '#00ffee';
-            ctx.shadowBlur = 10 * this.chargeGlow;
-            ctx.fillStyle = `rgba(0, 255, 238, ${0.5 + this.chargeGlow * 0.5})`;
-            ctx.beginPath();
-            ctx.arc(bx + 16, by + 52 + mouthH * 0.5, glowR, 0, Math.PI * 2);
-            ctx.fill();
-            ctx.restore();
-        }
-
-        // 5. 石肌の立体ハイライトライン・チゼル彫刻痕
-        ctx.strokeStyle = 'rgba(255, 255, 255, 0.28)';
-        ctx.lineWidth = 1;
-        ctx.beginPath();
-        ctx.moveTo(bx + 18, by + 4);
-        ctx.lineTo(bx + 8, by + 16);
-        ctx.lineTo(bx + 4, by + 24);
-        ctx.moveTo(bx + 14, by + 28);
-        ctx.lineTo(bx + 4, by + 46);
-        // 顎のハイライト
-        ctx.moveTo(bx + 10, by + 66 + jawDrop);
-        ctx.lineTo(bx + 20, by + h - 2);
-        ctx.stroke();
-
-        // 6. ダメージ残量ドット
-        if (this.hp < this.maxHp) {
-            for (let i = 0; i < this.maxHp; i++) {
-                ctx.fillStyle = (i < this.hp) ? '#00ffee' : 'rgba(255,255,255,0.15)';
-                ctx.fillRect(bx + 6 + i * 5, by + h - 4, 3, 2);
-            }
+            this._drawStandingMoai(ctx, bx, by, w, h, isFlash);
         }
 
         ctx.restore();
+    }
+
+    // 1. 立ちモアイ（重厚な岩盤に深く埋め込まれた巨大モアイ像）
+    _drawStandingMoai(ctx, bx, by, w, h, isFlash) {
+        const jawDrop = this.mouthOpenProgress * 15;
+
+        // --- A. 背面・足元を覆う重厚な埋没岩盤（モアイと一体化した古代岩塊） ---
+        const rockGrad = ctx.createLinearGradient(bx + 20, by + 20, bx + w + 18, by + h + 18);
+        rockGrad.addColorStop(0.0, '#64748b');
+        rockGrad.addColorStop(0.45, '#334155');
+        rockGrad.addColorStop(1.0, '#0f172a');
+        ctx.fillStyle = rockGrad;
+
+        ctx.beginPath();
+        ctx.moveTo(bx - 12, by + h + 16);
+        ctx.lineTo(bx + 4, by + h - 26);
+        ctx.lineTo(bx + 22, by + h - 42);
+        ctx.lineTo(bx + w - 26, by + 14);
+        ctx.lineTo(bx + w + 8, by + 36);
+        ctx.lineTo(bx + w + 18, by + h - 18);
+        ctx.lineTo(bx + w + 24, by + h + 16);
+        ctx.closePath();
+        ctx.fill();
+        ctx.strokeStyle = '#090d16';
+        ctx.lineWidth = 2.2;
+        ctx.stroke();
+
+        // --- B. モアイ本体の重厚な石肌グラデーション ---
+        const stoneGrad = ctx.createLinearGradient(bx, by, bx + w, by + h);
+        if (isFlash) {
+            stoneGrad.addColorStop(0.0, '#ffffff');
+            stoneGrad.addColorStop(0.5, '#ffaa88');
+            stoneGrad.addColorStop(1.0, '#ffffff');
+        } else {
+            stoneGrad.addColorStop(0.0, '#cbd5e1'); // 明るい石肌ハイライト
+            stoneGrad.addColorStop(0.28, '#94a3b8'); // 風化花崗岩
+            stoneGrad.addColorStop(0.65, '#475569'); // 重厚なスレート岩
+            stoneGrad.addColorStop(1.0, '#1e293b'); // 深部玄武岩の影
+        }
+        ctx.fillStyle = stoneGrad;
+
+        // 巨大モアイ頭部シルエット
+        ctx.beginPath();
+        ctx.moveTo(bx + w - 8, by + h + 8);          // 首元後ろ（岩盤に埋没）
+        ctx.lineTo(bx + w - 6, by + 24);             // 後頭部
+        ctx.lineTo(bx + w - 22, by + 4);             // 頭頂部後ろ
+        ctx.lineTo(bx + 26, by + 4);                 // 頭頂部前
+        ctx.lineTo(bx + 10, by + 24);                // 額
+        ctx.lineTo(bx + 2, by + 36);                 // 大きく突き出た眉庇
+        ctx.lineTo(bx + 18, by + 41);                // 彫りの深い眼窩くぼみ
+        ctx.lineTo(bx + 2, by + 74);                 // 巨大な鷲鼻の先端
+        ctx.lineTo(bx + 18, by + 78);                // 鼻の下
+        ctx.lineTo(bx + 20, by + 85);                // 上唇
+        ctx.lineTo(bx + 10, by + 90 + jawDrop);      // 下唇
+        ctx.lineTo(bx + 12, by + 112 + jawDrop);     // 頑強な顎先端
+        ctx.lineTo(bx + 32, by + h + 8);             // 首元前（岩盤に埋没）
+        ctx.closePath();
+        ctx.fill();
+
+        ctx.strokeStyle = isFlash ? '#ffffff' : '#0f172a';
+        ctx.lineWidth = 2.5;
+        ctx.stroke();
+
+        // --- C. 彫りの深い眼窩（重厚な黒影） ---
+        ctx.fillStyle = '#090d16';
+        ctx.beginPath();
+        ctx.moveTo(bx + 17, by + 39);
+        ctx.lineTo(bx + 44, by + 38);
+        ctx.lineTo(bx + 40, by + 51);
+        ctx.lineTo(bx + 19, by + 50);
+        ctx.closePath();
+        ctx.fill();
+
+        // --- D. モアイの巨大な長耳（側頭部の重厚なレリーフ） ---
+        ctx.fillStyle = isFlash ? '#ffffff' : '#475569';
+        ctx.fillRect(bx + w - 26, by + 34, 11, 46);
+        ctx.strokeStyle = '#0f172a';
+        ctx.lineWidth = 1.8;
+        ctx.strokeRect(bx + w - 26, by + 34, 11, 46);
+
+        // --- E. 口の空洞＆弱点コア発光（口を撃つとダメージ！） ---
+        const mouthH = Math.max(5, jawDrop + 4);
+        ctx.fillStyle = '#030712';
+        ctx.beginPath();
+        ctx.moveTo(bx + 18, by + 84);
+        ctx.lineTo(bx + 46, by + 84);
+        ctx.lineTo(bx + 46, by + 86 + mouthH);
+        ctx.lineTo(bx + 10, by + 86 + mouthH);
+        ctx.closePath();
+        ctx.fill();
+
+        // 口内のエネルギー球（弱点ガイドとしても機能）
+        const glowR = 4 + this.chargeGlow * 8;
+        ctx.save();
+        ctx.shadowColor = '#00ffee';
+        ctx.shadowBlur = 8 + 10 * this.chargeGlow;
+        ctx.fillStyle = isFlash ? '#ffffff' : `rgba(56, 189, 248, ${0.45 + this.chargeGlow * 0.55})`;
+        ctx.beginPath();
+        ctx.arc(bx + 26, by + 85 + mouthH * 0.5, glowR, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+
+        // --- F. 手前側の埋没岩盤（モアイの首元をガッチリと抱き込む前景岩塊） ---
+        ctx.fillStyle = '#334155';
+        ctx.beginPath();
+        ctx.moveTo(bx - 8, by + h + 16);
+        ctx.lineTo(bx + 8, by + h - 18);
+        ctx.lineTo(bx + 36, by + h - 26);
+        ctx.lineTo(bx + 58, by + h - 12);
+        ctx.lineTo(bx + w + 14, by + h - 28);
+        ctx.lineTo(bx + w + 20, by + h + 16);
+        ctx.closePath();
+        ctx.fill();
+        ctx.strokeStyle = '#0f172a';
+        ctx.lineWidth = 2;
+        ctx.stroke();
+
+        // 彫刻エッジハイライト
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.35)';
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.moveTo(bx + 26, by + 7);
+        ctx.lineTo(bx + 12, by + 24);
+        ctx.lineTo(bx + 5, by + 36);
+        ctx.moveTo(bx + 20, by + 44);
+        ctx.lineTo(bx + 5, by + 73);
+        ctx.stroke();
+    }
+
+    // 2. 横たわりモアイ（重厚な岩盤に横向きに埋没した巨大モアイ像）
+    _drawLyingMoai(ctx, bx, by, w, h, isFlash) {
+        const jawOpen = this.mouthOpenProgress * 14;
+
+        // --- A. 背面の重厚な岩盤ベッド ---
+        const rockGrad = ctx.createLinearGradient(bx, by + 20, bx, by + h + 16);
+        rockGrad.addColorStop(0.0, '#64748b');
+        rockGrad.addColorStop(0.5, '#334155');
+        rockGrad.addColorStop(1.0, '#0f172a');
+        ctx.fillStyle = rockGrad;
+
+        ctx.beginPath();
+        ctx.moveTo(bx - 16, by + h + 16);
+        ctx.lineTo(bx - 6, by + 38);
+        ctx.lineTo(bx + 35, by + 24);
+        ctx.lineTo(bx + w - 18, by + 18);
+        ctx.lineTo(bx + w + 14, by + 42);
+        ctx.lineTo(bx + w + 20, by + h + 16);
+        ctx.closePath();
+        ctx.fill();
+        ctx.strokeStyle = '#090d16';
+        ctx.lineWidth = 2.2;
+        ctx.stroke();
+
+        // --- B. 横たわる巨大モアイ本体（顔が上〜斜め前方を向く） ---
+        const stoneGrad = ctx.createLinearGradient(bx, by, bx + w, by + h);
+        if (isFlash) {
+            stoneGrad.addColorStop(0.0, '#ffffff');
+            stoneGrad.addColorStop(0.5, '#ffaa88');
+            stoneGrad.addColorStop(1.0, '#ffffff');
+        } else {
+            stoneGrad.addColorStop(0.0, '#cbd5e1');
+            stoneGrad.addColorStop(0.35, '#94a3b8');
+            stoneGrad.addColorStop(0.75, '#475569');
+            stoneGrad.addColorStop(1.0, '#1e293b');
+        }
+        ctx.fillStyle = stoneGrad;
+
+        ctx.beginPath();
+        ctx.moveTo(bx + 4, by + h + 6);               // 顎下（岩盤内）
+        ctx.lineTo(bx + 4, by + 28 - jawOpen * 0.5);  // 顎先端（左側）
+        ctx.lineTo(bx + 24, by + 20 - jawOpen * 0.5); // 下唇
+        ctx.lineTo(bx + 34, by + 28);                 // 口の奥
+        ctx.lineTo(bx + 44, by + 18);                 // 上唇
+        ctx.lineTo(bx + 54, by + 4);                  // 高く突き出た鼻先
+        ctx.lineTo(bx + 82, by + 18);                 // 眉下の深い眼窩
+        ctx.lineTo(bx + 92, by + 4);                  // 眉庇の突起
+        ctx.lineTo(bx + 114, by + 10);                // 額
+        ctx.lineTo(bx + w - 4, by + 28);              // 頭頂部（右側）
+        ctx.lineTo(bx + w - 2, by + h + 6);           // 後頭部（岩盤内）
+        ctx.closePath();
+        ctx.fill();
+
+        ctx.strokeStyle = isFlash ? '#ffffff' : '#0f172a';
+        ctx.lineWidth = 2.5;
+        ctx.stroke();
+
+        // --- C. 眼窩の深い影 ---
+        ctx.fillStyle = '#090d16';
+        ctx.beginPath();
+        ctx.moveTo(bx + 76, by + 17);
+        ctx.lineTo(bx + 90, by + 12);
+        ctx.lineTo(bx + 92, by + 28);
+        ctx.lineTo(bx + 74, by + 28);
+        ctx.closePath();
+        ctx.fill();
+
+        // --- D. 横向きの長耳レリーフ ---
+        ctx.fillStyle = isFlash ? '#ffffff' : '#475569';
+        ctx.fillRect(bx + 62, by + 44, 48, 12);
+        ctx.strokeStyle = '#0f172a';
+        ctx.lineWidth = 1.6;
+        ctx.strokeRect(bx + 62, by + 44, 48, 12);
+
+        // --- E. 口の空洞＆弱点コア発光 ---
+        const mouthW = Math.max(6, jawOpen + 6);
+        ctx.fillStyle = '#030712';
+        ctx.beginPath();
+        ctx.moveTo(bx + 24 - jawOpen * 0.4, by + 20);
+        ctx.lineTo(bx + 44, by + 18);
+        ctx.lineTo(bx + 42, by + 42);
+        ctx.lineTo(bx + 24 - jawOpen * 0.4, by + 38);
+        ctx.closePath();
+        ctx.fill();
+
+        const glowR = 4.5 + this.chargeGlow * 7.5;
+        ctx.save();
+        ctx.shadowColor = '#00ffee';
+        ctx.shadowBlur = 8 + 10 * this.chargeGlow;
+        ctx.fillStyle = isFlash ? '#ffffff' : `rgba(56, 189, 248, ${0.45 + this.chargeGlow * 0.55})`;
+        ctx.beginPath();
+        ctx.arc(bx + 33, by + 26, glowR, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+
+        // --- F. 手前側を覆う重厚な埋没岩盤 ---
+        ctx.fillStyle = '#334155';
+        ctx.beginPath();
+        ctx.moveTo(bx - 12, by + h + 16);
+        ctx.lineTo(bx + 2, by + h - 22);
+        ctx.lineTo(bx + 45, by + h - 30);
+        ctx.lineTo(bx + 92, by + h - 18);
+        ctx.lineTo(bx + w + 8, by + h - 28);
+        ctx.lineTo(bx + w + 16, by + h + 16);
+        ctx.closePath();
+        ctx.fill();
+        ctx.strokeStyle = '#0f172a';
+        ctx.lineWidth = 2;
+        ctx.stroke();
     }
 }
 
@@ -367,17 +564,19 @@ class MoaiTerrain {
     constructor(canvasWidth, canvasHeight) {
         this.width = canvasWidth;
         this.height = canvasHeight;
-        this.scrollSpeed = 1.8;
+        this.scrollSpeed = 2.0;
 
-        this.baseTopY = 70;
-        this.baseBottomY = canvasHeight - 70;
+        this.baseTopY = 76;
+        this.baseBottomY = canvasHeight - 76;
 
         this.active = false;
         this.wallActive = false;
         this.wallTransition = 0; // 0 -> 1
 
-        // 地形輪郭セグメント
-        this.terrainStep = 30; // 30px刻みで滑らかな起伏
+        // 地形輪郭セグメント（サブピクセルスクロール対応）
+        this.terrainStep = 30;
+        this.scrollOffset = 0;
+        this.generatedWorldX = 0;
         this.topHeights = [];
         this.bottomHeights = [];
 
@@ -409,6 +608,15 @@ class MoaiTerrain {
         this.nextSpawnX = canvasWidth + 20;
     }
 
+    _computeTerrainHeights(d) {
+        const hillTop = Math.sin(d * 0.008) * 44 + Math.sin(d * 0.022) * 26 + Math.cos(d * 0.048) * 14;
+        const hillBot = Math.cos(d * 0.007) * 48 + Math.sin(d * 0.020) * 28 + Math.sin(d * 0.044) * 15;
+        return {
+            top: Math.max(38, Math.min(185, this.baseTopY + hillTop)),
+            bottom: Math.min(this.height - 38, Math.max(this.height - 195, this.baseBottomY - hillBot))
+        };
+    }
+
     start() {
         this.active = true;
         this.wallActive = false;
@@ -416,17 +624,19 @@ class MoaiTerrain {
         this.moais = [];
         this.floatingIslands = [];
         this.distance = 0;
+        this.scrollOffset = 0;
+        this.generatedWorldX = 0;
 
-        // 地形ノード初期化（開幕から起伏ある古代岩山を生成！）
-        const count = Math.ceil(this.width / this.terrainStep) + 12;
+        // 地形ノード初期化（起伏ある古代岩山を生成！）
+        const count = Math.ceil(this.width / this.terrainStep) + 16;
         this.topHeights = [];
         this.bottomHeights = [];
         for (let i = 0; i < count; i++) {
             const d = i * this.terrainStep;
-            const hillTop = Math.sin(d * 0.007) * 35 + Math.sin(d * 0.018) * 20;
-            const hillBot = Math.cos(d * 0.006) * 45 + Math.sin(d * 0.015) * 25;
-            this.topHeights.push(Math.max(45, Math.min(170, this.baseTopY + hillTop)));
-            this.bottomHeights.push(Math.min(this.height - 45, Math.max(this.height - 185, this.baseBottomY - hillBot)));
+            this.generatedWorldX = d;
+            const h = this._computeTerrainHeights(d);
+            this.topHeights.push(h.top);
+            this.bottomHeights.push(h.bottom);
         }
     }
 
@@ -438,11 +648,12 @@ class MoaiTerrain {
     getTopY(x) {
         if (!this.wallActive) return 0;
         const clampedTransition = Math.max(0, Math.min(1, this.wallTransition));
-        const idx = Math.floor(x / this.terrainStep);
+        const exactIdx = (x + this.scrollOffset) / this.terrainStep;
+        const idx = Math.floor(exactIdx);
         if (idx < 0) return (this.topHeights[0] || this.baseTopY) * clampedTransition;
         if (idx >= this.topHeights.length - 1) return (this.topHeights[this.topHeights.length - 1] || this.baseTopY) * clampedTransition;
 
-        const t = (x % this.terrainStep) / this.terrainStep;
+        const t = exactIdx - idx;
         const y0 = this.topHeights[idx];
         const y1 = this.topHeights[idx + 1];
         const rawY = y0 + (y1 - y0) * t;
@@ -452,14 +663,15 @@ class MoaiTerrain {
     getBottomY(x) {
         if (!this.wallActive) return this.height;
         const clampedTransition = Math.max(0, Math.min(1, this.wallTransition));
-        const idx = Math.floor(x / this.terrainStep);
+        const exactIdx = (x + this.scrollOffset) / this.terrainStep;
+        const idx = Math.floor(exactIdx);
         let rawY = this.baseBottomY;
         if (idx < 0) {
             rawY = this.bottomHeights[0] || this.baseBottomY;
         } else if (idx >= this.bottomHeights.length - 1) {
             rawY = this.bottomHeights[this.bottomHeights.length - 1] || this.baseBottomY;
         } else {
-            const t = (x % this.terrainStep) / this.terrainStep;
+            const t = exactIdx - idx;
             const y0 = this.bottomHeights[idx];
             const y1 = this.bottomHeights[idx + 1];
             rawY = y0 + (y1 - y0) * t;
@@ -480,6 +692,21 @@ class MoaiTerrain {
         // 浮島との衝突
         for (let i = 0; i < this.floatingIslands.length; i++) {
             if (this.floatingIslands[i].checkCollision(rect)) return true;
+        }
+
+        // モアイ本体との衝突
+        for (let i = 0; i < this.moais.length; i++) {
+            const m = this.moais[i];
+            if (!m.active) continue;
+            const mb = m.getBounds();
+            if (
+                rect.x < mb.x + mb.width &&
+                rect.x + rect.width > mb.x &&
+                rect.y < mb.y + mb.height &&
+                rect.y + rect.height > mb.y
+            ) {
+                return true;
+            }
         }
 
         return false;
@@ -504,32 +731,27 @@ class MoaiTerrain {
 
         if (!this.wallActive) return;
 
-        // 岩壁出現イージング
+        // 岩壁せり上がりイージング
         if (this.wallTransition < 1.0) {
             this.wallTransition = Math.min(1.0, this.wallTransition + 0.015);
         }
 
-        // 2. 地形スクロール＆新規地形波形生成
-        const shiftX = this.scrollSpeed;
-        const nodesToShift = Math.floor(shiftX / this.terrainStep);
-        if (nodesToShift > 0) {
-            for (let i = 0; i < nodesToShift; i++) {
-                this.topHeights.shift();
-                this.bottomHeights.shift();
+        // 2. 天井・床の滑らかな左スクロール＆新規地形波形生成
+        this.scrollOffset += this.scrollSpeed;
+        while (this.scrollOffset >= this.terrainStep) {
+            this.scrollOffset -= this.terrainStep;
+            this.topHeights.shift();
+            this.bottomHeights.shift();
 
-                // 原作グラディウス特有の波打つ岩山地形（山頂・谷・平坦地）
-                const d = this.distance + this.width;
-                const hillTop = Math.sin(d * 0.007) * 35 + Math.sin(d * 0.018) * 20;
-                const hillBot = Math.cos(d * 0.006) * 45 + Math.sin(d * 0.015) * 25;
-
-                this.topHeights.push(Math.max(45, Math.min(170, this.baseTopY + hillTop)));
-                this.bottomHeights.push(Math.min(this.height - 45, Math.max(this.height - 185, this.baseBottomY - hillBot)));
-            }
+            this.generatedWorldX += this.terrainStep;
+            const h = this._computeTerrainHeights(this.generatedWorldX);
+            this.topHeights.push(h.top);
+            this.bottomHeights.push(h.bottom);
         }
 
-        // 3. モアイ像の更新
+        // 3. モアイ像の更新（地形スクロールと同期）
         const curPlayer = (typeof player !== 'undefined') ? player : null;
-        this.moais.forEach(m => m.update(this.scrollSpeed, curPlayer));
+        this.moais.forEach(m => m.update(this.scrollSpeed, curPlayer, this));
         this.moais = this.moais.filter(m => m.active);
 
         // 4. 浮島の更新
@@ -537,48 +759,69 @@ class MoaiTerrain {
         this.floatingIslands = this.floatingIslands.filter(i => i.active);
     }
 
-    spawnMoai(side, facing, xOffset = 0) {
-        const x = this.width + 30 + xOffset;
-        let y = (side === 'top') ? this.getTopY(x) : this.getBottomY(x);
-        this.moais.push(new MoaiEnemy(x, y, side, facing));
+    spawnMoai(side, facing, xOffset = 0, posture = 'standing') {
+        const x = this.width + 40 + xOffset;
+        let y = (side === 'top') ? this.getTopY(x + 45) : this.getBottomY(x + 45);
+        this.moais.push(new MoaiEnemy(x, y, side, facing, posture));
     }
 
-    spawnFloatingIsland(xOffset = 0, y = 280, w = 160, h = 55, spawnMoais = true) {
-        const x = this.width + 30 + xOffset;
+    spawnFloatingIsland(xOffset = 0, y = 280, w = 210, h = 56, spawnMoais = true) {
+        const x = this.width + 40 + xOffset;
         const island = new FloatingRockIsland(x, y, w, h);
         this.floatingIslands.push(island);
 
         if (spawnMoais) {
-            // 島の上に前向きモアイ
-            this.moais.push(new MoaiEnemy(x + 25, y, 'island', 'left'));
+            const topPosture = (Math.random() < 0.45) ? 'lying' : 'standing';
+            // 島の上にモアイ
+            this.moais.push(new MoaiEnemy(x + 20, y + 6, 'island', 'left', topPosture));
             // 島の下に後ろ向き（背後急襲）天井モアイ
-            this.moais.push(new MoaiEnemy(x + w - 75, y + h, 'top', 'right'));
+            this.moais.push(new MoaiEnemy(x + w - 105, y + h - 6, 'top', 'right', 'standing'));
         }
     }
 
     handleBulletCollisions(playerBullets) {
         if (!this.wallActive) return;
 
-        // 1. プレイヤー弾 vs モアイ像
+        // 1. プレイヤー弾 vs モアイ像（★口を撃たないと壊れない設定！）
         playerBullets.forEach(bullet => {
             if (!bullet.active) return;
+            const isLaser = (typeof Laser !== 'undefined' && bullet instanceof Laser);
 
             for (let i = this.moais.length - 1; i >= 0; i--) {
                 const m = this.moais[i];
                 if (!m.active) continue;
 
-                const bounds = m.getBounds();
-                if (checkCollision(bullet, bounds)) {
-                    if (typeof Laser !== 'undefined' && bullet instanceof Laser) {
-                        m.hit(2);
+                const mouthBounds = m.getMouthBounds();
+                const bodyBounds = m.getBounds();
+
+                // A. 弱点の「口」に命中した場合のみダメージ！
+                if (checkCollision(bullet, mouthBounds)) {
+                    if (isLaser) {
+                        if (m.laserHitCooldown <= 0) {
+                            m.laserHitCooldown = 9;
+                            m.hit(2);
+                            if (typeof Sound !== 'undefined' && typeof Sound.playBossHit === 'function') {
+                                Sound.playBossHit();
+                            }
+                        }
                     } else {
                         bullet.active = false;
                         m.hit(1);
+                        if (typeof Sound !== 'undefined' && typeof Sound.playBossHit === 'function') {
+                            Sound.playBossHit();
+                        }
+                        break;
                     }
-                    if (typeof Sound !== 'undefined' && typeof Sound.playBossHit === 'function') {
-                        Sound.playBossHit();
+                }
+                // B. 口以外の硬い岩盤・頭部ボディに当たった場合はノーダメージで弾かれる！
+                else if (checkCollision(bullet, bodyBounds)) {
+                    if (!isLaser) {
+                        bullet.active = false;
+                        if (typeof particles !== 'undefined' && typeof Particle !== 'undefined') {
+                            particles.push(new Particle(bullet.x, bullet.y, '#94a3b8'));
+                        }
+                        break;
                     }
-                    break;
                 }
             }
         });
@@ -641,16 +884,17 @@ class MoaiTerrain {
         });
         ctx.globalAlpha = 1.0;
 
-        // 4. 起伏ある古代岩山洞窟の描画
+        // 4. 起伏ある古代岩山洞窟と巨大モアイ群の描画
         if (this.wallActive && this.wallTransition > 0.02) {
-            this._drawCeiling(ctx);
-            this._drawFloor(ctx);
-
             // 中空浮島
             this.floatingIslands.forEach(island => island.draw(ctx));
 
-            // モアイ像群
+            // モアイ像群（岩盤に深く根ざすよう地形エッジと一体描画）
             this.moais.forEach(m => m.draw(ctx));
+
+            // スクロールする天井岩盤と床岩盤
+            this._drawCeiling(ctx);
+            this._drawFloor(ctx);
         }
 
         ctx.restore();
@@ -664,40 +908,51 @@ class MoaiTerrain {
         ctx.moveTo(0, 0);
         ctx.lineTo(this.width, 0);
 
-        for (let x = this.width; x >= 0; x -= 20) {
-            const y = this.getTopY(x);
+        for (let i = this.topHeights.length - 1; i >= 0; i--) {
+            const x = i * this.terrainStep - this.scrollOffset;
+            if (x < -this.terrainStep || x > this.width + this.terrainStep) continue;
+            const y = this.topHeights[i] * clampedTransition;
             ctx.lineTo(x, y);
         }
+        ctx.lineTo(0, this.getTopY(0));
         ctx.closePath();
 
-        const grad = ctx.createLinearGradient(0, 0, 0, 180 * clampedTransition);
-        grad.addColorStop(0.0, '#1e293b');
-        grad.addColorStop(0.5, '#334155');
-        grad.addColorStop(0.9, '#475569');
-        grad.addColorStop(1.0, '#1a2430');
+        const grad = ctx.createLinearGradient(0, 0, 0, 185 * clampedTransition);
+        grad.addColorStop(0.0, '#0f172a');
+        grad.addColorStop(0.45, '#334155');
+        grad.addColorStop(0.85, '#64748b');
+        grad.addColorStop(1.0, '#1e293b');
         ctx.fillStyle = grad;
         ctx.fill();
 
         // エッジシャープライン
-        ctx.strokeStyle = '#38bdf8';
-        ctx.lineWidth = 1.8;
+        ctx.strokeStyle = '#94a3b8';
+        ctx.lineWidth = 2.5;
         ctx.beginPath();
-        for (let x = 0; x <= this.width; x += 20) {
-            const y = this.getTopY(x);
-            if (x === 0) ctx.moveTo(x, y);
-            else ctx.lineTo(x, y);
+        let started = false;
+        for (let i = 0; i < this.topHeights.length; i++) {
+            const x = i * this.terrainStep - this.scrollOffset;
+            if (x < -this.terrainStep || x > this.width + this.terrainStep) continue;
+            const y = this.topHeights[i] * clampedTransition;
+            if (!started) {
+                ctx.moveTo(x, y);
+                started = true;
+            } else {
+                ctx.lineTo(x, y);
+            }
         }
         ctx.stroke();
 
-        // 天井岩肌の岩脈・クレバスライン
-        ctx.strokeStyle = 'rgba(100, 180, 240, 0.22)';
-        ctx.lineWidth = 1;
+        // スクロールと完全同期して流れる天井岩脈・クレバスライン
+        const crevasseShift = this.distance % 60;
+        ctx.strokeStyle = 'rgba(148, 163, 184, 0.28)';
+        ctx.lineWidth = 1.5;
         ctx.beginPath();
-        for (let x = 30; x <= this.width; x += 60) {
+        for (let x = -crevasseShift; x <= this.width + 60; x += 60) {
             const y = this.getTopY(x);
             ctx.moveTo(x, 0);
-            ctx.lineTo(x - 14, y * 0.45);
-            ctx.lineTo(x + 6, y - 4);
+            ctx.lineTo(x - 16, y * 0.5);
+            ctx.lineTo(x + 8, y - 3);
         }
         ctx.stroke();
 
@@ -712,40 +967,53 @@ class MoaiTerrain {
         ctx.moveTo(0, this.height);
         ctx.lineTo(this.width, this.height);
 
-        for (let x = this.width; x >= 0; x -= 20) {
-            const y = this.getBottomY(x);
+        for (let i = this.bottomHeights.length - 1; i >= 0; i--) {
+            const x = i * this.terrainStep - this.scrollOffset;
+            if (x < -this.terrainStep || x > this.width + this.terrainStep) continue;
+            const rawY = this.bottomHeights[i];
+            const y = this.height - (this.height - rawY) * clampedTransition;
             ctx.lineTo(x, y);
         }
+        ctx.lineTo(0, this.getBottomY(0));
         ctx.closePath();
 
-        const grad = ctx.createLinearGradient(0, this.height - 180 * clampedTransition, 0, this.height);
-        grad.addColorStop(0.0, '#1a2430');
-        grad.addColorStop(0.2, '#475569');
-        grad.addColorStop(0.65, '#334155');
-        grad.addColorStop(1.0, '#1e293b');
+        const grad = ctx.createLinearGradient(0, this.height - 190 * clampedTransition, 0, this.height);
+        grad.addColorStop(0.0, '#1e293b');
+        grad.addColorStop(0.18, '#64748b');
+        grad.addColorStop(0.60, '#334155');
+        grad.addColorStop(1.0, '#0f172a');
         ctx.fillStyle = grad;
         ctx.fill();
 
         // エッジシャープライン
-        ctx.strokeStyle = '#38bdf8';
-        ctx.lineWidth = 1.8;
+        ctx.strokeStyle = '#94a3b8';
+        ctx.lineWidth = 2.5;
         ctx.beginPath();
-        for (let x = 0; x <= this.width; x += 20) {
-            const y = this.getBottomY(x);
-            if (x === 0) ctx.moveTo(x, y);
-            else ctx.lineTo(x, y);
+        let started = false;
+        for (let i = 0; i < this.bottomHeights.length; i++) {
+            const x = i * this.terrainStep - this.scrollOffset;
+            if (x < -this.terrainStep || x > this.width + this.terrainStep) continue;
+            const rawY = this.bottomHeights[i];
+            const y = this.height - (this.height - rawY) * clampedTransition;
+            if (!started) {
+                ctx.moveTo(x, y);
+                started = true;
+            } else {
+                ctx.lineTo(x, y);
+            }
         }
         ctx.stroke();
 
-        // 地面の岩脈・クレバスライン
-        ctx.strokeStyle = 'rgba(100, 180, 240, 0.22)';
-        ctx.lineWidth = 1;
+        // スクロールと完全同期して流れる地面の岩脈・クレバスライン
+        const crevasseShift = this.distance % 60;
+        ctx.strokeStyle = 'rgba(148, 163, 184, 0.28)';
+        ctx.lineWidth = 1.5;
         ctx.beginPath();
-        for (let x = 40; x <= this.width; x += 60) {
+        for (let x = 30 - crevasseShift; x <= this.width + 60; x += 60) {
             const y = this.getBottomY(x);
             ctx.moveTo(x, this.height);
-            ctx.lineTo(x + 14, (this.height + y) * 0.55);
-            ctx.lineTo(x - 6, y + 4);
+            ctx.lineTo(x + 16, (this.height + y) * 0.52);
+            ctx.lineTo(x - 8, y + 3);
         }
         ctx.stroke();
 
@@ -799,21 +1067,21 @@ class Stage3 {
             this.stageTime += dt;
             this.terrain.update(dt);
 
-            // 1. 開幕13秒経過でモアイ洞窟（岩山地形）出現！
-            if (this.stageTime >= 13000 && !this.terrain.wallActive) {
+            // 1. 開幕10秒経過でモアイ洞窟（岩山地形）出現＆スクロール開始！
+            if (this.stageTime >= 10000 && !this.terrain.wallActive) {
                 this.terrain.startWalls();
             }
 
             // 2. 空中敵編隊（カプセル補給と牽制）
             this.updateFlyingEnemies(dt);
 
-            // 3. 原作グラディウス式 モアイ＆地形ウェーブ生成（13秒〜78秒）
-            if (this.stageTime >= 14000 && this.stageTime < 78000) {
+            // 3. 原作グラディウス式 モアイ＆地形ウェーブ生成（11秒〜78秒）
+            if (this.stageTime >= 11000 && this.stageTime < 78000) {
                 this.updateMoaiWaves(dt);
             }
 
             // 4. 地形を這うダッカー歩行砲台の生成
-            if (this.stageTime >= 24000 && this.stageTime < 76000) {
+            if (this.stageTime >= 22000 && this.stageTime < 76000) {
                 this.updateDuckers(dt);
             }
 
@@ -859,10 +1127,7 @@ class Stage3 {
         } else if (this.state === 'ALL_CLEAR') {
             this.terrain.update(dt);
             this.stageClearTimer += dt;
-            // 自機が栄光のハイパードライブ加速で右へ離脱！
-            if (typeof player !== 'undefined' && player) {
-                player.x += 4.5;
-            }
+            // 自機を右端に押し付けず、そのままの自由操作を維持
         }
     }
 
@@ -879,45 +1144,54 @@ class Stage3 {
         this.moaiWaveTimer += dt;
 
         // 難易度と進行度に応じた出現インターバル
-        let interval = 2200;
-        if (this.stageTime > 55000) interval = 1500; // クライマックスは高密度！
+        let interval = 2300;
+        if (this.stageTime > 52000) interval = 1650;
 
         if (this.moaiWaveTimer >= interval) {
             this.moaiWaveTimer = 0;
 
             const roll = Math.random();
 
-            // フェーズ別の原作再現配置
-            if (this.stageTime < 32000) {
-                // 前半：前向きモアイ（天井・床）
-                const side = (roll < 0.5) ? 'bottom' : 'top';
-                this.terrain.spawnMoai(side, 'left');
-            } else if (this.stageTime < 52000) {
-                // 中盤：前向き＋背後急襲の後ろ向きモアイ！
+            // 立ちモアイ(standing)・横たわりモアイ(lying)、前向き(left)・後ろ向き(right)を多彩に配置！
+            if (this.stageTime < 30000) {
+                // 前半：立ち前向き＆横たわりモアイの登場
                 if (roll < 0.35) {
-                    this.terrain.spawnMoai('bottom', 'left');
-                    this.terrain.spawnMoai('top', 'right', 60); // ★背後急襲モアイ！
-                } else if (roll < 0.70) {
-                    this.terrain.spawnMoai('top', 'left');
-                    this.terrain.spawnMoai('bottom', 'right', 50); // ★背後急襲モアイ！
+                    this.terrain.spawnMoai('bottom', 'left', 0, 'standing');
+                } else if (roll < 0.65) {
+                    this.terrain.spawnMoai('top', 'left', 0, 'standing');
+                } else if (roll < 0.85) {
+                    this.terrain.spawnMoai('bottom', 'left', 0, 'lying');
                 } else {
-                    // 中空浮島とモアイのコンビネーション
-                    this.terrain.spawnFloatingIsland(0, 260, 170, 50, true);
+                    this.terrain.spawnMoai('top', 'right', 0, 'lying');
+                }
+            } else if (this.stageTime < 52000) {
+                // 中盤：前向き＋後ろ向き、立ち＋横たわり、浮島との複合配置
+                if (roll < 0.28) {
+                    this.terrain.spawnMoai('bottom', 'left', 0, 'standing');
+                    this.terrain.spawnMoai('top', 'right', 70, 'standing'); // 背後急襲
+                } else if (roll < 0.55) {
+                    this.terrain.spawnMoai('top', 'left', 0, 'standing');
+                    this.terrain.spawnMoai('bottom', 'right', 60, 'lying'); // 横たわり背後急襲
+                } else if (roll < 0.78) {
+                    this.terrain.spawnMoai('bottom', 'left', 0, 'lying');
+                    this.terrain.spawnMoai('top', 'left', 90, 'standing');
+                } else {
+                    this.terrain.spawnFloatingIsland(0, 270, 210, 56, true);
                 }
             } else {
-                // 後半（モアイラッシュ）：激しい弾幕を誇る密集地帯！
-                if (roll < 0.40) {
-                    // 天井・床ダブル前向きモアイ
-                    this.terrain.spawnMoai('bottom', 'left');
-                    this.terrain.spawnMoai('top', 'left', 30);
-                } else if (roll < 0.75) {
-                    // 浮島＋挟み撃ちモアイ
-                    this.terrain.spawnFloatingIsland(0, 270, 160, 50, true);
-                    this.terrain.spawnMoai('bottom', 'left', 180);
+                // 後半（モアイラッシュ）：巨石モアイ密集地帯！
+                if (roll < 0.30) {
+                    this.terrain.spawnMoai('bottom', 'left', 0, 'standing');
+                    this.terrain.spawnMoai('top', 'left', 50, 'lying');
+                } else if (roll < 0.60) {
+                    this.terrain.spawnFloatingIsland(0, 275, 210, 56, true);
+                    this.terrain.spawnMoai('bottom', 'right', 170, 'standing');
+                } else if (roll < 0.82) {
+                    this.terrain.spawnMoai('bottom', 'right', 0, 'lying');
+                    this.terrain.spawnMoai('top', 'left', 60, 'standing');
                 } else {
-                    // 背後急襲ダブルモアイ
-                    this.terrain.spawnMoai('bottom', 'right');
-                    this.terrain.spawnMoai('top', 'right', 40);
+                    this.terrain.spawnMoai('bottom', 'right', 0, 'standing');
+                    this.terrain.spawnMoai('top', 'right', 55, 'lying');
                 }
             }
         }

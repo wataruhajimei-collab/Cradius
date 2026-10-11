@@ -124,7 +124,8 @@ function update(dt) {
     player.update(canvas.width, canvas.height);
 
     playerBullets.forEach(b => b.update(canvas.height));
-    playerBullets = playerBullets.filter(b => b.active && b.x < canvas.width && b.x > -50);
+    playerBullets = playerBullets.filter(b => b.active && ((typeof Laser !== 'undefined' && b instanceof Laser && b.framesAlive < b.minFrames) || b.x < canvas.width) && b.x > -50);
+    window.playerBullets = playerBullets;
 
     levelManager.update(dt);
 
@@ -242,7 +243,7 @@ function handleCollisions() {
     playerBullets.forEach(bullet => {
         // 弾と地形・浮遊大陸（ステージ1）
         if (levelManager.stage === 1 && bullet.active && levelManager.checkCollision(bullet)) {
-            if (!(bullet instanceof Missile)) {
+            if (!(bullet instanceof Missile) && !(typeof Laser !== 'undefined' && bullet instanceof Laser)) {
                 bullet.active = false;
                 createExplosion(bullet.x, bullet.y, '#555555');
             }

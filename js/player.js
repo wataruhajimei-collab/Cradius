@@ -49,8 +49,24 @@ class Player {
         // 位置の履歴を記録（オプション用）
         // プレイヤーが移動した時のみ履歴を追加することで、停止時にオプションが自機に重ならないようにする
         if (this.history.length === 0 || this.history[0].x !== this.x || this.history[0].y !== this.y) {
+            // 万一座標が大きく飛んだ場合もワープに見えないよう補間履歴を挿入
+            if (this.history.length > 0) {
+                const dx = this.x - this.history[0].x;
+                const dy = this.y - this.history[0].y;
+                const dist = Math.hypot(dx, dy);
+                if (dist > this.speed * 2.5) {
+                    const steps = Math.min(30, Math.ceil(dist / Math.max(3, this.speed)));
+                    for (let s = 1; s < steps; s++) {
+                        const ratio = s / steps;
+                        this.history.unshift({
+                            x: this.history[0].x + dx * ratio,
+                            y: this.history[0].y + dy * ratio
+                        });
+                    }
+                }
+            }
             this.history.unshift({ x: this.x, y: this.y });
-            if (this.history.length > this.historyMax) {
+            while (this.history.length > this.historyMax) {
                 this.history.pop();
             }
         }
@@ -61,9 +77,9 @@ class Player {
         // ショット（Zキー）
         if (Input.isDown('KeyZ')) {
             const now = Date.now();
-            // レーザー時は画面内のレーザーが出切るまで待機し、出切った瞬間に次弾発射可能（判定間隔50ms）
+            // レーザー時は近くの敵に当たっても連射・乱れが起きないよう一定間隔（360ms）を保証
             // 通常弾/DOUBLEは標準の shotDelay (200ms)
-            const currentDelay = this.weaponType === 'LASER' ? 50 : this.shotDelay;
+            const currentDelay = this.weaponType === 'LASER' ? 360 : this.shotDelay;
             if (now - this.lastShotTime > currentDelay) {
                 if (this.shoot()) {
                     this.lastShotTime = now;

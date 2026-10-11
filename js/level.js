@@ -507,10 +507,7 @@ class LevelManager {
                 }
             } else if (this.state === 'STAGE_CLEAR') {
                 this.stageClearTimer += dt;
-                // 自機を前進加速させてステージクリア演出
-                if (typeof player !== 'undefined') {
-                    player.x += 3.5;
-                }
+                // 本家グラディウス同様、自機を右端に押し付けずプレイヤーの自由操作を維持したまま次ステージへ遷移
                 // 約3秒後にステージ2（ストーンヘンジ面）へ突入
                 if (this.stageClearTimer > 3000) {
                     this.startStage2();
@@ -562,10 +559,7 @@ class LevelManager {
             window.enemies = enemies;
         }
 
-        if (typeof player !== 'undefined') {
-            player.x = 80;
-            player.y = this.starfield.height / 2 - 10;
-        }
+        // 自機とオプションの現在位置・軌跡をそのまま維持し、ワープ現象を防止
 
         if (typeof StonehengeStage !== 'undefined') {
             stonehengeStage = new StonehengeStage(this.starfield.width, this.starfield.height);
@@ -593,10 +587,8 @@ class LevelManager {
         if (typeof enemies !== 'undefined') enemies.length = 0;
         if (typeof enemyBullets !== 'undefined') enemyBullets.length = 0;
 
-        // 自機を画面左から颯爽と登場させる
+        // 自機とオプションの現在位置・軌跡をそのまま維持し、ワープ現象を防止
         if (typeof player !== 'undefined') {
-            player.x = 80;
-            player.y = this.starfield.height / 2 - 10;
             if (typeof player.vx !== 'undefined') player.vx = 0;
             if (typeof player.vy !== 'undefined') player.vy = 0;
         }

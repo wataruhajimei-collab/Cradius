@@ -118,14 +118,17 @@ class Laser {
         this.offsetY = offsetY;
         this.x = x;
         this.y = owner.y + offsetY;
-        this.width = 5000; // ユーザー要望により長さを2倍（2500 -> 5000）に延長
+        this.width = 5000; // 長い貫通レーザー
         this.height = 3; // 極細シャープなグラディウスレーザー
         this.speedX = speedX;
         this.color = color;
         this.active = true;
+        this.framesAlive = 0;
+        this.minFrames = 22; // 近くの敵に当たっても発射間隔が乱れないよう一定フレーム維持
     }
 
     update(canvasHeight) {
+        this.framesAlive++;
         this.x += this.speedX;
         // 常に発射元（自機またはオプション）のY座標にリアルタイム追従
         this.y = this.owner.y + this.offsetY;
@@ -193,45 +196,53 @@ class EnemyLaser extends Bullet {
     }
 }
 
-// 古代イオンリング弾 (RingBullet: ストーンアイ・モアイが放つリング光弾)
+// 古代イオンリング弾 (RingBullet: モアイが放つ本家グラディウス風の大きな丸いリング光弾)
 class RingBullet extends Bullet {
     constructor(x, y, speedX, speedY, color = '#38bdf8') {
-        super(x - 8, y - 8, speedX, speedY, color, true);
-        this.radius = 8;
-        this.width = 16;
-        this.height = 16;
+        super(x - 16, y - 16, speedX, speedY, color, true);
+        this.radius = 16; // 本家グラディウス風の大きめな丸いリング（半径16px＝直径32px）
+        this.width = 32;
+        this.height = 32;
         this.color = color;
-        this.pulse = 0;
+        this.pulse = Math.random() * Math.PI * 2;
     }
 
     update(canvasHeight) {
         super.update(canvasHeight);
-        this.pulse += 0.15;
+        this.pulse += 0.22;
     }
 
     draw(ctx) {
         ctx.save();
         const cx = this.x + this.width / 2;
         const cy = this.y + this.height / 2;
-        const r = this.radius + Math.sin(this.pulse) * 1.5;
+        const r = this.radius + Math.sin(this.pulse) * 2.0;
 
         ctx.shadowColor = this.color;
-        ctx.shadowBlur = 10;
+        ctx.shadowBlur = 12;
 
-        // 外周リング
+        // 外周の太いプラズマリング
         ctx.strokeStyle = this.color;
-        ctx.lineWidth = 3;
+        ctx.lineWidth = 5.0;
         ctx.beginPath();
         ctx.arc(cx, cy, r, 0, Math.PI * 2);
         ctx.stroke();
 
-        // 内周ホワイトリング
+        // 中間の高輝度ホワイト・シアンリング
         ctx.strokeStyle = '#ffffff';
-        ctx.lineWidth = 1.5;
+        ctx.lineWidth = 2.5;
         ctx.beginPath();
-        ctx.arc(cx, cy, r * 0.65, 0, Math.PI * 2);
+        ctx.arc(cx, cy, r * 0.82, 0, Math.PI * 2);
+        ctx.stroke();
+
+        // 内周の淡いエネルギー輪郭
+        ctx.strokeStyle = 'rgba(180, 245, 255, 0.7)';
+        ctx.lineWidth = 1.8;
+        ctx.beginPath();
+        ctx.arc(cx, cy, r * 0.55, 0, Math.PI * 2);
         ctx.stroke();
 
         ctx.restore();
     }
 }
+

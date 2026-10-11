@@ -9,16 +9,123 @@
 // ==========================================
 
 class StoneBlock {
-    constructor(x, y, width = 40, height = 40, isDestructible = true) {
+    constructor(x, y, width = 20, height = 20, isDestructible = true) {
         this.x = x;
         this.y = y;
         this.width = width;
         this.height = height;
         this.isDestructible = isDestructible;
-        this.maxHp = isDestructible ? 2 : Infinity;
+        this.maxHp = isDestructible ? 1 : Infinity;
         this.hp = this.maxHp;
         this.active = true;
         this.flashTimer = 0;
+        // 粒ごとの微細なランダムオフセットとサイズ変化（自然な粒状感）
+        this.jx = ((Math.abs(Math.sin(x * 0.13 + y * 0.29))) - 0.5) * 2.2;
+        this.jy = ((Math.abs(Math.cos(x * 0.19 + y * 0.11))) - 0.5) * 2.2;
+        this.variant = Math.floor(Math.abs(Math.sin(x * 0.37 + y * 0.53)) * 3);
+    }
+
+    static _initSprites() {
+        if (StoneBlock._spritesReady) return;
+        StoneBlock._spritesReady = true;
+
+        // 1. 壊れる石（小さい丸い粒のような石: 20x20）のプリレンダリングキャッシュ（3バリエーション）
+        StoneBlock._pebbleCanvases = [];
+        for (let v = 0; v < 3; v++) {
+            const c = document.createElement('canvas');
+            c.width = 24;
+            c.height = 24;
+            const g = c.getContext('2d');
+            const cx = 12;
+            const cy = 12;
+            const r = 8.2 - (v * 0.4);
+
+            // 小さな副粒（本家グラディウスの粒状感を演出する小コブ）
+            const subAngle = v * 2.1 + 0.6;
+            const sx = cx + Math.cos(subAngle) * 5.2;
+            const sy = cy + Math.sin(subAngle) * 4.8;
+            g.fillStyle = '#6e2518';
+            g.beginPath();
+            g.arc(sx, sy, 4.2, 0, Math.PI * 2);
+            g.fill();
+            g.strokeStyle = '#2b0b05';
+            g.lineWidth = 1.2;
+            g.stroke();
+
+            // メインの丸い石粒（球体陰影グラデーション）
+            const grad = g.createRadialGradient(cx - 2.5, cy - 2.5, 1.0, cx, cy, r);
+            grad.addColorStop(0.0, '#ffb094'); // ハイライト
+            grad.addColorStop(0.30, '#e2684e'); // 赤茶テラコッタ
+            grad.addColorStop(0.70, '#a83823'); // 深い赤褐色
+            grad.addColorStop(1.0, '#3d1109');  // 輪郭シャドウ
+
+            g.fillStyle = grad;
+            g.beginPath();
+            g.arc(cx, cy, r, 0, Math.PI * 2);
+            g.fill();
+
+            g.strokeStyle = '#290a05';
+            g.lineWidth = 1.3;
+            g.stroke();
+
+            // 粒の光沢ドット
+            g.fillStyle = 'rgba(255, 235, 220, 0.85)';
+            g.beginPath();
+            g.arc(cx - 2.6, cy - 2.6, 1.8, 0, Math.PI * 2);
+            g.fill();
+
+            StoneBlock._pebbleCanvases.push(c);
+        }
+
+        // 2. 壊れない岩（本家グラディウス風の「薄くて丸みを帯びた平石スラブ」: 幅46 x 厚さ19）のキャッシュ
+        const slabC = document.createElement('canvas');
+        slabC.width = 48;
+        slabC.height = 22;
+        const sg = slabC.getContext('2d');
+        const sw = 44;
+        const sh = 17;
+        const sx0 = 2;
+        const sy0 = 2.5;
+        const sr = sh / 2; // 両端が完全に丸みを帯びたカプセル・平石形状
+
+        sg.beginPath();
+        sg.arc(sx0 + sr, sy0 + sr, sr, Math.PI * 0.5, Math.PI * 1.5);
+        sg.lineTo(sx0 + sw - sr, sy0);
+        sg.arc(sx0 + sw - sr, sy0 + sr, sr, Math.PI * 1.5, Math.PI * 0.5);
+        sg.lineTo(sx0 + sr, sy0 + sh);
+        sg.closePath();
+
+        // 立体的な薄石グラデーション（上端ハイライト〜スレートグレー〜下端の深い影）
+        const sGrad = sg.createLinearGradient(0, sy0, 0, sy0 + sh);
+        sGrad.addColorStop(0.0, '#cbd5e1');
+        sGrad.addColorStop(0.22, '#94a3b8');
+        sGrad.addColorStop(0.55, '#64748b');
+        sGrad.addColorStop(0.85, '#334155');
+        sGrad.addColorStop(1.0, '#0f172a');
+        sg.fillStyle = sGrad;
+        sg.fill();
+
+        sg.strokeStyle = '#090d16';
+        sg.lineWidth = 1.6;
+        sg.stroke();
+
+        // 丸みを帯びた上縁の石肌ハイライト曲線
+        sg.strokeStyle = 'rgba(248, 250, 252, 0.55)';
+        sg.lineWidth = 1.3;
+        sg.beginPath();
+        sg.moveTo(sx0 + sr, sy0 + 2.2);
+        sg.lineTo(sx0 + sw - sr, sy0 + 2.2);
+        sg.stroke();
+
+        // 石スラブ表面の横方向の層・くぼみディテール
+        sg.strokeStyle = 'rgba(15, 23, 42, 0.45)';
+        sg.lineWidth = 1.1;
+        sg.beginPath();
+        sg.moveTo(sx0 + sr + 3, sy0 + sh * 0.58);
+        sg.lineTo(sx0 + sw - sr - 4, sy0 + sh * 0.58);
+        sg.stroke();
+
+        StoneBlock._slabCanvas = slabC;
     }
 
     update(scrollSpeed) {
@@ -31,22 +138,21 @@ class StoneBlock {
 
     hit(damage = 1) {
         if (!this.isDestructible) {
-            // 破壊不能石柱: 火花が散る
             return false;
         }
 
         this.hp -= damage;
-        this.flashTimer = 5;
+        this.flashTimer = 4;
 
         if (this.hp <= 0) {
             this.active = false;
-            // アーケード版準拠：赤茶色の岩石破片が飛び散るエフェクト
+            // 小さい石粒が砕け散るエフェクト
             if (typeof Particle !== 'undefined' && typeof particles !== 'undefined') {
-                for (let i = 0; i < 9; i++) {
-                    const color = (Math.random() < 0.45) ? '#c24b38' : ((Math.random() < 0.5) ? '#e06b58' : '#7a2b1f');
+                for (let i = 0; i < 4; i++) {
+                    const color = (Math.random() < 0.5) ? '#e06b58' : '#943828';
                     particles.push(new Particle(
-                        this.x + this.width / 2 + (Math.random() - 0.5) * 20,
-                        this.y + this.height / 2 + (Math.random() - 0.5) * 20,
+                        this.x + this.width / 2 + (Math.random() - 0.5) * 10,
+                        this.y + this.height / 2 + (Math.random() - 0.5) * 10,
                         color
                     ));
                 }
@@ -54,116 +160,31 @@ class StoneBlock {
             if (typeof Sound !== 'undefined' && typeof Sound.playExplosion === 'function') {
                 Sound.playExplosion();
             }
-            return true; // 破壊完了
+            return true;
         }
         return false;
     }
 
     draw(ctx) {
         if (!this.active) return;
-        ctx.save();
-
-        const isFlashing = this.flashTimer > 0;
+        StoneBlock._initSprites();
 
         if (this.isDestructible) {
-            // --- アーケード版再現：赤茶色・丸みを帯びた細胞状の石ブロック ---
-            const r = 6; // 丸みを持たせた角
-            const bx = this.x + 1;
-            const by = this.y + 1;
-            const bw = this.width - 2;
-            const bh = this.height - 2;
-
-            ctx.beginPath();
-            ctx.moveTo(bx + r, by);
-            ctx.lineTo(bx + bw - r, by);
-            ctx.quadraticCurveTo(bx + bw, by, bx + bw, by + r);
-            ctx.lineTo(bx + bw, by + bh - r);
-            ctx.quadraticCurveTo(bx + bw, by + bh, bx + bw - r, by + bh);
-            ctx.lineTo(bx + r, by + bh);
-            ctx.quadraticCurveTo(bx, by + bh, bx, by + bh - r);
-            ctx.lineTo(bx, by + r);
-            ctx.quadraticCurveTo(bx, by, bx + r, by);
-            ctx.closePath();
-
-            const grad = ctx.createRadialGradient(bx + bw * 0.35, by + bh * 0.35, 2, bx + bw * 0.5, by + bh * 0.5, bw * 0.65);
-            if (isFlashing) {
-                grad.addColorStop(0.0, '#ffffff');
-                grad.addColorStop(0.5, '#ffbbbb');
-                grad.addColorStop(1.0, '#ffffff');
-            } else {
-                const hpRatio = this.hp / this.maxHp;
-                if (hpRatio > 0.5) {
-                    grad.addColorStop(0.0, '#e06b58'); // 赤茶色ハイライト
-                    grad.addColorStop(0.45, '#c24b38'); // テラコッタレッド
-                    grad.addColorStop(0.85, '#943828');
-                    grad.addColorStop(1.0, '#662418');  // 深い影
-                } else {
-                    grad.addColorStop(0.0, '#c75645'); // ひび割れ被弾色
-                    grad.addColorStop(0.5, '#a63d2e');
-                    grad.addColorStop(1.0, '#4a170f');
-                }
-            }
-            ctx.fillStyle = grad;
-            ctx.fill();
-
-            // 外枠エッジ
-            ctx.strokeStyle = isFlashing ? '#ffffff' : '#3d140e';
-            ctx.lineWidth = 1.6;
-            ctx.stroke();
-
-            // 細胞状ストーンの立体ハイライトライン
-            ctx.strokeStyle = 'rgba(255, 220, 200, 0.4)';
-            ctx.lineWidth = 1.2;
-            ctx.beginPath();
-            ctx.arc(bx + bw * 0.38, by + bh * 0.35, bw * 0.22, Math.PI * 0.8, Math.PI * 1.8);
-            ctx.stroke();
-
-            // クラック（ひび割れ模様：耐久力減少時）
-            if (this.hp <= 1) {
-                ctx.strokeStyle = isFlashing ? '#ffffff' : 'rgba(30, 8, 4, 0.8)';
-                ctx.lineWidth = 1.2;
-                ctx.beginPath();
-                ctx.moveTo(bx + 8, by + 12);
-                ctx.lineTo(bx + 20, by + 24);
-                ctx.lineTo(bx + 32, by + 18);
-                ctx.moveTo(bx + 20, by + 24);
-                ctx.lineTo(bx + 16, by + 34);
-                ctx.stroke();
-            }
-
+            // --- 壊れる石: 小さい丸い粒のような石 ---
+            const sprite = StoneBlock._pebbleCanvases[this.variant];
+            ctx.drawImage(sprite, this.x - 2 + this.jx, this.y - 2 + this.jy);
         } else {
-            // --- 破壊不能な古代巨石柱（スレートグレーのストーンヘンジモノリス） ---
-            const grad = ctx.createLinearGradient(this.x, this.y, this.x + this.width, this.y + this.height);
-            grad.addColorStop(0.0, '#64748b'); // スレートグレー
-            grad.addColorStop(0.35, '#475569');
-            grad.addColorStop(0.75, '#334155');
-            grad.addColorStop(1.0, '#1e293b'); // 玄武岩
-            ctx.fillStyle = grad;
-            ctx.fillRect(this.x, this.y, this.width, this.height);
-
-            ctx.strokeStyle = '#0f172a';
-            ctx.lineWidth = 2;
-            ctx.strokeRect(this.x, this.y, this.width, this.height);
-
-            // 切り石のエッジハイライト
-            ctx.strokeStyle = 'rgba(255, 255, 255, 0.25)';
-            ctx.lineWidth = 1;
-            ctx.beginPath();
-            ctx.moveTo(this.x + 1, this.y + this.height - 1);
-            ctx.lineTo(this.x + 1, this.y + 1);
-            ctx.lineTo(this.x + this.width - 1, this.y + 1);
-            ctx.stroke();
-
-            // 古代の石柱刻印ライン
-            ctx.strokeStyle = 'rgba(56, 189, 248, 0.3)';
-            ctx.lineWidth = 1.2;
-            ctx.beginPath();
-            ctx.moveTo(this.x + this.width / 2, this.y + 6);
-            ctx.lineTo(this.x + this.width / 2, this.y + this.height - 6);
-            ctx.stroke();
+            // --- 壊れない岩: 本家グラディウス風の薄くて丸みを帯びた平石（2段積層または単層） ---
+            const slab = StoneBlock._slabCanvas;
+            if (this.height >= 36) {
+                // 40px高の枠内に薄い丸石スラブを2段重ねて描画（少しずつ互い違いにして自然な巨石積みに）
+                const offsetTop = ((Math.floor(this.y / 40) % 2) === 0) ? -2 : 1;
+                ctx.drawImage(slab, this.x - 4 + offsetTop, this.y - 1);
+                ctx.drawImage(slab, this.x - 4 - offsetTop, this.y + 19);
+            } else {
+                ctx.drawImage(slab, this.x - 4, this.y - 1);
+            }
         }
-
-        ctx.restore();
     }
 }
 
@@ -338,11 +359,9 @@ class StonehengeStage {
             }
 
         } else if (this.state === 'STAGE_CLEAR' || this.state === 'ALL_CLEAR') {
-            // --- フェーズ6: ステージクリア＆3面ワープ ---
+            // --- フェーズ6: ステージクリア＆3面遷移 ---
             this.stageClearTimer += dt;
-            if (typeof player !== 'undefined') {
-                player.x += 4.2; // 自機が右へ疾走離脱
-            }
+            // 自機を右端に押し付けず、現在の位置・操作を維持
             if (this.stageClearTimer > 3500) {
                 this.active = false;
                 if (typeof levelManager !== 'undefined' && typeof levelManager.startStage3 === 'function') {
@@ -397,21 +416,31 @@ class StonehengeStage {
         }
     }
 
+    // 小さい丸い石粒（20x20）を40x40セル内に2x2で配置するヘルパー
+    _spawnPebbleCluster(colX, rowY) {
+        const sub = 20;
+        for (let dy = 0; dy < 40; dy += sub) {
+            for (let dx = 0; dx < 40; dx += sub) {
+                this.blocks.push(new StoneBlock(colX + dx, rowY + dy, sub, sub, true));
+            }
+        }
+    }
+
     // =========================================================================
     // ストーンヘンジ面 レイアウト生成
-    // 原作アーケード版準拠：赤丸掘削ブロック＋巨石柱＋砲台＋ハッチ＋ダッカー
+    // 原作アーケード版準拠：小さい丸い粒の壊れる石＋薄くて丸みを帯びた壊れない平石
     // =========================================================================
     generateColumn(colX) {
         const totalRows = Math.floor(this.height / this.columnWidth); // 600 / 40 = 15行 (r = 0〜14)
         const colIndex = this.totalColumnsGenerated++;
 
-        // 1. 最外郭境界: 天井（行0）と地面（行14）は古代巨石モノリス
-        this.blocks.push(new StoneBlock(colX, 0, this.columnWidth, this.columnWidth, false));
-        this.blocks.push(new StoneBlock(colX, (totalRows - 1) * this.columnWidth, this.columnWidth, this.columnWidth, false));
+        // 1. 最外郭境界: 天井（行0）と地面（行14）は薄くて丸みを帯びた平石スラブ
+        this.blocks.push(new StoneBlock(colX, 0, this.columnWidth, 20, false));
+        this.blocks.push(new StoneBlock(colX, this.height - 20, this.columnWidth, 20, false));
 
         // 2. 36列周期の古代遺跡迷路パターン
         const phase = colIndex % 36;
-        let indestructibleRows = []; // 壊れない石柱の行番号
+        let indestructibleRows = []; // 壊れない薄石スラブの行番号
         let enemySpawns = []; // { row, isCeil, type }
 
         // --- ゾーン1: 天井・床の巨石ピラー (phase: 1〜7) ---
@@ -480,7 +509,7 @@ class StonehengeStage {
             enemySpawns.push({ row: 7, isCeil: false, type: 'HATCHER' }); // ★ハッチ基地！
         }
 
-        // 3. 壊れない石（古代モノリスブロック）の配置
+        // 3. 壊れない岩（薄くて丸みを帯びた平石スラブ）の配置
         indestructibleRows.forEach(r => {
             this.blocks.push(new StoneBlock(colX, r * this.columnWidth, this.columnWidth, this.columnWidth, false));
         });
@@ -502,8 +531,7 @@ class StonehengeStage {
             });
         }
 
-        // 5. 破壊できる石（赤丸掘削ブロック）の充填
-        // 安全な開口トンネル（幅3ブロック）は緩やかなS字サイン波で必ず確保し、掘削の快感と回避を両立！
+        // 5. 破壊できる石（小さい丸い粒のような石）の充填
         const waveCenter = Math.round(7 + Math.sin(colIndex * 0.22) * 3.2); // r: 4〜10
         const isTunnelRow = (r) => (r >= waveCenter - 1 && r <= waveCenter + 1);
 
@@ -512,13 +540,12 @@ class StonehengeStage {
 
             // トンネル部分は空間をあける
             if (isTunnelRow(r)) {
-                // ごく稀に単独の掘削ブロックを配置してアクセント
                 if (Math.random() < 0.08) {
-                    this.blocks.push(new StoneBlock(colX, r * this.columnWidth, this.columnWidth, this.columnWidth, true));
+                    this._spawnPebbleCluster(colX, r * this.columnWidth);
                 }
             } else {
-                // トンネル外は赤丸掘削ブロックで密集充填！
-                this.blocks.push(new StoneBlock(colX, r * this.columnWidth, this.columnWidth, this.columnWidth, true));
+                // トンネル外は小さい丸い石粒で密集充填！
+                this._spawnPebbleCluster(colX, r * this.columnWidth);
             }
         }
     }
@@ -529,31 +556,38 @@ class StonehengeStage {
 
         playerBullets.forEach(bullet => {
             if (!bullet.active) return;
+            const isLaser = (typeof Laser !== 'undefined' && bullet instanceof Laser);
+            const isMissile = (typeof Missile !== 'undefined' && bullet instanceof Missile);
+            let laserHits = 0;
 
             for (let i = 0; i < this.blocks.length; i++) {
                 const b = this.blocks[i];
                 if (!b.active) continue;
 
+                // 小さい石粒を掘りやすいよう上下判定を少し広げる
+                const padY = b.isDestructible ? 3 : 0;
                 if (
                     bullet.x < b.x + b.width &&
                     bullet.x + bullet.width > b.x &&
-                    bullet.y < b.y + b.height &&
-                    bullet.y + bullet.height > b.y
+                    bullet.y < b.y + b.height + padY &&
+                    bullet.y + bullet.height > b.y - padY
                 ) {
-                    // レーザーは石を貫通しながら複数ブロックを一度に掘削！
-                    if (typeof Laser !== 'undefined' && bullet instanceof Laser) {
-                        b.hit(2);
-                    } else if (typeof Missile !== 'undefined' && bullet instanceof Missile) {
+                    if (isLaser) {
+                        // レーザーは壊れない岩で消滅せず、壊れる石粒を次々と貫通掘削
+                        if (b.isDestructible) {
+                            b.hit(2);
+                            laserHits++;
+                            if (laserHits >= 4) break;
+                        }
+                    } else if (isMissile) {
                         bullet.active = false;
                         b.hit(2);
+                        break;
                     } else {
                         bullet.active = false;
                         b.hit(1);
+                        break;
                     }
-                    if (typeof Sound !== 'undefined' && typeof Sound.playBossHit === 'function') {
-                        Sound.playBossHit();
-                    }
-                    break;
                 }
             }
         });

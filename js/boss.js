@@ -178,9 +178,11 @@ class Boss {
 
         // 3. 上下ハル（無敵装甲アーム）への弾かれ判定
         if (checkCollision(bullet, topHull) || checkCollision(bullet, bottomHull)) {
-            bullet.active = false;
-            createExplosion(bullet.x, bullet.y, '#667788');
-            if (typeof Sound !== 'undefined') Sound.playBossHit();
+            if (!(bullet instanceof Laser)) {
+                bullet.active = false;
+                createExplosion(bullet.x, bullet.y, '#667788');
+                if (typeof Sound !== 'undefined') Sound.playBossHit();
+            }
             return;
         }
     }
@@ -725,9 +727,11 @@ class GolemBoss {
 
         for (const armor of armorParts) {
             if (checkCollision(bullet, armor)) {
-                bullet.active = false;
-                createExplosion(bullet.x, bullet.y, '#556677');
-                if (typeof Sound !== 'undefined') Sound.playBossHit();
+                if (!(bullet instanceof Laser)) {
+                    bullet.active = false;
+                    createExplosion(bullet.x, bullet.y, '#556677');
+                    if (typeof Sound !== 'undefined') Sound.playBossHit();
+                }
                 return;
             }
         }
