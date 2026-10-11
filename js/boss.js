@@ -523,6 +523,18 @@ class GolemBoss {
         this.hitFlashTimer2 = 0;
         this.shieldFlashTimer1 = 0;
         this.shieldFlashTimer2 = 0;
+        this.hasTentacles = true;
+        this.isScreaming = false;
+        this.screamText = '';
+    }
+
+    triggerDeathScream() {
+        if (this.isScreaming) return;
+        this.isScreaming = true;
+        this.screamText = 'ウワーーーー！';
+        if (typeof Sound !== 'undefined' && typeof Sound.playBossScream === 'function') {
+            Sound.playBossScream();
+        }
     }
 
     _syncLegacyTestState() {
@@ -602,7 +614,7 @@ class GolemBoss {
             this.shootRings();
         }
 
-        // 攻撃2: 多関節メカニカル触手先端クローからの自機狙い高速レーザー＆エネルギー弾連射
+        // 攻撃2: 多関節メカニカル触手先端クローからの自機狙い＆後方同時高速レーザー連射
         this.tentacleFireTimer++;
         if (this.tentacleFireTimer > (isEnraged ? 48 : 65)) {
             this.tentacleFireTimer = 0;
@@ -658,15 +670,25 @@ class GolemBoss {
         const LaserClass = (typeof EnemyLaser !== 'undefined') ? EnemyLaser : Bullet;
 
         [topTip, botTip].forEach((tip, idx) => {
-            let dx = targetX - tip.x;
-            let dy = targetY - tip.y;
-            if (dx > -40) dx = -160;
+            const dx = targetX - tip.x;
+            const dy = targetY - tip.y;
             const dist = Math.sqrt(dx * dx + dy * dy) || 1;
             const spd = 6.8;
             const vx = (dx / dist) * spd;
             const vy = (dy / dist) * spd;
             const color = (idx === 0) ? '#00ffee' : '#ffaa00';
+
+            // 1. 自機狙いレーザー（自機が後ろに回り込んだ場合も制限なく後方へ撃つ！）
             this.bullets.push(new LaserClass(tip.x, tip.y, vx, vy, color));
+
+            // 2. 後方（右方向・逆方向）へも同時に触手レーザーを発射！
+            const rearVx = vx < 0 ? -vx : Math.abs(spd * 0.95);
+            const rearVy = vx < 0 ? -vy : vy * 0.5;
+            this.bullets.push(new LaserClass(tip.x, tip.y, rearVx, rearVy, color));
+            if (vx >= 0) {
+                // 自機が後方にいる場合も前方（左方向）へ同時発射して前後両方向をカバー
+                this.bullets.push(new LaserClass(tip.x, tip.y, -Math.abs(vx || spd), vy, color));
+            }
         });
 
         if (typeof Sound !== 'undefined' && typeof Sound.playLaser === 'function') {
@@ -743,6 +765,7 @@ class GolemBoss {
             }
         }
         this.hp = Math.max(0, this.core1Hp) + Math.max(0, this.core2Hp);
+        this.checkDefeat();
     }
 
     handleBulletCollision(bullet) {
@@ -876,8 +899,11 @@ class GolemBoss {
 
     checkDefeat() {
         if (this.core1Hp <= 0 && this.core2Hp <= 0 && !this.isDying) {
+            this.triggerDeathScream();
             if (typeof triggerBossDefeatExplosion === 'function') {
                 triggerBossDefeatExplosion(this);
+            } else {
+                this.isDying = true;
             }
         }
     }
@@ -981,6 +1007,24 @@ class GolemBoss {
 
         // --- 6. 旋回する浮遊モノリス結界石とルーン稲妻 ---
         this._drawOrbitingMonoliths(ctx, bx + 62, by + bh / 2);
+
+        // 撃破時の大声断末魔シャウト演出（「ウワーーーー！」）
+        if (this.isDying || this.isScreaming) {
+            ctx.save();
+            const sx = bx + bw / 2 + (Math.random() - 0.5) * 16;
+            const sy = Math.max(60, by - 24) + (Math.random() - 0.5) * 16;
+            ctx.font = '900 42px "Impact", "Arial Black", sans-serif';
+            ctx.textAlign = 'center';
+            ctx.shadowColor = '#ff0000';
+            ctx.shadowBlur = 22;
+            ctx.strokeStyle = '#ffffff';
+            ctx.lineWidth = 6;
+            const txt = this.screamText || 'ウワーーーー！';
+            ctx.strokeText(txt, sx, sy);
+            ctx.fillStyle = '#ff2200';
+            ctx.fillText(txt, sx, sy);
+            ctx.restore();
+        }
 
         ctx.restore();
 
@@ -1224,6 +1268,33 @@ class BigCoreBoss {
         this.organPulse = 0;
         this.jawOpen = 0;
         this.bullets = [];
+
+        // 3面ボスの触手は太さと長さを3倍に設定
+        this.hasTentacles = true;
+        this.tentacleLengthScale = 3;
+        this.tentacleThicknessScale = 3;
+        this.isScreaming = false;
+        this.screamText = '';
+    }
+
+    triggerDeathScream() {
+        if (this.isScreaming) return;
+        this.isScreaming = true;
+        this.screamText = 'ウワーーーー！';
+        if (typeof Sound !== 'undefined' && typeof Sound.playBossScream === 'function') {
+            Sound.playBossScream();
+        }
+    }
+
+    checkDefeat() {
+        if (this.hp <= 0 && !this.isDying) {
+            this.triggerDeathScream();
+            if (typeof triggerBossDefeatExplosion === 'function') {
+                triggerBossDefeatExplosion(this);
+            } else {
+                this.isDying = true;
+            }
+        }
     }
 
     get allShieldsDestroyed() {
@@ -1234,15 +1305,17 @@ class BigCoreBoss {
         return this.allShieldsDestroyed;
     }
 
-    // 4本のうねる機械触手＆生体触手（外側2本＝重装甲メカニカル触手、内側2本＝脈動する生体血管触手）
+    // 4本のうねる機械触手＆生体触手（太さ3倍・長さ3倍の超巨大触手！）
     _getBioMechaTentacles() {
         const cx = this.x;
         const cy = this.y;
+        const lenScale = this.tentacleLengthScale || 3;
+        const thickScale = this.tentacleThicknessScale || 3;
         const configs = [
-            { ox: -15, oy: -82, sign: -1, isBio: false, phase: 0.0, len: 21 },
-            { ox: 20,  oy: -58, sign: -1, isBio: true,  phase: 1.6, len: 19 },
-            { ox: 20,  oy: 58,  sign: 1,  isBio: true,  phase: 3.1, len: 19 },
-            { ox: -15, oy: 82,  sign: 1,  isBio: false, phase: 4.7, len: 21 }
+            { ox: -15, oy: -82, sign: -1, isBio: false, phase: 0.0, baseLen: 21, len: 21 * lenScale },
+            { ox: 20,  oy: -58, sign: -1, isBio: true,  phase: 1.6, baseLen: 19, len: 19 * lenScale },
+            { ox: 20,  oy: 58,  sign: 1,  isBio: true,  phase: 3.1, baseLen: 19, len: 19 * lenScale },
+            { ox: -15, oy: 82,  sign: 1,  isBio: false, phase: 4.7, baseLen: 21, len: 21 * lenScale }
         ];
         const speedMult = this.coreOpen ? 1.55 : 1.0;
 
@@ -1250,7 +1323,7 @@ class BigCoreBoss {
             const nodes = [];
             let nx = cx + cfg.ox;
             let ny = cy + cfg.oy;
-            nodes.push({ x: nx, y: ny, angle: Math.PI });
+            nodes.push({ x: nx, y: ny, angle: Math.PI, radius: 15 * thickScale });
             const segs = 9;
             for (let i = 1; i <= segs; i++) {
                 const t = i / segs;
@@ -1258,9 +1331,19 @@ class BigCoreBoss {
                 const ang = Math.PI + cfg.sign * (0.42 - t * 0.55) + whip;
                 nx += Math.cos(ang) * cfg.len;
                 ny += Math.sin(ang) * cfg.len;
-                nodes.push({ x: nx, y: ny, angle: ang });
+                const r = Math.max(6, 15 - i * 1.0) * thickScale;
+                nodes.push({ x: nx, y: ny, angle: ang, radius: r });
             }
-            return { isBio: cfg.isBio, sign: cfg.sign, nodes };
+            return {
+                isBio: cfg.isBio,
+                sign: cfg.sign,
+                baseLen: cfg.baseLen,
+                len: cfg.len,
+                lengthScale: lenScale,
+                thicknessScale: thickScale,
+                lineWidth: (cfg.isBio ? 8 : 6) * thickScale,
+                nodes
+            };
         });
     }
 
@@ -1294,7 +1377,7 @@ class BigCoreBoss {
             this.shoot();
         }
 
-        // 武器2: 4本の機械＆生体触手からの自機狙いニードルレーザー＆生体胞子弾幕
+        // 武器2: 4本の超巨大機械＆生体触手からの自機狙い＆後方同時ニードルレーザー＆生体胞子弾幕
         this.tentacleTimer++;
         const tentacleInterval = this.coreOpen ? 46 : 68;
         if (this.tentacleTimer >= tentacleInterval) {
@@ -1337,24 +1420,35 @@ class BigCoreBoss {
 
         tentacles.forEach((t, idx) => {
             const tip = t.nodes[t.nodes.length - 1];
-            let dx = targetX - tip.x;
-            let dy = targetY - tip.y;
-            if (dx > -30) dx = -150;
+            const dx = targetX - tip.x;
+            const dy = targetY - tip.y;
             const dist = Math.sqrt(dx * dx + dy * dy) || 1;
             const spd = this.coreOpen ? 7.2 : 6.0;
             const vx = (dx / dist) * spd;
             const vy = (dy / dist) * spd;
+            const rearVx = vx < 0 ? -vx : Math.abs(spd * 0.95);
+            const rearVy = vx < 0 ? -vy : vy * 0.5;
 
             if (t.isBio) {
-                // 生体触手先端からは赤紫の高速バイオレーザー＋上下拡散弾
+                // 生体触手先端からは赤紫の高速バイオレーザー＋上下拡散弾（前方・自機狙い＆後方へ同時発射！）
                 this.bullets.push(new LaserClass(tip.x, tip.y, vx, vy, '#ff2266'));
+                this.bullets.push(new LaserClass(tip.x, tip.y, rearVx, rearVy, '#ff2266'));
+                if (vx >= 0) {
+                    this.bullets.push(new LaserClass(tip.x, tip.y, -Math.abs(vx || spd), vy, '#ff2266'));
+                }
                 if (this.coreOpen) {
                     this.bullets.push(new ShotClass(tip.x, tip.y, vx * 0.85, vy - 1.4));
                     this.bullets.push(new ShotClass(tip.x, tip.y, vx * 0.85, vy + 1.4));
+                    this.bullets.push(new ShotClass(tip.x, tip.y, rearVx * 0.85, rearVy - 1.4));
+                    this.bullets.push(new ShotClass(tip.x, tip.y, rearVx * 0.85, rearVy + 1.4));
                 }
             } else {
-                // 機械触手先端からはシアンレーザー
+                // 機械触手先端からはシアンレーザー（前方・自機狙い＆後方へ同時発射！）
                 this.bullets.push(new LaserClass(tip.x, tip.y, vx, vy, '#00ffee'));
+                this.bullets.push(new LaserClass(tip.x, tip.y, rearVx, rearVy, '#00ffee'));
+                if (vx >= 0) {
+                    this.bullets.push(new LaserClass(tip.x, tip.y, -Math.abs(vx || spd), vy, '#00ffee'));
+                }
             }
         });
     }
@@ -1418,6 +1512,7 @@ class BigCoreBoss {
     hitCore(damage) {
         this.hitFlashTimer = 5;
         this.hp -= damage;
+        this.checkDefeat();
     }
 
     handleBulletCollision(bullet) {
@@ -1456,9 +1551,7 @@ class BigCoreBoss {
                 this.hitCore(1);
                 createExplosion(bullet.x, bullet.y, '#ff2266');
                 if (typeof Sound !== 'undefined') Sound.playBossHit();
-                if (this.hp <= 0 && typeof triggerBossDefeatExplosion === 'function') {
-                    triggerBossDefeatExplosion(this);
-                }
+                this.checkDefeat();
                 return;
             }
         }
@@ -1486,7 +1579,7 @@ class BigCoreBoss {
         const cy = this.y;
         const hw = this.width / 2;
 
-        // --- 1. 4本のうねる機械触手＆生体血管触手 ---
+        // --- 1. 4本のうねる機械触手＆生体血管触手（太さ・長さ3倍！） ---
         this._drawBioMechaTentacles(ctx);
 
         // --- 2. 巨大生体脳みそ（大脳皮質の皺）＆拍動する内臓器官・血管網 ---
@@ -1502,6 +1595,24 @@ class BigCoreBoss {
         // --- 5. 前面4つの生体臓器カプセル・シールドコア ---
         this._drawShieldCores(ctx, cy);
 
+        // 撃破時の大声断末魔シャウト演出（「ウワーーーー！」）
+        if (this.isDying || this.isScreaming) {
+            ctx.save();
+            const sx = cx + (Math.random() - 0.5) * 18;
+            const sy = Math.max(65, cy - 115) + (Math.random() - 0.5) * 18;
+            ctx.font = '900 46px "Impact", "Arial Black", sans-serif';
+            ctx.textAlign = 'center';
+            ctx.shadowColor = '#ff0044';
+            ctx.shadowBlur = 24;
+            ctx.strokeStyle = '#ffffff';
+            ctx.lineWidth = 6;
+            const txt = this.screamText || 'ウワーーーー！';
+            ctx.strokeText(txt, sx, sy);
+            ctx.fillStyle = '#ff1144';
+            ctx.fillText(txt, sx, sy);
+            ctx.restore();
+        }
+
         ctx.restore();
 
         this.bullets.forEach(b => b.draw(ctx));
@@ -1509,14 +1620,15 @@ class BigCoreBoss {
 
     _drawBioMechaTentacles(ctx) {
         const tentacles = this._getBioMechaTentacles();
+        const thickScale = this.tentacleThicknessScale || 3;
         ctx.save();
 
         tentacles.forEach(t => {
             const nodes = t.nodes;
 
-            // 生体動脈ラインまたは高圧エネルギー導管
+            // 生体動脈ラインまたは高圧エネルギー導管（太さ3倍）
             ctx.strokeStyle = t.isBio ? 'rgba(225, 29, 72, 0.7)' : 'rgba(56, 189, 248, 0.55)';
-            ctx.lineWidth = t.isBio ? 8 : 6;
+            ctx.lineWidth = (t.isBio ? 8 : 6) * thickScale;
             ctx.beginPath();
             nodes.forEach((n, idx) => {
                 if (idx === 0) ctx.moveTo(n.x, n.y);
@@ -1524,18 +1636,18 @@ class BigCoreBoss {
             });
             ctx.stroke();
 
-            // 各関節の描画
+            // 各関節の描画（太さ3倍）
             for (let i = 0; i < nodes.length; i++) {
                 const n = nodes[i];
-                const r = Math.max(6, 15 - i * 1.0);
+                const r = (n.radius !== undefined) ? n.radius : (Math.max(6, 15 - i * 1.0) * thickScale);
                 ctx.save();
                 ctx.translate(n.x, n.y);
                 ctx.rotate(n.angle);
 
                 if (t.isBio) {
-                    // 生体触手：脈動する赤紫の筋肉組織＆内臓血管節
-                    const pulseR = r + Math.sin(this.organPulse + i * 0.7) * 1.8;
-                    const bioGrad = ctx.createRadialGradient(-2, -2, 1, 0, 0, pulseR);
+                    // 生体触手：脈動する赤紫の筋肉組織＆内臓血管節（太さ3倍）
+                    const pulseR = r + Math.sin(this.organPulse + i * 0.7) * 1.8 * thickScale;
+                    const bioGrad = ctx.createRadialGradient(-2 * thickScale, -2 * thickScale, 1 * thickScale, 0, 0, pulseR);
                     bioGrad.addColorStop(0, '#fda4af');
                     bioGrad.addColorStop(0.45, '#e11d48');
                     bioGrad.addColorStop(0.85, '#881337');
@@ -1545,18 +1657,18 @@ class BigCoreBoss {
                     ctx.ellipse(0, 0, pulseR * 1.15, pulseR * 0.85, 0, 0, Math.PI * 2);
                     ctx.fill();
                     ctx.strokeStyle = '#fb7185';
-                    ctx.lineWidth = 1;
+                    ctx.lineWidth = 1 * thickScale;
                     ctx.stroke();
                 } else {
-                    // 機械触手：重厚なチタン装甲リング＆モアイ岩石節
-                    const mechGrad = ctx.createRadialGradient(-2, -2, 1, 0, 0, r);
+                    // 機械触手：重厚なチタン装甲リング＆モアイ岩石節（太さ3倍）
+                    const mechGrad = ctx.createRadialGradient(-2 * thickScale, -2 * thickScale, 1 * thickScale, 0, 0, r);
                     mechGrad.addColorStop(0, '#e2e8f0');
                     mechGrad.addColorStop(0.5, '#475569');
                     mechGrad.addColorStop(1, '#0f172a');
                     ctx.fillStyle = mechGrad;
                     ctx.fillRect(-r * 0.85, -r * 0.7, r * 1.7, r * 1.4);
                     ctx.strokeStyle = '#94a3b8';
-                    ctx.lineWidth = 1.2;
+                    ctx.lineWidth = 1.2 * thickScale;
                     ctx.strokeRect(-r * 0.85, -r * 0.7, r * 1.7, r * 1.4);
 
                     ctx.fillStyle = '#00ffee';
@@ -1565,8 +1677,10 @@ class BigCoreBoss {
                     ctx.fill();
                 }
 
-                // 触手先端のクロー／生体牙ノズル
+                // 触手先端のクロー／生体牙ノズル（太さ3倍）
                 if (i === nodes.length - 1) {
+                    ctx.save();
+                    ctx.scale(thickScale, thickScale);
                     ctx.fillStyle = t.isBio ? '#fecdd3' : '#cbd5e1';
                     ctx.beginPath();
                     ctx.moveTo(2, -6);
@@ -1588,6 +1702,7 @@ class BigCoreBoss {
                     ctx.beginPath();
                     ctx.arc(6, 0, 4.5, 0, Math.PI * 2);
                     ctx.fill();
+                    ctx.restore();
                 }
 
                 ctx.restore();

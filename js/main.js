@@ -411,6 +411,26 @@ function triggerBossDefeatExplosion(boss) {
     if (boss.isDying) return;
     boss.isDying = true;
 
+    // 触手のあるボス（2面 GolemBoss・3面 BigCoreBoss 等）を倒した時は大声で「ウワーーーー！」と叫ぶ！
+    const hasTentacles = Boolean(
+        boss.hasTentacles ||
+        (typeof GolemBoss !== 'undefined' && boss instanceof GolemBoss) ||
+        (typeof BigCoreBoss !== 'undefined' && boss instanceof BigCoreBoss) ||
+        typeof boss._getTentacleNodes === 'function' ||
+        typeof boss._getBioMechaTentacles === 'function'
+    );
+    if (hasTentacles) {
+        if (typeof boss.triggerDeathScream === 'function') {
+            boss.triggerDeathScream();
+        } else {
+            boss.isScreaming = true;
+            boss.screamText = 'ウワーーーー！';
+            if (typeof Sound !== 'undefined' && typeof Sound.playBossScream === 'function') {
+                Sound.playBossScream();
+            }
+        }
+    }
+
     // サウンド再生（重低音連続大爆発）
     if (typeof Sound !== 'undefined') Sound.playBossExplode();
 
