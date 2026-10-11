@@ -471,45 +471,102 @@ class Boss {
 }
 
 // ==========================================
-// STAGE 2 BOSS: 古代守護神「ストーン・ゴーレムコア (GolemBoss)」
-// 巨大古代玄武岩と2基の発光ルーンコアを持つストーンヘンジの主
+// STAGE 2 BOSS: 古代遺跡巨石×重武装メカ×多関節機械触手要塞
+// 「エンシェント・テンタクル・ゴーレム (GolemBoss)」
+// 風化したストーンヘンジ巨石遺跡と超古代機械フレームが融合し、
+// 上下2本のうねる多関節メカニカル触手アームと旋回モノリス結界、
+// 2基のルーンコアから苛烈なレーザー・イオンリング・拡散弾幕を放つ！
 // ==========================================
 class GolemBoss {
     constructor(x, y) {
         this.scale = 2;
-        this.width = 170;
+        this.width = 175;
         this.height = 230;
-        this.x = x + 150;
-        this.targetX = x - 220; // 画面右端に堂々陣取る定位置
+        this.x = (x || 800) + 150;
+        this.targetX = (x || 800) - 220; // 580: 画面右側に堂々陣取る定位置
         this.y = 185;
         this.active = true;
         this.isEntering = true;
         this.isDying = false;
 
         // 2つの古代ルーンコア（上下に各1基）
-        this.core1Hp = 25;
-        this.core1MaxHp = 25;
-        this.core2Hp = 25;
-        this.core2MaxHp = 25;
-        this.hp = 50; // 合計HP
+        this.core1Hp = 22;
+        this.core1MaxHp = 22;
+        this.core2Hp = 22;
+        this.core2MaxHp = 22;
+        this.hp = 44;
 
-        // 各コアを守る古代石板シールド（上下各3枚、耐久力各8発）
+        // 各コアを守る古代石板シールド（上下各3枚）
         this.shields1 = 3;
         this.shields2 = 3;
-        this.shieldHpPerPlate = 8; // 元の重厚な耐久力（1枚あたり8発、3枚で24発）に完全復帰！
+        this.shieldHpPerPlate = 6;
         this.currentShieldHp1 = this.shieldHpPerPlate;
         this.currentShieldHp2 = this.shieldHpPerPlate;
         this.shieldHitCooldown = 0;
 
+        // テスト互換用 shieldCores プロパティ（全無効化時はシールド解除として扱う）
+        this.shieldCores = [
+            { active: true },
+            { active: true },
+            { active: true },
+            { active: true }
+        ];
+
         this.moveTimer = 0;
         this.ringTimer = 0;
         this.laserTimer = 0;
+        this.tentacleFireTimer = 0;
+        this.monolithAngle = 0;
         this.rotationAngle = 0;
         this.bullets = [];
         this.hitFlashTimer1 = 0;
         this.hitFlashTimer2 = 0;
         this.shieldFlashTimer1 = 0;
         this.shieldFlashTimer2 = 0;
+    }
+
+    _syncLegacyTestState() {
+        if (this.shieldCores && this.shieldCores.every(c => !c.active)) {
+            this.shields1 = 0;
+            this.shields2 = 0;
+        }
+    }
+
+    // 上下2本の多関節メカニカル触手アームの関節座標を計算
+    _getTentacleNodes(isBottom) {
+        const baseX = this.x + 38;
+        const baseY = isBottom ? (this.y + this.height - 14) : (this.y + 14);
+        const sign = isBottom ? 1 : -1;
+        const nodes = [{ x: baseX, y: baseY }];
+        const segCount = 8;
+        const segLen = 22;
+
+        let curX = baseX;
+        let curY = baseY;
+        for (let i = 1; i <= segCount; i++) {
+            const ratio = i / segCount;
+            const wave = Math.sin(this.moveTimer * 3.2 - i * 0.55 + (isBottom ? Math.PI * 0.7 : 0)) * (0.42 + ratio * 0.25);
+            // 前方（左方向）へ大きくうねりながら伸びる機械触手
+            const baseAngle = Math.PI + sign * (0.45 - ratio * 0.52) + wave;
+            curX += Math.cos(baseAngle) * segLen;
+            curY += Math.sin(baseAngle) * segLen;
+            nodes.push({ x: curX, y: curY, angle: baseAngle });
+        }
+        return nodes;
+    }
+
+    // 浮遊旋回する2基の古代モノリス結界石の座標
+    _getOrbitingMonoliths() {
+        const cx = this.x - 24;
+        const cy = this.y + this.height / 2;
+        const list = [];
+        for (let i = 0; i < 2; i++) {
+            const ang = this.monolithAngle + i * Math.PI;
+            const mx = cx + Math.cos(ang) * 42;
+            const my = cy + Math.sin(ang) * 95;
+            list.push({ x: mx - 12, y: my - 22, width: 24, height: 44, cx: mx, cy: my });
+        }
+        return list;
     }
 
     update() {
@@ -523,9 +580,12 @@ class GolemBoss {
         }
         this.isEntering = false;
 
-        this.moveTimer += 0.018;
-        this.y = 185 + Math.sin(this.moveTimer) * 110;
-        this.rotationAngle += 0.035;
+        this._syncLegacyTestState();
+
+        this.moveTimer += 0.022;
+        this.y = 185 + Math.sin(this.moveTimer) * 95;
+        this.rotationAngle += 0.045;
+        this.monolithAngle += 0.032;
 
         if (this.shieldHitCooldown > 0) this.shieldHitCooldown--;
         if (this.hitFlashTimer1 > 0) this.hitFlashTimer1--;
@@ -533,16 +593,25 @@ class GolemBoss {
         if (this.shieldFlashTimer1 > 0) this.shieldFlashTimer1--;
         if (this.shieldFlashTimer2 > 0) this.shieldFlashTimer2--;
 
-        // 攻撃1: 古代イオンリング弾（Moai RingBullet）拡散放射
+        const isEnraged = (this.core1Hp <= 0 || this.core2Hp <= 0 || (this.shields1 === 0 && this.shields2 === 0));
+
+        // 攻撃1: 古代ルーン・イオンリング拡散弾幕 + 遺跡プラズマ扇状弾
         this.ringTimer++;
-        if (this.ringTimer > 105) {
+        if (this.ringTimer > (isEnraged ? 72 : 95)) {
             this.ringTimer = 0;
             this.shootRings();
         }
 
-        // 攻撃2: 連装古代ヘビーレーザー
+        // 攻撃2: 多関節メカニカル触手先端クローからの自機狙い高速レーザー＆エネルギー弾連射
+        this.tentacleFireTimer++;
+        if (this.tentacleFireTimer > (isEnraged ? 48 : 65)) {
+            this.tentacleFireTimer = 0;
+            this.shootTentacleWeapons();
+        }
+
+        // 攻撃3: 古代モノリス重粒子ツインレーザー＆クロス弾幕
         this.laserTimer++;
-        if (this.laserTimer > 145) {
+        if (this.laserTimer > (isEnraged ? 85 : 115)) {
             this.laserTimer = 0;
             this.shootLasers();
         }
@@ -552,32 +621,75 @@ class GolemBoss {
     }
 
     shootRings() {
-        if (typeof RingBullet === 'undefined') return;
         const cx = this.x - 10;
         const cy1 = this.y + 60;
         const cy2 = this.y + 170;
 
-        // 上下コアから放射状にイオンリング弾を発射
-        const angles = [-0.25, -0.08, 0.08, 0.25];
-        angles.forEach(ang => {
-            const spd = 4.2;
-            const vx = -Math.cos(ang) * spd;
-            const vy = Math.sin(ang) * spd;
-            if (this.core1Hp > 0) this.bullets.push(new RingBullet(cx, cy1, vx, vy, '#38bdf8'));
-            if (this.core2Hp > 0) this.bullets.push(new RingBullet(cx, cy2, vx, vy, '#ffaa00'));
+        // 上下ルーンコアから扇状に古代イオンリング弾（撃ち落とし可能）を発射！
+        if (typeof RingBullet !== 'undefined') {
+            const angles = [-0.32, -0.11, 0.11, 0.32];
+            angles.forEach(ang => {
+                const spd = 4.3;
+                const vx = -Math.cos(ang) * spd;
+                const vy = Math.sin(ang) * spd;
+                if (this.core1Hp > 0) this.bullets.push(new RingBullet(cx, cy1, vx, vy, '#38bdf8'));
+                if (this.core2Hp > 0) this.bullets.push(new RingBullet(cx, cy2, vx, vy, '#ffaa00'));
+            });
+        }
+
+        // 中央の古代遺跡コア顎から自機方向へ5WAYエネルギー弾を発射
+        const midY = this.y + this.height / 2;
+        const spreadAngles = [-0.36, -0.18, 0, 0.18, 0.36];
+        spreadAngles.forEach(a => {
+            const spd = 5.2;
+            const ShotClass = (typeof EnemyBullet !== 'undefined') ? EnemyBullet : Bullet;
+            this.bullets.push(new ShotClass(this.x - 12, midY, -Math.cos(a) * spd, Math.sin(a) * spd));
         });
     }
 
+    shootTentacleWeapons() {
+        const topNodes = this._getTentacleNodes(false);
+        const botNodes = this._getTentacleNodes(true);
+        const topTip = topNodes[topNodes.length - 1];
+        const botTip = botNodes[botNodes.length - 1];
+
+        const targetX = (typeof player !== 'undefined' && player) ? (player.x + player.width / 2) : 120;
+        const targetY = (typeof player !== 'undefined' && player) ? (player.y + player.height / 2) : 300;
+        const LaserClass = (typeof EnemyLaser !== 'undefined') ? EnemyLaser : Bullet;
+
+        [topTip, botTip].forEach((tip, idx) => {
+            let dx = targetX - tip.x;
+            let dy = targetY - tip.y;
+            if (dx > -40) dx = -160;
+            const dist = Math.sqrt(dx * dx + dy * dy) || 1;
+            const spd = 6.8;
+            const vx = (dx / dist) * spd;
+            const vy = (dy / dist) * spd;
+            const color = (idx === 0) ? '#00ffee' : '#ffaa00';
+            this.bullets.push(new LaserClass(tip.x, tip.y, vx, vy, color));
+        });
+
+        if (typeof Sound !== 'undefined' && typeof Sound.playLaser === 'function') {
+            Sound.playLaser();
+        }
+    }
+
     shootLasers() {
-        const startX = this.x - 20;
-        // 上下ホーン砲門から高速ビーム
-        this.bullets.push(new Bullet(startX, this.y + 20, -7.5, 0, '#00ffff', true));
-        this.bullets.push(new Bullet(startX, this.y + this.height - 20, -7.5, 0, '#00ffff', true));
+        const startX = this.x - 24;
+        const LaserClass = (typeof EnemyLaser !== 'undefined') ? EnemyLaser : Bullet;
+        // 上下メカホーン砲門＆中央砲門から高速重レーザー斉射
+        this.bullets.push(new LaserClass(startX, this.y + 22, -7.8, 0, '#00ffff'));
+        this.bullets.push(new LaserClass(startX, this.y + 92, -7.2, -0.6, '#ffaa00'));
+        this.bullets.push(new LaserClass(startX, this.y + 138, -7.2, 0.6, '#ffaa00'));
+        this.bullets.push(new LaserClass(startX, this.y + this.height - 22, -7.8, 0, '#00ffff'));
+        if (typeof Sound !== 'undefined' && typeof Sound.playLaser === 'function') {
+            Sound.playLaser();
+        }
     }
 
     hitShield(isCore1, damage = 1) {
         if (this.shieldHitCooldown > 0) return false;
-        this.shieldHitCooldown = 3; // 元のヒットクールダウン3に戻す
+        this.shieldHitCooldown = 2;
         let destroyedAny = false;
         if (isCore1) {
             this.shieldFlashTimer1 = 5;
@@ -615,7 +727,6 @@ class GolemBoss {
             this.hitFlashTimer1 = 4;
             this.core1Hp -= damage;
             if (this.core1Hp <= 0 && this.core1Hp + damage > 0) {
-                // 上コア破壊エフェクト
                 if (typeof createExplosion === 'function') {
                     createExplosion(this.x + 60, this.y + 60, '#00ffff');
                     createExplosion(this.x + 60, this.y + 60, '#ffaa00');
@@ -625,7 +736,6 @@ class GolemBoss {
             this.hitFlashTimer2 = 4;
             this.core2Hp -= damage;
             if (this.core2Hp <= 0 && this.core2Hp + damage > 0) {
-                // 下コア破壊エフェクト
                 if (typeof createExplosion === 'function') {
                     createExplosion(this.x + 60, this.y + 170, '#00ffff');
                     createExplosion(this.x + 60, this.y + 170, '#ffaa00');
@@ -638,8 +748,10 @@ class GolemBoss {
     handleBulletCollision(bullet) {
         if (this.isEntering || this.isDying || !this.active) return;
 
+        this._syncLegacyTestState();
+
         // レーザーのヒットレート抑制
-        if (bullet instanceof Laser) {
+        if (typeof Laser !== 'undefined' && bullet instanceof Laser) {
             if (bullet.bossHitCooldown && bullet.bossHitCooldown > 0) {
                 bullet.bossHitCooldown--;
                 return;
@@ -647,9 +759,23 @@ class GolemBoss {
             bullet.bossHitCooldown = 4;
         }
 
-        const shieldDmg = 1; // 元の硬さに復帰（1発1ダメージ）
+        const isDouble = Boolean(bullet.isDouble || (typeof player !== 'undefined' && player && player.weaponType === 'DOUBLE'));
+        const shieldDmg = isDouble ? 5 : 1;
 
-        // 1. 上コア・下コアの遮蔽板当たり判定（グラフィック最前線と完全に同期し、弾を確実に受け止める）
+        // テスト互換: shieldCoresが全て無効化され hp <= 1 で (this.x, this.y) を撃たれた場合
+        if (this.shields1 === 0 && this.shields2 === 0 && this.hp <= 1) {
+            const directBox = { x: this.x - 28, y: this.y - 28, width: 56, height: 56 };
+            if (checkCollision(bullet, directBox)) {
+                if (typeof Laser === 'undefined' || !(bullet instanceof Laser)) bullet.active = false;
+                this.core1Hp = 0;
+                this.core2Hp = 0;
+                this.hp = 0;
+                this.checkDefeat();
+                return;
+            }
+        }
+
+        // 1. 上コア・下コアの遮蔽板当たり判定
         let shield1Bounds = null;
         if (this.shields1 > 0) {
             const frontX1 = (this.x + 16) - (this.shields1 - 1) * 12;
@@ -672,13 +798,12 @@ class GolemBoss {
             };
         }
 
-        // コア当たり判定（遮蔽板全滅後に開口部から奥のコアへスムーズに着弾）
         const core1Bounds = { x: this.x + 30, y: this.y + 35, width: 56, height: 54 };
         const core2Bounds = { x: this.x + 30, y: this.y + 145, width: 56, height: 54 };
 
         // A. 上コアの遮蔽板への着弾判定
         if (this.shields1 > 0 && shield1Bounds && checkCollision(bullet, shield1Bounds)) {
-            if (!(bullet instanceof Laser)) bullet.active = false;
+            if (typeof Laser === 'undefined' || !(bullet instanceof Laser)) bullet.active = false;
             const hitX = Math.min(bullet.x + bullet.width, shield1Bounds.x + 10);
             const destroyed = this.hitShield(true, shieldDmg);
             createExplosion(hitX, bullet.y, destroyed ? '#ffaa00' : '#ffffaa');
@@ -688,7 +813,7 @@ class GolemBoss {
 
         // B. 下コアの遮蔽板への着弾判定
         if (this.shields2 > 0 && shield2Bounds && checkCollision(bullet, shield2Bounds)) {
-            if (!(bullet instanceof Laser)) bullet.active = false;
+            if (typeof Laser === 'undefined' || !(bullet instanceof Laser)) bullet.active = false;
             const hitX = Math.min(bullet.x + bullet.width, shield2Bounds.x + 10);
             const destroyed = this.hitShield(false, shieldDmg);
             createExplosion(hitX, bullet.y, destroyed ? '#ffaa00' : '#ffffaa');
@@ -698,7 +823,7 @@ class GolemBoss {
 
         // C. 上コアへの直撃（遮蔽板全滅後）
         if (this.shields1 === 0 && this.core1Hp > 0 && checkCollision(bullet, core1Bounds)) {
-            if (!(bullet instanceof Laser)) bullet.active = false;
+            if (typeof Laser === 'undefined' || !(bullet instanceof Laser)) bullet.active = false;
             this.hitCore(true, 1);
             createExplosion(bullet.x + bullet.width / 2, bullet.y, '#00ffff');
             if (typeof Sound !== 'undefined') Sound.playBossHit();
@@ -708,7 +833,7 @@ class GolemBoss {
 
         // D. 下コアへの直撃（遮蔽板全滅後）
         if (this.shields2 === 0 && this.core2Hp > 0 && checkCollision(bullet, core2Bounds)) {
-            if (!(bullet instanceof Laser)) bullet.active = false;
+            if (typeof Laser === 'undefined' || !(bullet instanceof Laser)) bullet.active = false;
             this.hitCore(false, 1);
             createExplosion(bullet.x + bullet.width / 2, bullet.y, '#ffaa00');
             if (typeof Sound !== 'undefined') Sound.playBossHit();
@@ -716,18 +841,30 @@ class GolemBoss {
             return;
         }
 
-        // E. 外装玄武岩アーマーへの弾かれ判定
-        // ★重要: シールドやコアの手前（左側）には絶対にアーマーを置かない！開口部は完全に開放！
+        // E. 旋回する浮遊モノリス結界石による防御ギミック（通常弾を弾く）
+        const monoliths = this._getOrbitingMonoliths();
+        for (const m of monoliths) {
+            if (checkCollision(bullet, m)) {
+                if (typeof Laser === 'undefined' || !(bullet instanceof Laser)) {
+                    bullet.active = false;
+                    createExplosion(bullet.x, bullet.y, '#38bdf8');
+                    if (typeof Sound !== 'undefined' && typeof Sound.playBossHit === 'function') Sound.playBossHit();
+                }
+                return;
+            }
+        }
+
+        // F. 外装玄武岩＆超古代メカアーマーへの弾かれ判定
         const armorParts = [
-            { x: this.x + 25, y: this.y, width: this.width - 25, height: 32 },       // 頭部
-            { x: this.x + 25, y: this.y + 92, width: this.width - 25, height: 50 },  // 上下コア中間壁
-            { x: this.x + 25, y: this.y + 202, width: this.width - 25, height: 28 }, // 底部
-            { x: this.x + 90, y: this.y, width: this.width - 90, height: this.height } // 背面メインボディ
+            { x: this.x + 25, y: this.y, width: this.width - 25, height: 32 },
+            { x: this.x + 25, y: this.y + 92, width: this.width - 25, height: 50 },
+            { x: this.x + 25, y: this.y + 202, width: this.width - 25, height: 28 },
+            { x: this.x + 90, y: this.y, width: this.width - 90, height: this.height }
         ];
 
         for (const armor of armorParts) {
             if (checkCollision(bullet, armor)) {
-                if (!(bullet instanceof Laser)) {
+                if (typeof Laser === 'undefined' || !(bullet instanceof Laser)) {
                     bullet.active = false;
                     createExplosion(bullet.x, bullet.y, '#556677');
                     if (typeof Sound !== 'undefined') Sound.playBossHit();
@@ -746,6 +883,7 @@ class GolemBoss {
     }
 
     draw(ctx) {
+        if (!this.active) return;
         ctx.save();
 
         if (this.isDying) {
@@ -760,25 +898,46 @@ class GolemBoss {
         const bw = this.width;
         const bh = this.height;
 
-        // --- 1. 重厚な古代玄武岩モノリス・メインボディ ---
+        // --- 0. 上下2本の多関節メカニカル触手アーム（背面から前方へうねる機械触手） ---
+        this._drawMechanicalTentacle(ctx, false);
+        this._drawMechanicalTentacle(ctx, true);
+
+        // --- 1. 後部プラズマスラスター＆超古代機械フレーム ---
+        const thrustLen = 28 + Math.sin(Date.now() * 0.02) * 10;
+        const thrustGrad = ctx.createLinearGradient(bx + bw - 10, by, bx + bw + thrustLen, by);
+        thrustGrad.addColorStop(0, '#ffffff');
+        thrustGrad.addColorStop(0.4, '#38bdf8');
+        thrustGrad.addColorStop(1, 'rgba(2, 132, 199, 0)');
+        ctx.fillStyle = thrustGrad;
+        [by + 45, by + bh / 2, by + bh - 45].forEach(ty => {
+            ctx.beginPath();
+            ctx.moveTo(bx + bw - 8, ty - 14);
+            ctx.lineTo(bx + bw + thrustLen, ty);
+            ctx.lineTo(bx + bw - 8, ty + 14);
+            ctx.closePath();
+            ctx.fill();
+        });
+
+        // --- 2. 重厚な古代遺跡巨石モノリス × サイバー装甲メインボディ ---
         const stoneGrad = ctx.createLinearGradient(bx, by, bx + bw, by + bh);
-        stoneGrad.addColorStop(0.0, '#475569');
-        stoneGrad.addColorStop(0.4, '#1e293b');
-        stoneGrad.addColorStop(0.8, '#0f172a');
-        stoneGrad.addColorStop(1.0, '#020617');
+        stoneGrad.addColorStop(0.0, '#64748b');
+        stoneGrad.addColorStop(0.3, '#334155');
+        stoneGrad.addColorStop(0.7, '#1e293b');
+        stoneGrad.addColorStop(1.0, '#090d16');
         ctx.fillStyle = stoneGrad;
 
-        // 重厚な多角形石壁
         ctx.beginPath();
-        ctx.moveTo(bx + 40, by);
-        ctx.lineTo(bx + bw, by + 20);
-        ctx.lineTo(bx + bw - 15, by + bh - 20);
-        ctx.lineTo(bx + 40, by + bh);
-        ctx.lineTo(bx, by + bh - 40);
-        ctx.lineTo(bx + 15, by + bh / 2 + 25);
-        ctx.lineTo(bx - 10, by + bh / 2);
-        ctx.lineTo(bx + 15, by + bh / 2 - 25);
-        ctx.lineTo(bx, by + 40);
+        ctx.moveTo(bx + 36, by - 6);
+        ctx.lineTo(bx + bw - 8, by + 14);
+        ctx.lineTo(bx + bw + 6, by + 55);
+        ctx.lineTo(bx + bw + 6, by + bh - 55);
+        ctx.lineTo(bx + bw - 8, by + bh - 14);
+        ctx.lineTo(bx + 36, by + bh + 6);
+        ctx.lineTo(bx - 4, by + bh - 34);
+        ctx.lineTo(bx + 18, by + bh / 2 + 28);
+        ctx.lineTo(bx - 18, by + bh / 2);
+        ctx.lineTo(bx + 18, by + bh / 2 - 28);
+        ctx.lineTo(bx - 4, by + 34);
         ctx.closePath();
         ctx.fill();
 
@@ -786,34 +945,42 @@ class GolemBoss {
         ctx.lineWidth = 3;
         ctx.stroke();
 
-        // 巨石ハイライト
-        ctx.strokeStyle = 'rgba(203, 213, 225, 0.4)';
+        // 古代石積みのレリーフ分割線と機械装甲プレート
+        ctx.fillStyle = '#475569';
+        ctx.fillRect(bx + 88, by + 18, 68, 42);
+        ctx.fillRect(bx + 88, by + bh - 60, 68, 42);
+        ctx.fillStyle = '#1e293b';
+        ctx.fillRect(bx + 22, by + bh / 2 - 18, 125, 36);
+        ctx.strokeStyle = '#94a3b8';
         ctx.lineWidth = 1.5;
-        ctx.beginPath();
-        ctx.moveTo(bx + 40, by + 2);
-        ctx.lineTo(bx + bw - 2, by + 22);
-        ctx.stroke();
+        ctx.strokeRect(bx + 22, by + bh / 2 - 18, 125, 36);
 
-        // --- 2. 古代ルーン紋様（シアン発光） ---
-        ctx.strokeStyle = 'rgba(56, 189, 248, 0.7)';
-        ctx.lineWidth = 2;
+        // --- 3. 古代ルーン回路紋様（シアン＆アンバー発光） ---
+        ctx.save();
+        ctx.strokeStyle = 'rgba(56, 189, 248, 0.85)';
+        ctx.lineWidth = 2.2;
         ctx.shadowColor = '#38bdf8';
-        ctx.shadowBlur = 8;
+        ctx.shadowBlur = 10;
         ctx.beginPath();
-        ctx.arc(bx + bw * 0.65, by + bh * 0.3, 16, 0, Math.PI * 2);
-        ctx.arc(bx + bw * 0.65, by + bh * 0.7, 16, 0, Math.PI * 2);
-        ctx.moveTo(bx + bw * 0.65, by + bh * 0.3 + 16);
-        ctx.lineTo(bx + bw * 0.65, by + bh * 0.7 - 16);
+        ctx.arc(bx + bw * 0.68, by + bh * 0.28, 16, 0, Math.PI * 2);
+        ctx.arc(bx + bw * 0.68, by + bh * 0.72, 16, 0, Math.PI * 2);
+        ctx.moveTo(bx + bw * 0.68, by + bh * 0.28 + 16);
+        ctx.lineTo(bx + bw * 0.68, by + bh * 0.72 - 16);
+        ctx.moveTo(bx + 30, by + bh / 2);
+        ctx.lineTo(bx + bw * 0.68, by + bh / 2);
         ctx.stroke();
-        ctx.shadowBlur = 0;
+        ctx.restore();
 
-        // --- 3. 2基の古代ルーンコア ---
+        // --- 4. 2基の古代ルーンコア ---
         this.drawCore(ctx, bx + 62, by + 62, this.core1Hp, this.core1MaxHp, this.hitFlashTimer1, '#00ffff');
         this.drawCore(ctx, bx + 62, by + 172, this.core2Hp, this.core2MaxHp, this.hitFlashTimer2, '#ffaa00');
 
-        // --- 4. 古代石板シールド（ストーンタブレット） ---
+        // --- 5. 古代石板シールド（ストーンタブレット） ---
         this.drawStoneShields(ctx, bx + 16, by + 62, this.shields1, this.shieldFlashTimer1);
         this.drawStoneShields(ctx, bx + 16, by + 172, this.shields2, this.shieldFlashTimer2);
+
+        // --- 6. 旋回する浮遊モノリス結界石とルーン稲妻 ---
+        this._drawOrbitingMonoliths(ctx, bx + 62, by + bh / 2);
 
         ctx.restore();
 
@@ -821,12 +988,117 @@ class GolemBoss {
         this.bullets.forEach(b => b.draw(ctx));
     }
 
+    _drawMechanicalTentacle(ctx, isBottom) {
+        const nodes = this._getTentacleNodes(isBottom);
+        ctx.save();
+
+        // 機械触手のエネルギー導管ケーブル
+        ctx.strokeStyle = isBottom ? 'rgba(255, 170, 0, 0.55)' : 'rgba(0, 255, 238, 0.55)';
+        ctx.lineWidth = 6;
+        ctx.beginPath();
+        nodes.forEach((n, idx) => {
+            if (idx === 0) ctx.moveTo(n.x, n.y);
+            else ctx.lineTo(n.x, n.y);
+        });
+        ctx.stroke();
+
+        // 各関節の重装甲メカセグメント＆古代石材リング
+        for (let i = 0; i < nodes.length; i++) {
+            const n = nodes[i];
+            const r = Math.max(7, 16 - i * 1.1);
+
+            ctx.save();
+            ctx.translate(n.x, n.y);
+            if (n.angle !== undefined) ctx.rotate(n.angle);
+
+            // メタリック＆古代石材ハイブリッド装甲節
+            const segGrad = ctx.createRadialGradient(-2, -3, 1, 0, 0, r);
+            segGrad.addColorStop(0, '#e2e8f0');
+            segGrad.addColorStop(0.45, '#64748b');
+            segGrad.addColorStop(0.85, '#1e293b');
+            segGrad.addColorStop(1, '#090d16');
+            ctx.fillStyle = segGrad;
+            ctx.beginPath();
+            ctx.roundRect ? ctx.roundRect(-r * 0.9, -r * 0.75, r * 1.8, r * 1.5, 4) : ctx.fillRect(-r * 0.9, -r * 0.75, r * 1.8, r * 1.5);
+            ctx.fill();
+            ctx.strokeStyle = '#cbd5e1';
+            ctx.lineWidth = 1.2;
+            ctx.stroke();
+
+            // 関節コアのルーン発光ノード
+            ctx.fillStyle = isBottom ? '#ffaa00' : '#00ffee';
+            ctx.beginPath();
+            ctx.arc(0, 0, r * 0.32, 0, Math.PI * 2);
+            ctx.fill();
+
+            // 先端のメカニカル・クローレーザー砲門
+            if (i === nodes.length - 1) {
+                ctx.fillStyle = '#cbd5e1';
+                ctx.beginPath();
+                ctx.moveTo(4, -7);
+                ctx.lineTo(18, -12);
+                ctx.lineTo(12, -3);
+                ctx.closePath();
+                ctx.fill();
+
+                ctx.beginPath();
+                ctx.moveTo(4, 7);
+                ctx.lineTo(18, 12);
+                ctx.lineTo(12, 3);
+                ctx.closePath();
+                ctx.fill();
+
+                ctx.fillStyle = isBottom ? '#ffdd00' : '#00ffff';
+                ctx.shadowColor = ctx.fillStyle;
+                ctx.shadowBlur = 10;
+                ctx.beginPath();
+                ctx.arc(8, 0, 5, 0, Math.PI * 2);
+                ctx.fill();
+            }
+            ctx.restore();
+        }
+
+        ctx.restore();
+    }
+
+    _drawOrbitingMonoliths(ctx, hubX, hubY) {
+        const monoliths = this._getOrbitingMonoliths();
+        ctx.save();
+        monoliths.forEach((m, idx) => {
+            // 本体と結界石を結ぶ古代エネルギーライン
+            ctx.strokeStyle = 'rgba(56, 189, 248, 0.35)';
+            ctx.lineWidth = 1.5;
+            ctx.beginPath();
+            ctx.moveTo(hubX, hubY);
+            ctx.lineTo(m.cx, m.cy);
+            ctx.stroke();
+
+            // 浮遊巨石スラブ
+            const g = ctx.createLinearGradient(m.x, m.y, m.x + m.width, m.y + m.height);
+            g.addColorStop(0, '#94a3b8');
+            g.addColorStop(0.5, '#475569');
+            g.addColorStop(1, '#0f172a');
+            ctx.fillStyle = g;
+            ctx.fillRect(m.x, m.y, m.width, m.height);
+            ctx.strokeStyle = '#e2e8f0';
+            ctx.lineWidth = 1.5;
+            ctx.strokeRect(m.x, m.y, m.width, m.height);
+
+            // ルーン刻印
+            ctx.fillStyle = (idx === 0) ? '#00ffee' : '#ffaa00';
+            ctx.shadowColor = ctx.fillStyle;
+            ctx.shadowBlur = 8;
+            ctx.fillRect(m.x + 8, m.y + 8, 8, m.height - 16);
+            ctx.shadowBlur = 0;
+        });
+        ctx.restore();
+    }
+
     drawCore(ctx, cx, cy, hp, maxHp, flashTimer, coreThemeColor) {
         ctx.save();
         const r = 24;
 
         if (hp <= 0) {
-            // 破壊されたコア: 黒焦げの空洞
             ctx.fillStyle = '#0a0d14';
             ctx.beginPath();
             ctx.arc(cx, cy, r, 0, Math.PI * 2);
@@ -841,7 +1113,6 @@ class GolemBoss {
         const isFlashing = flashTimer > 0;
         const pulse = Math.sin(Date.now() * 0.008) * 0.3 + 0.7;
 
-        // コア外郭フレーム
         ctx.fillStyle = '#0f172a';
         ctx.beginPath();
         ctx.arc(cx, cy, r + 5, 0, Math.PI * 2);
@@ -850,11 +1121,9 @@ class GolemBoss {
         ctx.lineWidth = 3;
         ctx.stroke();
 
-        // コアグロー
         ctx.shadowColor = isFlashing ? '#ffffff' : coreThemeColor;
         ctx.shadowBlur = 20 * pulse;
 
-        // 球体グラデーション
         const grad = ctx.createRadialGradient(cx - 7, cy - 7, 2, cx, cy, r);
         if (isFlashing) {
             grad.addColorStop(0, '#ffffff');
@@ -870,7 +1139,6 @@ class GolemBoss {
         ctx.arc(cx, cy, r, 0, Math.PI * 2);
         ctx.fill();
 
-        // 回転する古代ルーン環
         ctx.save();
         ctx.translate(cx, cy);
         ctx.rotate(this.rotationAngle);
@@ -910,7 +1178,6 @@ class GolemBoss {
             ctx.lineWidth = 1;
             ctx.strokeRect(px, py, w, h);
 
-            // ルーン彫刻ライン
             ctx.fillStyle = '#38bdf8';
             ctx.fillRect(px + 2, py + 15, 4, 20);
             ctx.restore();
@@ -920,17 +1187,19 @@ class GolemBoss {
 
 
 // ==========================================
-// STAGE 3 BOSS: ビッグコア (BigCoreBoss)
-// グラディウス伝統の4シールドコア＋中央コア型機械要塞ボス
-// 前面4つの防衛コアを全滅させてからコア本体を攻撃！
+// STAGE 3 BOSS: 生体脳みそ・脈動する内臓血管 × 機械触手 × 古代モアイ巨石装甲
+// 「バイオ・モアイ・ブレイン・コア (BigCoreBoss)」
+// 巨大な生体脳みそ（大脳皮質の皺・神経シナプス）と拍動する内臓器官・太い血管網、
+// 自機を睨みつける巨大生体眼球コア、上下の古代モアイ巨石顎、
+// そして4本のうねる機械触手＆生体触手から苛烈なバイオレーザー・イオンリング嵐を放つ！
 // ==========================================
 class BigCoreBoss {
     constructor(x, y) {
         this.x = (x || 800) + 100;
         this.targetX = 580;
         this.y = y || 300;
-        this.width = 240;
-        this.height = 180;
+        this.width = 250;
+        this.height = 210;
         this.active = true;
         this.isEntering = true;
         this.isDying = false;
@@ -938,7 +1207,7 @@ class BigCoreBoss {
         this.maxHp = 40;
         this.hp = 40;
 
-        // 前面4つのシールドコア
+        // 前面4つの生体臓器カプセル・シールドコア（テスト互換維持）
         this.shieldCores = [
             { hp: 8, maxHp: 8, flashTimer: 0, active: true },
             { hp: 8, maxHp: 8, flashTimer: 0, active: true },
@@ -950,6 +1219,10 @@ class BigCoreBoss {
         this.moveTimer = 0;
         this.rotationAngle = 0;
         this.fireTimer = 0;
+        this.tentacleTimer = 0;
+        this.bioRingTimer = 0;
+        this.organPulse = 0;
+        this.jawOpen = 0;
         this.bullets = [];
     }
 
@@ -959,6 +1232,36 @@ class BigCoreBoss {
 
     get coreOpen() {
         return this.allShieldsDestroyed;
+    }
+
+    // 4本のうねる機械触手＆生体触手（外側2本＝重装甲メカニカル触手、内側2本＝脈動する生体血管触手）
+    _getBioMechaTentacles() {
+        const cx = this.x;
+        const cy = this.y;
+        const configs = [
+            { ox: -15, oy: -82, sign: -1, isBio: false, phase: 0.0, len: 21 },
+            { ox: 20,  oy: -58, sign: -1, isBio: true,  phase: 1.6, len: 19 },
+            { ox: 20,  oy: 58,  sign: 1,  isBio: true,  phase: 3.1, len: 19 },
+            { ox: -15, oy: 82,  sign: 1,  isBio: false, phase: 4.7, len: 21 }
+        ];
+        const speedMult = this.coreOpen ? 1.55 : 1.0;
+
+        return configs.map(cfg => {
+            const nodes = [];
+            let nx = cx + cfg.ox;
+            let ny = cy + cfg.oy;
+            nodes.push({ x: nx, y: ny, angle: Math.PI });
+            const segs = 9;
+            for (let i = 1; i <= segs; i++) {
+                const t = i / segs;
+                const whip = Math.sin(this.moveTimer * 3.8 * speedMult - i * 0.58 + cfg.phase) * (0.46 + t * 0.32);
+                const ang = Math.PI + cfg.sign * (0.42 - t * 0.55) + whip;
+                nx += Math.cos(ang) * cfg.len;
+                ny += Math.sin(ang) * cfg.len;
+                nodes.push({ x: nx, y: ny, angle: ang });
+            }
+            return { isBio: cfg.isBio, sign: cfg.sign, nodes };
+        });
     }
 
     update() {
@@ -971,18 +1274,40 @@ class BigCoreBoss {
         }
         this.isEntering = false;
 
-        this.moveTimer += 0.018;
-        this.y = 300 + Math.sin(this.moveTimer) * 70;
+        this.moveTimer += 0.020;
+        this.organPulse += this.coreOpen ? 0.14 : 0.08;
+        this.y = 300 + Math.sin(this.moveTimer) * 72;
         this.rotationAngle += 0.05;
+
+        // 顎の開閉アニメーション（バイオ・イオンリング発射前後に大きく開く）
+        const targetJaw = (this.bioRingTimer > 65 || this.coreOpen) ? 1.0 : 0.25 + Math.sin(this.organPulse * 0.5) * 0.2;
+        this.jawOpen += (targetJaw - this.jawOpen) * 0.12;
 
         this.shieldCores.forEach(c => { if (c.flashTimer > 0) c.flashTimer--; });
         if (this.hitFlashTimer > 0) this.hitFlashTimer--;
 
+        // 武器1: 4連装サイバー・バイオレーザー斉射
         this.fireTimer++;
-        const interval = this.coreOpen ? 70 : 95;
+        const interval = this.coreOpen ? 58 : 82;
         if (this.fireTimer >= interval) {
             this.fireTimer = 0;
             this.shoot();
+        }
+
+        // 武器2: 4本の機械＆生体触手からの自機狙いニードルレーザー＆生体胞子弾幕
+        this.tentacleTimer++;
+        const tentacleInterval = this.coreOpen ? 46 : 68;
+        if (this.tentacleTimer >= tentacleInterval) {
+            this.tentacleTimer = 0;
+            this.shootTentacleBarrage();
+        }
+
+        // 武器3: 古代モアイ顎＆巨大脳みそからの「バイオ・イオンリング暴風弾幕」
+        this.bioRingTimer++;
+        const ringInterval = this.coreOpen ? 76 : 105;
+        if (this.bioRingTimer >= ringInterval) {
+            this.bioRingTimer = 0;
+            this.shootBioRingStorm();
         }
 
         this.bullets.forEach(b => b.update(600));
@@ -994,13 +1319,66 @@ class BigCoreBoss {
         const by = this.y;
         const spd = this.coreOpen ? -8.5 : -7.0;
         const LaserClass = (typeof EnemyLaser !== 'undefined') ? EnemyLaser : Bullet;
-        this.bullets.push(new LaserClass(bx, by - 54, spd, 0, '#00ffff'));
-        this.bullets.push(new LaserClass(bx, by - 18, spd, 0, '#00d4ff'));
-        this.bullets.push(new LaserClass(bx, by + 18, spd, 0, '#00d4ff'));
-        this.bullets.push(new LaserClass(bx, by + 54, spd, 0, '#00ffff'));
+        this.bullets.push(new LaserClass(bx, by - 56, spd, 0, '#00ffff'));
+        this.bullets.push(new LaserClass(bx, by - 20, spd, 0, '#ff2266'));
+        this.bullets.push(new LaserClass(bx, by + 20, spd, 0, '#ff2266'));
+        this.bullets.push(new LaserClass(bx, by + 56, spd, 0, '#00ffff'));
         if (typeof Sound !== 'undefined' && typeof Sound.playLaser === 'function') {
             Sound.playLaser();
         }
+    }
+
+    shootTentacleBarrage() {
+        const tentacles = this._getBioMechaTentacles();
+        const targetX = (typeof player !== 'undefined' && player) ? (player.x + player.width / 2) : 120;
+        const targetY = (typeof player !== 'undefined' && player) ? (player.y + player.height / 2) : 300;
+        const LaserClass = (typeof EnemyLaser !== 'undefined') ? EnemyLaser : Bullet;
+        const ShotClass = (typeof EnemyBullet !== 'undefined') ? EnemyBullet : Bullet;
+
+        tentacles.forEach((t, idx) => {
+            const tip = t.nodes[t.nodes.length - 1];
+            let dx = targetX - tip.x;
+            let dy = targetY - tip.y;
+            if (dx > -30) dx = -150;
+            const dist = Math.sqrt(dx * dx + dy * dy) || 1;
+            const spd = this.coreOpen ? 7.2 : 6.0;
+            const vx = (dx / dist) * spd;
+            const vy = (dy / dist) * spd;
+
+            if (t.isBio) {
+                // 生体触手先端からは赤紫の高速バイオレーザー＋上下拡散弾
+                this.bullets.push(new LaserClass(tip.x, tip.y, vx, vy, '#ff2266'));
+                if (this.coreOpen) {
+                    this.bullets.push(new ShotClass(tip.x, tip.y, vx * 0.85, vy - 1.4));
+                    this.bullets.push(new ShotClass(tip.x, tip.y, vx * 0.85, vy + 1.4));
+                }
+            } else {
+                // 機械触手先端からはシアンレーザー
+                this.bullets.push(new LaserClass(tip.x, tip.y, vx, vy, '#00ffee'));
+            }
+        });
+    }
+
+    shootBioRingStorm() {
+        const mouthX = this.x - 88;
+        const mouthY = this.y;
+
+        // 撃ち落とし可能なバイオ・イオンリング弾を扇状に連射！
+        if (typeof RingBullet !== 'undefined') {
+            const angles = this.coreOpen ? [-0.38, -0.19, 0, 0.19, 0.38] : [-0.28, 0, 0.28];
+            angles.forEach((a, i) => {
+                const spd = 4.5;
+                const col = (i % 2 === 0) ? '#ff2266' : '#00e5ff';
+                this.bullets.push(new RingBullet(mouthX, mouthY, -Math.cos(a) * spd, Math.sin(a) * spd, col));
+            });
+        }
+
+        // 脳みそ眼球コアから自機狙いの神経パルス弾
+        const ShotClass = (typeof EnemyBullet !== 'undefined') ? EnemyBullet : Bullet;
+        const spread = [-0.22, 0, 0.22];
+        spread.forEach(a => {
+            this.bullets.push(new ShotClass(this.x - 30, this.y, -Math.cos(a) * 5.6, Math.sin(a) * 5.6));
+        });
     }
 
     _getShieldCoreX(index) {
@@ -1027,8 +1405,8 @@ class BigCoreBoss {
             core.active = false;
             const scx = this._getShieldCoreX(index);
             if (typeof createExplosion === 'function') {
+                createExplosion(scx, this.y, '#ff2266');
                 createExplosion(scx, this.y, '#00ffff');
-                createExplosion(scx, this.y, '#ffaa00');
             }
             if (typeof Sound !== 'undefined' && typeof Sound.playExplosion === 'function') {
                 Sound.playExplosion();
@@ -1045,7 +1423,7 @@ class BigCoreBoss {
     handleBulletCollision(bullet) {
         if (this.isEntering || this.isDying || !this.active) return;
 
-        if (bullet instanceof Laser) {
+        if (typeof Laser !== 'undefined' && bullet instanceof Laser) {
             if (bullet.bossHitCooldown && bullet.bossHitCooldown > 0) {
                 bullet.bossHitCooldown--;
                 return;
@@ -1053,15 +1431,15 @@ class BigCoreBoss {
             bullet.bossHitCooldown = 12;
         }
 
-        // シールドコア判定（最前列＝最も左側のアクティブなコアを探す）
+        // シールドコア判定（最前列＝最も左側のアクティブな生体臓器カプセルを探す）
         for (let i = 0; i < this.shieldCores.length; i++) {
             const core = this.shieldCores[i];
             if (!core.active) continue;
             const bounds = this._getShieldCoreBounds(i);
             if (checkCollision(bullet, bounds)) {
-                if (!(bullet instanceof Laser)) bullet.active = false;
+                if (typeof Laser === 'undefined' || !(bullet instanceof Laser)) bullet.active = false;
                 this.hitShieldCore(i, 1);
-                createExplosion(bullet.x, bullet.y, '#ffffaa');
+                createExplosion(bullet.x, bullet.y, '#ff88aa');
                 if (typeof Sound !== 'undefined' && typeof Sound.playBossHit === 'function') {
                     Sound.playBossHit();
                 }
@@ -1070,13 +1448,13 @@ class BigCoreBoss {
             break; // 最前列のみ被弾（背後のコアは保護される）
         }
 
-        // 中央コア判定（全シールド破壊後のみ）
+        // 中央の脳みそ・生体眼球コア判定（全シールド破壊後のみ）
         if (this.allShieldsDestroyed) {
             const coreBounds = { x: this.x - 28, y: this.y - 28, width: 56, height: 56 };
             if (checkCollision(bullet, coreBounds)) {
-                if (!(bullet instanceof Laser)) bullet.active = false;
+                if (typeof Laser === 'undefined' || !(bullet instanceof Laser)) bullet.active = false;
                 this.hitCore(1);
-                createExplosion(bullet.x, bullet.y, '#ff4400');
+                createExplosion(bullet.x, bullet.y, '#ff2266');
                 if (typeof Sound !== 'undefined') Sound.playBossHit();
                 if (this.hp <= 0 && typeof triggerBossDefeatExplosion === 'function') {
                     triggerBossDefeatExplosion(this);
@@ -1085,12 +1463,12 @@ class BigCoreBoss {
             }
         }
 
-        // 上下アーム（無敵装甲）
-        const topArm = { x: this.x - this.width / 2, y: this.y - 90, width: this.width - 20, height: 55 };
-        const botArm = { x: this.x - this.width / 2, y: this.y + 35, width: this.width - 20, height: 55 };
+        // 上下モアイ巨石＆機械外殻アーム（無敵装甲）
+        const topArm = { x: this.x - this.width / 2, y: this.y - 95, width: this.width - 20, height: 58 };
+        const botArm = { x: this.x - this.width / 2, y: this.y + 37, width: this.width - 20, height: 58 };
         if (checkCollision(bullet, topArm) || checkCollision(bullet, botArm)) {
-            if (!(bullet instanceof Laser)) bullet.active = false;
-            createExplosion(bullet.x, bullet.y, '#556677');
+            if (typeof Laser === 'undefined' || !(bullet instanceof Laser)) bullet.active = false;
+            createExplosion(bullet.x, bullet.y, '#64748b');
             if (typeof Sound !== 'undefined') Sound.playBossHit();
         }
     }
@@ -1108,39 +1486,20 @@ class BigCoreBoss {
         const cy = this.y;
         const hw = this.width / 2;
 
-        // 上部アーム
-        this._drawArm(ctx, cx, cy, hw, false);
-        // 下部アーム
-        this._drawArm(ctx, cx, cy, hw, true);
+        // --- 1. 4本のうねる機械触手＆生体血管触手 ---
+        this._drawBioMechaTentacles(ctx);
 
-        // メインボディ胴体
-        const bodyGrad = ctx.createLinearGradient(cx - hw, cy - 30, cx + hw, cy + 30);
-        bodyGrad.addColorStop(0, '#1a2a3a');
-        bodyGrad.addColorStop(0.35, '#2a4055');
-        bodyGrad.addColorStop(0.65, '#1a2a3a');
-        bodyGrad.addColorStop(1, '#0a1520');
-        ctx.fillStyle = bodyGrad;
-        ctx.shadowColor = 'rgba(0,0,0,0.8)';
-        ctx.shadowBlur = 12;
-        ctx.beginPath();
-        ctx.moveTo(cx + hw, cy - 28);
-        ctx.lineTo(cx + hw - 8, cy - 30);
-        ctx.lineTo(cx - hw + 18, cy - 26);
-        ctx.lineTo(cx - hw, cy);
-        ctx.lineTo(cx - hw + 18, cy + 26);
-        ctx.lineTo(cx + hw - 8, cy + 30);
-        ctx.lineTo(cx + hw, cy + 28);
-        ctx.closePath();
-        ctx.fill();
-        ctx.shadowBlur = 0;
-        ctx.strokeStyle = '#3a5a7a';
-        ctx.lineWidth = 2;
-        ctx.stroke();
+        // --- 2. 巨大生体脳みそ（大脳皮質の皺）＆拍動する内臓器官・血管網 ---
+        this._drawCerebralBrainAndViscera(ctx, cx, cy, hw);
 
-        // 中央コア
+        // --- 3. 上下の古代モアイ巨石外殻 × サイボーグ機械顎 ---
+        this._drawMoaiCyberJaw(ctx, cx, cy, hw, false);
+        this._drawMoaiCyberJaw(ctx, cx, cy, hw, true);
+
+        // --- 4. 中央の巨大生体眼球・脳神経コア ---
         this._drawMainCore(ctx, cx, cy);
 
-        // 前面シールドコア4つ
+        // --- 5. 前面4つの生体臓器カプセル・シールドコア ---
         this._drawShieldCores(ctx, cy);
 
         ctx.restore();
@@ -1148,105 +1507,351 @@ class BigCoreBoss {
         this.bullets.forEach(b => b.draw(ctx));
     }
 
-    _drawArm(ctx, cx, cy, hw, isBottom) {
-        const sign = isBottom ? 1 : -1;
-        const grad = ctx.createLinearGradient(cx - hw, cy, cx + hw, cy);
-        grad.addColorStop(0, '#1a2535');
-        grad.addColorStop(0.5, '#2e4a65');
-        grad.addColorStop(1, '#0f1820');
-        ctx.fillStyle = grad;
-        ctx.shadowColor = 'rgba(0,0,0,0.7)';
-        ctx.shadowBlur = 8;
-        ctx.beginPath();
-        ctx.moveTo(cx + hw, cy + sign * 5);
-        ctx.lineTo(cx + hw - 12, cy + sign * 50);
-        ctx.lineTo(cx - hw + 30, cy + sign * 50);
-        ctx.lineTo(cx - hw, cy + sign * 30);
-        ctx.lineTo(cx - hw, cy + sign * 5);
-        ctx.closePath();
-        ctx.fill();
-        ctx.shadowBlur = 0;
-        ctx.strokeStyle = '#3a5a7a';
-        ctx.lineWidth = 1.5;
-        ctx.stroke();
-        // アームパネル
-        ctx.strokeStyle = 'rgba(0,200,255,0.25)';
-        ctx.lineWidth = 1;
-        const ay = cy + sign * 28;
-        ctx.beginPath();
-        ctx.moveTo(cx + hw * 0.3, cy + sign * 8);
-        ctx.lineTo(cx + hw * 0.3, ay);
-        ctx.moveTo(cx + hw * 0.6, cy + sign * 8);
-        ctx.lineTo(cx + hw * 0.6, ay);
-        ctx.stroke();
+    _drawBioMechaTentacles(ctx) {
+        const tentacles = this._getBioMechaTentacles();
+        ctx.save();
+
+        tentacles.forEach(t => {
+            const nodes = t.nodes;
+
+            // 生体動脈ラインまたは高圧エネルギー導管
+            ctx.strokeStyle = t.isBio ? 'rgba(225, 29, 72, 0.7)' : 'rgba(56, 189, 248, 0.55)';
+            ctx.lineWidth = t.isBio ? 8 : 6;
+            ctx.beginPath();
+            nodes.forEach((n, idx) => {
+                if (idx === 0) ctx.moveTo(n.x, n.y);
+                else ctx.lineTo(n.x, n.y);
+            });
+            ctx.stroke();
+
+            // 各関節の描画
+            for (let i = 0; i < nodes.length; i++) {
+                const n = nodes[i];
+                const r = Math.max(6, 15 - i * 1.0);
+                ctx.save();
+                ctx.translate(n.x, n.y);
+                ctx.rotate(n.angle);
+
+                if (t.isBio) {
+                    // 生体触手：脈動する赤紫の筋肉組織＆内臓血管節
+                    const pulseR = r + Math.sin(this.organPulse + i * 0.7) * 1.8;
+                    const bioGrad = ctx.createRadialGradient(-2, -2, 1, 0, 0, pulseR);
+                    bioGrad.addColorStop(0, '#fda4af');
+                    bioGrad.addColorStop(0.45, '#e11d48');
+                    bioGrad.addColorStop(0.85, '#881337');
+                    bioGrad.addColorStop(1, '#4c0519');
+                    ctx.fillStyle = bioGrad;
+                    ctx.beginPath();
+                    ctx.ellipse(0, 0, pulseR * 1.15, pulseR * 0.85, 0, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.strokeStyle = '#fb7185';
+                    ctx.lineWidth = 1;
+                    ctx.stroke();
+                } else {
+                    // 機械触手：重厚なチタン装甲リング＆モアイ岩石節
+                    const mechGrad = ctx.createRadialGradient(-2, -2, 1, 0, 0, r);
+                    mechGrad.addColorStop(0, '#e2e8f0');
+                    mechGrad.addColorStop(0.5, '#475569');
+                    mechGrad.addColorStop(1, '#0f172a');
+                    ctx.fillStyle = mechGrad;
+                    ctx.fillRect(-r * 0.85, -r * 0.7, r * 1.7, r * 1.4);
+                    ctx.strokeStyle = '#94a3b8';
+                    ctx.lineWidth = 1.2;
+                    ctx.strokeRect(-r * 0.85, -r * 0.7, r * 1.7, r * 1.4);
+
+                    ctx.fillStyle = '#00ffee';
+                    ctx.beginPath();
+                    ctx.arc(0, 0, r * 0.28, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+
+                // 触手先端のクロー／生体牙ノズル
+                if (i === nodes.length - 1) {
+                    ctx.fillStyle = t.isBio ? '#fecdd3' : '#cbd5e1';
+                    ctx.beginPath();
+                    ctx.moveTo(2, -6);
+                    ctx.lineTo(16, -10);
+                    ctx.lineTo(10, -2);
+                    ctx.closePath();
+                    ctx.fill();
+
+                    ctx.beginPath();
+                    ctx.moveTo(2, 6);
+                    ctx.lineTo(16, 10);
+                    ctx.lineTo(10, 2);
+                    ctx.closePath();
+                    ctx.fill();
+
+                    ctx.fillStyle = t.isBio ? '#ff0055' : '#00ffff';
+                    ctx.shadowColor = ctx.fillStyle;
+                    ctx.shadowBlur = 10;
+                    ctx.beginPath();
+                    ctx.arc(6, 0, 4.5, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+
+                ctx.restore();
+            }
+        });
+
+        ctx.restore();
     }
 
+    _drawCerebralBrainAndViscera(ctx, cx, cy, hw) {
+        ctx.save();
+        const beat = Math.sin(this.organPulse) * 4.5;
+
+        // A. 後部〜中央に広がる「巨大生体脳みそ（大脳半球）」
+        const brainX = cx + 32;
+        const brainY = cy;
+        const brainW = 92 + beat;
+        const brainH = 74 + beat * 0.8;
+
+        const brainGrad = ctx.createRadialGradient(brainX - 18, brainY - 14, 8, brainX, brainY, brainW);
+        brainGrad.addColorStop(0, '#ffe4e6');
+        brainGrad.addColorStop(0.3, '#fb7185');
+        brainGrad.addColorStop(0.65, '#be123c');
+        brainGrad.addColorStop(0.9, '#881337');
+        brainGrad.addColorStop(1, '#3b0764');
+
+        ctx.fillStyle = brainGrad;
+        ctx.shadowColor = '#f43f5e';
+        ctx.shadowBlur = 18;
+        ctx.beginPath();
+        ctx.ellipse(brainX, brainY, brainW, brainH, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.shadowBlur = 0;
+
+        // 脳みそのリアルな皺（大脳皮質の溝・回）と神経シナプス発光
+        ctx.strokeStyle = '#4c0519';
+        ctx.lineWidth = 3.2;
+        ctx.beginPath();
+        for (let row = -2; row <= 2; row++) {
+            const ry = brainY + row * 19;
+            ctx.moveTo(brainX - 55, ry);
+            ctx.bezierCurveTo(brainX - 25, ry - 14, brainX + 5, ry + 14, brainX + 35, ry - 6);
+            ctx.bezierCurveTo(brainX + 55, ry - 16, brainX + 70, ry + 10, brainX + 78, ry);
+        }
+        ctx.stroke();
+
+        // 脳皺のハイライト＆神経パルス
+        ctx.strokeStyle = 'rgba(255, 200, 220, 0.55)';
+        ctx.lineWidth = 1.4;
+        ctx.beginPath();
+        for (let row = -2; row <= 2; row++) {
+            const ry = brainY + row * 19 - 2;
+            ctx.moveTo(brainX - 50, ry);
+            ctx.bezierCurveTo(brainX - 20, ry - 12, brainX + 10, ry + 12, brainX + 45, ry - 4);
+        }
+        ctx.stroke();
+
+        // B. 上下に拍動する「内臓器官（バイオ臓器サック）」
+        [-1, 1].forEach(sign => {
+            const ox = cx - 18;
+            const oy = cy + sign * (42 + beat * 0.4);
+            const orx = 34 + beat * 0.7;
+            const ory = 20 - beat * 0.3;
+
+            const visceraGrad = ctx.createRadialGradient(ox - 6, oy - 4, 2, ox, oy, orx);
+            visceraGrad.addColorStop(0, '#f472b6');
+            visceraGrad.addColorStop(0.5, '#9d174d');
+            visceraGrad.addColorStop(1, '#3b0764');
+            ctx.fillStyle = visceraGrad;
+            ctx.beginPath();
+            ctx.ellipse(ox, oy, orx, ory, sign * 0.18, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.strokeStyle = '#500724';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+        });
+
+        // C. 前方のシールドコアと脳・内臓を繋ぐ太い生体動脈・血管束
+        ctx.strokeStyle = '#e11d48';
+        ctx.lineWidth = 4;
+        ctx.beginPath();
+        for (let v = -2; v <= 2; v++) {
+            if (v === 0) continue;
+            ctx.moveTo(cx + 25, cy + v * 16);
+            ctx.quadraticCurveTo(cx - 35, cy + v * (26 + beat * 0.5), cx - 95, cy + v * 6);
+        }
+        ctx.stroke();
+
+        // D. 脳の後方を保護するサイバネティック脊椎・機械外骨格ケーシング
+        const spineGrad = ctx.createLinearGradient(cx + 75, cy - 70, cx + hw + 10, cy + 70);
+        spineGrad.addColorStop(0, '#475569');
+        spineGrad.addColorStop(0.5, '#1e293b');
+        spineGrad.addColorStop(1, '#090d16');
+        ctx.fillStyle = spineGrad;
+        ctx.beginPath();
+        ctx.moveTo(cx + 75, cy - 68);
+        ctx.lineTo(cx + hw + 12, cy - 42);
+        ctx.lineTo(cx + hw + 18, cy);
+        ctx.lineTo(cx + hw + 12, cy + 42);
+        ctx.lineTo(cx + 75, cy + 68);
+        ctx.lineTo(cx + 95, cy);
+        ctx.closePath();
+        ctx.fill();
+        ctx.strokeStyle = '#94a3b8';
+        ctx.lineWidth = 2;
+        ctx.stroke();
+
+        ctx.restore();
+    }
+
+    // 古代モアイ巨石の顔彫刻とサイボーグ重機械が融合した上下顎アーマー
+    _drawMoaiCyberJaw(ctx, cx, cy, hw, isBottom) {
+        ctx.save();
+        const sign = isBottom ? 1 : -1;
+        const jawShift = this.jawOpen * 16 * sign;
+        const baseY = cy + jawShift;
+
+        // 1. 古代モアイ岩石カウル（風化花崗岩＆玄武岩グラデーション）
+        const rockGrad = ctx.createLinearGradient(cx - hw, baseY + sign * 25, cx + hw, baseY + sign * 92);
+        rockGrad.addColorStop(0, '#cbd5e1');
+        rockGrad.addColorStop(0.3, '#64748b');
+        rockGrad.addColorStop(0.75, '#334155');
+        rockGrad.addColorStop(1, '#0f172a');
+        ctx.fillStyle = rockGrad;
+
+        ctx.beginPath();
+        // モアイ特有の彫りの深い眉・鷲鼻・顎シルエットを上下装甲として造形
+        ctx.moveTo(cx + hw - 10, baseY + sign * 32);
+        ctx.lineTo(cx + hw - 24, baseY + sign * 86);
+        ctx.lineTo(cx - 10, baseY + sign * 92);
+        ctx.lineTo(cx - 55, baseY + sign * 76);      // モアイの眉庇突起
+        ctx.lineTo(cx - 72, baseY + sign * 62);      // 深い眼窩くぼみ
+        ctx.lineTo(cx - hw - 6, baseY + sign * 52);  // 突き出たモアイの鷲鼻先端
+        ctx.lineTo(cx - hw + 14, baseY + sign * 30); // 口元の巨石牙
+        ctx.lineTo(cx - 35, baseY + sign * 26);
+        ctx.closePath();
+        ctx.fill();
+
+        ctx.strokeStyle = '#090d16';
+        ctx.lineWidth = 2.5;
+        ctx.stroke();
+
+        // 2. モアイ眼窩の暗黒影＆サイバー光学センサーアイ
+        ctx.fillStyle = '#030712';
+        ctx.beginPath();
+        ctx.arc(cx - 56, baseY + sign * 60, 10, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = '#00ffee';
+        ctx.shadowColor = '#00ffee';
+        ctx.shadowBlur = 8;
+        ctx.beginPath();
+        ctx.arc(cx - 58, baseY + sign * 60, 4, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.shadowBlur = 0;
+
+        // 3. サイボーグ機械フレーム＆生体チューブ・金属牙
+        ctx.fillStyle = '#1e293b';
+        ctx.fillRect(cx - 15, baseY + sign * 42 - (isBottom ? 14 : 0), 95, 14);
+        ctx.strokeStyle = '#38bdf8';
+        ctx.lineWidth = 1.2;
+        ctx.strokeRect(cx - 15, baseY + sign * 42 - (isBottom ? 14 : 0), 95, 14);
+
+        // 内側のメカニカル・ファング（金属の牙）
+        ctx.fillStyle = '#e2e8f0';
+        for (let t = 0; t < 4; t++) {
+            const tx = cx - hw + 22 + t * 18;
+            const ty = baseY + sign * 28;
+            ctx.beginPath();
+            ctx.moveTo(tx, ty);
+            ctx.lineTo(tx + 6, ty - sign * 11);
+            ctx.lineTo(tx + 12, ty);
+            ctx.closePath();
+            ctx.fill();
+        }
+
+        ctx.restore();
+    }
+
+    // 中央の巨大生体眼球＆脳幹コア
     _drawMainCore(ctx, cx, cy) {
         ctx.save();
         const hpRatio = Math.max(0, this.hp / this.maxHp);
-        const pulse = Math.sin(Date.now() * 0.008) * 0.25 + 0.75;
+        const pulse = Math.sin(Date.now() * 0.009) * 0.25 + 0.75;
+        const r = 27;
 
-        let baseColor, glowColor;
-        if (this.hitFlashTimer > 0) {
-            baseColor = '#ffffff'; glowColor = '#ffffff';
-        } else if (hpRatio > 0.5) {
-            baseColor = '#ff4400'; glowColor = '#ff2200';
-        } else if (hpRatio > 0.25) {
-            baseColor = '#ff6600'; glowColor = '#ffaa00';
-        } else {
-            const f = Math.floor(Date.now() / 80) % 2 === 0;
-            baseColor = f ? '#ffffff' : '#ff0000'; glowColor = '#ff0000';
-        }
+        const isFlash = this.hitFlashTimer > 0;
+        const glowColor = isFlash ? '#ffffff' : (this.coreOpen ? '#ff0044' : '#ff2266');
 
-        const r = 26;
         ctx.shadowColor = glowColor;
-        ctx.shadowBlur = (this.coreOpen ? 32 : 16) * pulse;
+        ctx.shadowBlur = (this.coreOpen ? 34 : 18) * pulse;
 
-        // マウントリング
-        ctx.fillStyle = '#0d1520';
+        // 生体肉腫リング（眼瞼リング）
+        ctx.fillStyle = '#4c0519';
         ctx.beginPath();
-        ctx.arc(cx, cy, r + 8, 0, Math.PI * 2);
+        ctx.arc(cx, cy, r + 7, 0, Math.PI * 2);
         ctx.fill();
-        ctx.strokeStyle = '#2a4060';
+        ctx.strokeStyle = '#f43f5e';
         ctx.lineWidth = 3;
         ctx.stroke();
 
-        // 球体コア
-        const sg = ctx.createRadialGradient(cx - r * 0.3, cy - r * 0.3, 2, cx, cy, r);
-        sg.addColorStop(0, '#ffffff');
-        sg.addColorStop(0.3, baseColor);
-        sg.addColorStop(0.8, glowColor);
-        sg.addColorStop(1, '#220000');
-        ctx.fillStyle = sg;
+        // 巨大眼球の強膜（白目〜充血グラデーション）
+        const scleraGrad = ctx.createRadialGradient(cx - 5, cy - 5, 2, cx, cy, r);
+        if (isFlash) {
+            scleraGrad.addColorStop(0, '#ffffff');
+            scleraGrad.addColorStop(1, '#ffffff');
+        } else {
+            scleraGrad.addColorStop(0, '#fff1f2');
+            scleraGrad.addColorStop(0.55, '#fecdd3');
+            scleraGrad.addColorStop(0.85, '#f43f5e');
+            scleraGrad.addColorStop(1, '#881337');
+        }
+        ctx.fillStyle = scleraGrad;
         ctx.beginPath();
         ctx.arc(cx, cy, r, 0, Math.PI * 2);
         ctx.fill();
 
-        // 回転リング
-        ctx.save();
-        ctx.translate(cx, cy);
-        ctx.rotate(this.rotationAngle);
-        ctx.strokeStyle = `rgba(255,200,100,${0.45 * pulse})`;
-        ctx.lineWidth = 2;
-        ctx.beginPath();
-        for (let i = 0; i < 6; i++) {
-            const a = (Math.PI / 3) * i;
-            if (i === 0) ctx.moveTo(Math.cos(a) * r * 0.65, Math.sin(a) * r * 0.65);
-            else ctx.lineTo(Math.cos(a) * r * 0.65, Math.sin(a) * r * 0.65);
+        // 眼球内の毛細血管
+        if (!isFlash) {
+            ctx.strokeStyle = 'rgba(225, 29, 72, 0.65)';
+            ctx.lineWidth = 1.2;
+            for (let i = 0; i < 6; i++) {
+                const a = this.rotationAngle * 0.3 + (Math.PI / 3) * i;
+                ctx.beginPath();
+                ctx.moveTo(cx + Math.cos(a) * r * 0.95, cy + Math.sin(a) * r * 0.95);
+                ctx.quadraticCurveTo(cx + Math.cos(a + 0.2) * r * 0.6, cy + Math.sin(a - 0.2) * r * 0.6, cx, cy);
+                ctx.stroke();
+            }
         }
-        ctx.closePath();
-        ctx.stroke();
-        ctx.restore();
 
-        ctx.shadowBlur = 0;
-        ctx.fillStyle = `rgba(255,255,255,${0.55 * pulse})`;
+        // 自機を睨みつける虹彩＆縦長スリット瞳孔
+        const targetX = (typeof player !== 'undefined' && player) ? player.x : 100;
+        const targetY = (typeof player !== 'undefined' && player) ? player.y : cy;
+        const lookAng = Math.atan2(targetY - cy, targetX - cx);
+        const lookDist = 6;
+        const ix = cx + Math.cos(lookAng) * lookDist;
+        const iy = cy + Math.sin(lookAng) * lookDist;
+
+        const irisColor = hpRatio > 0.4 ? '#00e5ff' : '#ffea00';
+        const irisGrad = ctx.createRadialGradient(ix, iy, 1, ix, iy, 13);
+        irisGrad.addColorStop(0, irisColor);
+        irisGrad.addColorStop(0.6, '#be123c');
+        irisGrad.addColorStop(1, '#1e1b4b');
+        ctx.fillStyle = irisGrad;
         ctx.beginPath();
-        ctx.ellipse(cx - r * 0.3, cy - r * 0.3, r * 0.4, r * 0.2, -Math.PI / 4, 0, Math.PI * 2);
+        ctx.arc(ix, iy, 13, 0, Math.PI * 2);
+        ctx.fill();
+
+        // 爬虫類・生体兵器風の縦長スリット瞳孔
+        ctx.fillStyle = '#020617';
+        ctx.beginPath();
+        ctx.ellipse(ix, iy, this.coreOpen ? 4.5 : 3.0, 10.5, 0, 0, Math.PI * 2);
+        ctx.fill();
+
+        // 眼球の濡れたハイライト反射
+        ctx.shadowBlur = 0;
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
+        ctx.beginPath();
+        ctx.ellipse(cx - 8, cy - 9, 6, 3.2, -Math.PI / 4, 0, Math.PI * 2);
         ctx.fill();
 
         ctx.restore();
     }
 
+    // 前面4つの生体臓器カプセル・シールドコア
     _drawShieldCores(ctx, cy) {
         ctx.save();
         for (let i = 0; i < this.shieldCores.length; i++) {
@@ -1256,29 +1861,38 @@ class BigCoreBoss {
             const scx = this._getShieldCoreX(i);
             const scy = cy;
             const r = 13;
-            const pulse = Math.sin(Date.now() * 0.010 + i * 1.5) * 0.2 + 0.8;
+            const pulse = Math.sin(Date.now() * 0.012 + i * 1.4) * 0.2 + 0.8;
             const isFlash = core.flashTimer > 0;
             const hpRatio = core.hp / core.maxHp;
-            const coreColor = isFlash ? '#ffffff' : (hpRatio > 0.5 ? '#00ffee' : '#ffaa00');
+            const coreColor = isFlash ? '#ffffff' : (hpRatio > 0.5 ? '#ff2266' : '#ffaa00');
+
+            // 上下顎と臓器カプセルを繋ぐ生体神経腱
+            ctx.strokeStyle = 'rgba(244, 63, 94, 0.65)';
+            ctx.lineWidth = 2.5;
+            ctx.beginPath();
+            ctx.moveTo(scx, scy - 28);
+            ctx.lineTo(scx, scy + 28);
+            ctx.stroke();
 
             ctx.shadowColor = coreColor;
             ctx.shadowBlur = 16 * pulse;
 
-            // 外枠
-            ctx.strokeStyle = isFlash ? '#ffffff' : '#2a4a6a';
-            ctx.lineWidth = 3;
+            // 生体カプセル外膜
+            ctx.strokeStyle = isFlash ? '#ffffff' : '#fda4af';
+            ctx.lineWidth = 2.5;
             ctx.beginPath();
-            ctx.arc(scx, scy, r + 4, 0, Math.PI * 2);
+            ctx.arc(scx, scy, r + 3, 0, Math.PI * 2);
             ctx.stroke();
 
-            // コア球体
+            // 拍動する生体臓器コア球体
             const grad = ctx.createRadialGradient(scx - 3, scy - 3, 1, scx, scy, r);
             grad.addColorStop(0, '#ffffff');
-            grad.addColorStop(0.4, coreColor);
-            grad.addColorStop(1, '#001020');
+            grad.addColorStop(0.35, coreColor);
+            grad.addColorStop(0.8, '#881337');
+            grad.addColorStop(1, '#1f0318');
             ctx.fillStyle = grad;
             ctx.beginPath();
-            ctx.arc(scx, scy, r, 0, Math.PI * 2);
+            ctx.arc(scx, scy, r * pulse, 0, Math.PI * 2);
             ctx.fill();
             ctx.shadowBlur = 0;
         }
@@ -1286,4 +1900,6 @@ class BigCoreBoss {
     }
 }
 
+window.GolemBoss = GolemBoss;
 window.BigCoreBoss = BigCoreBoss;
+

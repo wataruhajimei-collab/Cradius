@@ -683,26 +683,40 @@ class MoaiTerrain {
     checkCollision(rect) {
         if (!this.active || !this.wallActive || this.wallTransition < 0.3) return false;
 
-        // モアイが放つイオンリング弾（RingBullet）はモアイ自身や地形に消されず自機へ向かって飛来する（原作仕様）
-        if (typeof RingBullet !== 'undefined' && rect instanceof RingBullet) {
+        const isRing = (typeof RingBullet !== 'undefined' && rect instanceof RingBullet);
+        const isEnemyShot = Boolean(rect.isEnemy || isRing);
+
+        // イオンリング弾がモアイの口から発射された直後（口内・顎付近を抜けるまでの数フレーム）は消滅させない
+        if (isRing && typeof rect.framesAlive === 'number' && rect.framesAlive <= 6) {
             return false;
         }
 
         const cx = rect.x + rect.width / 2;
         const cy = rect.y + rect.height / 2;
         const topY = this.getTopY(cx);
-        if (rect.isEnemy ? (cy < topY) : (rect.y < topY)) return true;
-
         const bottomY = this.getBottomY(cx);
-        if (rect.isEnemy ? (cy > bottomY) : (rect.y + rect.height > bottomY)) return true;
+
+        if (isEnemyShot) {
+            // 本家グラディウス準拠：イオンリング弾・敵弾は岩盤地形（天井・床・浮島）に当たると消滅する！
+            const r = isRing ? 6 : 3;
+            if (cy - r < topY) return true;
+            if (cy + r > bottomY) return true;
+
+            const shotCore = { x: cx - r, y: cy - r, width: r * 2, height: r * 2 };
+            for (let i = 0; i < this.floatingIslands.length; i++) {
+                if (this.floatingIslands[i].checkCollision(shotCore)) return true;
+            }
+            // モアイ像自身の当たり判定では敵弾・イオンリングを消滅させない（発射即消滅の防止）
+            return false;
+        }
+
+        if (rect.y < topY) return true;
+        if (rect.y + rect.height > bottomY) return true;
 
         // 浮島との衝突
         for (let i = 0; i < this.floatingIslands.length; i++) {
             if (this.floatingIslands[i].checkCollision(rect)) return true;
         }
-
-        // 敵弾（ダッカー弾など）はモアイ本体との衝突判定を行わない
-        if (rect.isEnemy) return false;
 
         // モアイ本体との衝突（自機など）
         for (let i = 0; i < this.moais.length; i++) {
@@ -1315,14 +1329,14 @@ class Stage3 {
             if (pulse) {
                 ctx.save();
                 ctx.textAlign = 'center';
-                ctx.font = 'bold 28px "Courier New", monospace';
-                ctx.fillStyle = '#ff3300';
-                ctx.shadowColor = '#ff0000';
+                ctx.font = 'bold 26px "Courier New", monospace';
+                ctx.fillStyle = '#ff2266';
+                ctx.shadowColor = '#ff0044';
                 ctx.shadowBlur = 16;
-                ctx.fillText('WARNING : BIG CORE APPROACHING!', this.width / 2, this.height / 2 - 30);
-                ctx.font = 'bold 18px "Courier New", monospace';
+                ctx.fillText('WARNING : BIO-MOAI BRAIN CORE APPROACHING!', this.width / 2, this.height / 2 - 30);
+                ctx.font = 'bold 17px "Courier New", monospace';
                 ctx.fillStyle = '#ffcc00';
-                ctx.fillText('DESTROY 4 SHIELD BARRIERS TO EXPOSE REACTOR!', this.width / 2, this.height / 2 + 15);
+                ctx.fillText('DESTROY 4 ORGAN BARRIERS TO EXPOSE THE CEREBRAL BRAIN CORE!', this.width / 2, this.height / 2 + 15);
                 ctx.restore();
             }
         }

@@ -320,9 +320,15 @@ function handleCollisions() {
             }
         }
         
-        const isRingBullet = (typeof RingBullet !== 'undefined' && bullet instanceof RingBullet);
-        if (bullet.active && !isRingBullet && levelManager.checkCollision(bullet)) {
+        if (bullet.active && levelManager.checkCollision(bullet)) {
             bullet.active = false;
+            if (typeof RingBullet !== 'undefined' && bullet instanceof RingBullet && typeof particles !== 'undefined' && typeof Particle !== 'undefined') {
+                const cx = bullet.x + bullet.width / 2;
+                const cy = bullet.y + bullet.height / 2;
+                for (let i = 0; i < 5; i++) {
+                    particles.push(new Particle(cx, cy, bullet.color || '#38bdf8'));
+                }
+            }
         }
     });
 
@@ -354,6 +360,24 @@ function handleCollisions() {
         // 登場中（isEntering）や撃破中（isDying）は無敵
         if (!boss.isEntering && !boss.isDying) {
             playerBullets.forEach(bullet => {
+                if (!bullet.active) return;
+
+                // ボスが放ったイオンリング弾（RingBullet）は自機弾で撃ち落とし可能
+                if (boss.bullets && typeof RingBullet !== 'undefined') {
+                    for (let i = 0; i < boss.bullets.length; i++) {
+                        const bShot = boss.bullets[i];
+                        if (bShot.active && bShot instanceof RingBullet && checkCollision(bullet, bShot)) {
+                            bShot.active = false;
+                            if (typeof Laser === 'undefined' || !(bullet instanceof Laser)) {
+                                bullet.active = false;
+                            }
+                            createExplosion(bShot.x + bShot.width / 2, bShot.y + bShot.height / 2, bShot.color || '#38bdf8');
+                            if (typeof Sound !== 'undefined' && typeof Sound.playBossHit === 'function') Sound.playBossHit();
+                            if (!bullet.active) break;
+                        }
+                    }
+                }
+
                 if (bullet.active && boss.active) {
                     if (typeof boss.handleBulletCollision === 'function') {
                         boss.handleBulletCollision(bullet);

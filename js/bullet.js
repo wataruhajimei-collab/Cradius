@@ -205,10 +205,12 @@ class RingBullet extends Bullet {
         this.height = 32;
         this.color = color;
         this.pulse = Math.random() * Math.PI * 2;
+        this.framesAlive = 0;
     }
 
     update(canvasHeight) {
         super.update(canvasHeight);
+        this.framesAlive++;
         this.pulse += 0.22;
     }
 

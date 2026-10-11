@@ -372,8 +372,9 @@ class StonehengeStage {
     }
 
     _spawnBoss() {
-        const bossClass = (typeof BigCoreBoss !== 'undefined') ? BigCoreBoss :
-                          (typeof window.BigCoreBoss !== 'undefined') ? window.BigCoreBoss :
+        const bossClass = (typeof GolemBoss !== 'undefined') ? GolemBoss :
+                          (typeof window.GolemBoss !== 'undefined') ? window.GolemBoss :
+                          (typeof BigCoreBoss !== 'undefined') ? BigCoreBoss :
                           (typeof Boss !== 'undefined') ? Boss : null;
         if (bossClass) {
             this.boss = new bossClass(this.width, this.height / 2);
@@ -698,14 +699,14 @@ class StonehengeStage {
             if (pulse) {
                 ctx.save();
                 ctx.textAlign = 'center';
-                ctx.font = 'bold 28px "Courier New", monospace';
+                ctx.font = 'bold 26px "Courier New", monospace';
                 ctx.fillStyle = '#ff3300';
                 ctx.shadowColor = '#ff0000';
                 ctx.shadowBlur = 16;
-                ctx.fillText('WARNING : BIG CORE APPROACHING!', this.width / 2, this.height / 2 - 30);
-                ctx.font = 'bold 18px "Courier New", monospace';
+                ctx.fillText('WARNING : ANCIENT MECHA-GOLEM APPROACHING!', this.width / 2, this.height / 2 - 30);
+                ctx.font = 'bold 17px "Courier New", monospace';
                 ctx.fillStyle = '#ffcc00';
-                ctx.fillText('DESTROY 4 SHIELD BARRIERS TO EXPOSE REACTOR!', this.width / 2, this.height / 2 + 15);
+                ctx.fillText('DESTROY STONE TABLETS & TWIN RUNE CORES! BEWARE OF MECHA TENTACLES!', this.width / 2, this.height / 2 + 15);
                 ctx.restore();
             }
         }
