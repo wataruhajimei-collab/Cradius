@@ -539,7 +539,7 @@ class SoundManager {
         if (this._bossScreamBuffer) return this._bossScreamBuffer;
 
         const sr = this.ctx.sampleRate || 44100;
-        const totalDur = 2.15;
+        const totalDur = 3.80;
         const voiceDur = 1.48;
         const len = Math.floor(sr * totalDur);
         const buf = this.ctx.createBuffer(1, len, sr);
@@ -722,37 +722,68 @@ class SoundManager {
             }
         }
 
-        // --- 6. アーケード格闘・シューティング風のドラマチックな断末魔K.O.エコー（「ウワァァーー！…ワァァーー…ァァ…」） ---
-        const d1 = Math.floor(0.23 * sr);
-        const d2 = Math.floor(0.46 * sr);
-        const d3 = Math.floor(0.69 * sr);
+        // --- 6. 極端に響き渡る大宇宙要塞K.O.ロングエコー（「ウワァァーー！！ …ワァァーー！！ …ワァァーー… …ァァーー… …ァァ…」） ---
+        // 原音(dry)をまずピーク正規化して声自体の密度・音圧を最大化
+        let dryPeak = 0.001;
         for (let i = 0; i < len; i++) {
-            let v = dry[i];
-            if (i >= d1) v += dry[i - d1] * 0.42;
-            if (i >= d2) v += dry[i - d2] * 0.22;
-            if (i >= d3) v += dry[i - d3] * 0.11;
+            const a = Math.abs(dry[i]);
+            if (a > dryPeak) dryPeak = a;
+        }
+        const dryNorm = 1.0 / dryPeak;
+        for (let i = 0; i < len; i++) {
+            // 原音の声質を保ったまま太く濃密にブースト
+            dry[i] = Math.tanh(dry[i] * dryNorm * 2.2) / Math.tanh(2.2);
+        }
+
+        // 8段の強烈なK.O.スタジアムエコー＋空間反射タップ（3.8秒間にわたり極端にこだまする！）
+        const echoTaps = [
+            { delay: 0.24, gain: 0.85 },
+            { delay: 0.48, gain: 0.72 },
+            { delay: 0.72, gain: 0.60 },
+            { delay: 0.96, gain: 0.48 },
+            { delay: 1.20, gain: 0.38 },
+            { delay: 1.44, gain: 0.28 },
+            { delay: 1.68, gain: 0.20 },
+            { delay: 1.92, gain: 0.14 },
+            { delay: 2.16, gain: 0.09 },
+            // 大聖堂・要塞内部の密な空間リバーブ反射
+            { delay: 0.11, gain: 0.32 },
+            { delay: 0.35, gain: 0.30 },
+            { delay: 0.59, gain: 0.25 },
+            { delay: 0.83, gain: 0.20 },
+            { delay: 1.07, gain: 0.15 }
+        ];
+
+        for (let i = 0; i < len; i++) {
+            let v = dry[i] * 1.35; // 原音アタックも強力に
+            for (let t = 0; t < echoTaps.length; t++) {
+                const dSamples = Math.floor(echoTaps[t].delay * sr);
+                if (i >= dSamples) {
+                    v += dry[i - dSamples] * echoTaps[t].gain;
+                }
+            }
             out[i] = v;
         }
 
-        // --- 7. ピーク正規化＋音割れゼロのウォーム・マキシマイズ（ノイズを出さずに最大音圧へ） ---
+        // --- 7. 3倍の音圧感を生むクリーン・ラウドネスマキシマイズ（音割れノイズを出さずに声量を極限まで引き上げる） ---
         let maxPeak = 0.001;
         for (let i = 0; i < len; i++) {
             const a = Math.abs(out[i]);
             if (a > maxPeak) maxPeak = a;
         }
-        const normGain = 0.96 / maxPeak;
-        const drive = 1.65;
+        const normGain = 0.98 / maxPeak;
+        const drive = 2.6;
         const tanhNorm = Math.tanh(drive);
         for (let i = 0; i < len; i++) {
             const x = out[i] * normGain;
-            out[i] = Math.tanh(x * drive) / tanhNorm * 0.96;
+            out[i] = (Math.tanh(x * drive) / tanhNorm) * 0.98;
         }
 
         this._bossScreamBuffer = buf;
         return buf;
     }
 
-    // ボス撃破時の断末魔の絶叫: 0秒から大迫力の断末魔「ウワァァァーー！！」を轟かせる
+    // ボス撃破時の断末魔の絶叫: 3倍の大声量＋極端に響き渡るロングエコーで「ウワァァァーー！！」を轟かせる
     playBossScream() {
         this.screamCount = (this.screamCount || 0) + 1;
         this.lastScreamText = 'ウワーーーー！';
@@ -770,31 +801,66 @@ class SoundManager {
         const src = this.ctx.createBufferSource();
         src.buffer = screamBuf;
 
-        // 肉声の迫力をさらに引き立てる中域プレゼンスブースト＆クリーン出力
+        // 人間の声の帯域（600Hz〜2400Hz）を分厚く押し出す2段プレゼンス＆ボディブースト
+        const bodyBoost = this.ctx.createBiquadFilter();
+        bodyBoost.type = 'peaking';
+        bodyBoost.frequency.setValueAtTime(750, now);
+        bodyBoost.Q.setValueAtTime(0.85, now);
+        bodyBoost.gain.setValueAtTime(6.5, now);
+
         const presence = this.ctx.createBiquadFilter();
         presence.type = 'peaking';
-        presence.frequency.setValueAtTime(1150, now);
-        presence.Q.setValueAtTime(1.0, now);
-        presence.gain.setValueAtTime(3.5, now);
+        presence.frequency.setValueAtTime(1350, now);
+        presence.Q.setValueAtTime(0.95, now);
+        presence.gain.setValueAtTime(7.5, now);
+
+        // さらに外部フィードバック・ディレイ回路を重ねてエコーを極端に響かせる！
+        const extDelay = this.ctx.createDelay(1.0);
+        extDelay.delayTime.setValueAtTime(0.24, now);
+        const extFeedback = this.ctx.createGain();
+        extFeedback.gain.setValueAtTime(0.62, now);
+        const extFilter = this.ctx.createBiquadFilter();
+        extFilter.type = 'lowpass';
+        extFilter.frequency.setValueAtTime(2800, now);
+        const extWet = this.ctx.createGain();
+        extWet.gain.setValueAtTime(0.85, now);
+
+        extDelay.connect(extFilter);
+        extFilter.connect(extFeedback);
+        extFeedback.connect(extDelay);
+        extFilter.connect(extWet);
+
+        // 音割れを防ぎつつ従来の3倍の体感音量を実現するマキシマイズ出力段
+        const limiter = this.ctx.createDynamicsCompressor();
+        limiter.threshold.setValueAtTime(-3.0, now);
+        limiter.knee.setValueAtTime(4.0, now);
+        limiter.ratio.setValueAtTime(12.0, now);
+        limiter.attack.setValueAtTime(0.001, now);
+        limiter.release.setValueAtTime(0.06, now);
 
         const outGain = this.ctx.createGain();
-        outGain.gain.setValueAtTime(1.85, now);
+        outGain.gain.setValueAtTime(5.2, now); // 従来の約3倍の大音量ゲイン！
 
-        src.connect(presence);
-        presence.connect(outGain);
+        src.connect(bodyBoost);
+        bodyBoost.connect(presence);
+        presence.connect(limiter);
+        presence.connect(extDelay);
+        extWet.connect(limiter);
+        limiter.connect(outGain);
         outGain.connect(this.ctx.destination);
 
-        // 叫び声の間、BGMを完全ミュートして断末魔を最前面に際立たせる
+        // 叫び声とロングエコーが響き渡る間、BGMを完全ミュートして断末魔を最前面に際立たせる
         if (this.bgmGain) {
             try {
                 this.bgmGain.gain.cancelScheduledValues(now);
                 this.bgmGain.gain.setValueAtTime(0.0, now);
-                this.bgmGain.gain.linearRampToValueAtTime(0.70, now + 2.2);
+                this.bgmGain.gain.setValueAtTime(0.0, now + 3.2);
+                this.bgmGain.gain.linearRampToValueAtTime(0.70, now + 3.9);
             } catch (e) {}
         }
 
         src.start(now);
-        this.autoClean(src, 2.2, presence, outGain);
+        this.autoClean(src, 4.0, bodyBoost, presence, extDelay, extFeedback, extFilter, extWet, limiter, outGain);
     }
 
     // --- BGM エンジン (本格 KONAMI 矩形波倶楽部スタイル) ---
