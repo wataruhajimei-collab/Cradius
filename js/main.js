@@ -515,8 +515,10 @@ function triggerBossDefeatExplosion(boss) {
             if (typeof BossExplosion !== 'undefined') {
                 particles.push(new BossExplosion(explosionX, explosionY, radius));
             }
-            const sparkColor = isStage3 ? '#ff1144' : (isStage2 ? '#e6ccb2' : '#ffaa00');
-            createExplosion(explosionX, explosionY, sparkColor);
+            if (!isStage3) {
+                const sparkColor = isStage2 ? '#e6ccb2' : '#ffaa00';
+                createExplosion(explosionX, explosionY, sparkColor);
+            }
             if (i % 3 === 0 && typeof spawnBossDismembermentWave === 'function') {
                 spawnBossDismembermentWave(boss, false);
             }
@@ -535,8 +537,10 @@ function triggerBossDefeatExplosion(boss) {
         if (typeof spawnBossDismembermentWave === 'function') {
             spawnBossDismembermentWave(boss, true);
         }
-        for (let j = 0; j < 20; j++) {
-            createExplosion(centerX, centerY, isStage3 ? '#dc143c' : (isStage2 ? '#ddb892' : '#ffffff'));
+        if (!isStage3) {
+            for (let j = 0; j < 20; j++) {
+                createExplosion(centerX, centerY, isStage2 ? '#ddb892' : '#ffffff');
+            }
         }
     }, 1100);
 
