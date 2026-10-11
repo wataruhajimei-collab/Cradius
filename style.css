@@ -444,3 +444,27 @@ html, body {
     }
 }
 
+.arcade-scream-test-btn {
+    margin-top: clamp(12px, 2.2vh, 22px);
+    padding: 10px 20px;
+    background: linear-gradient(180deg, #ff2244 0%, #aa0022 100%);
+    color: #ffffaa;
+    font-family: 'Press Start 2P', "Hiragino Kaku Gothic ProN", "Meiryo", sans-serif;
+    font-size: clamp(11px, 2.2vw, 15px);
+    font-weight: 900;
+    border: 2px solid #ffcc44;
+    border-radius: 6px;
+    box-shadow: 0 0 14px rgba(255, 34, 68, 0.75);
+    cursor: pointer;
+    z-index: 30;
+    position: relative;
+    pointer-events: auto;
+    transition: transform 0.1s ease, box-shadow 0.1s ease;
+}
+
+.arcade-scream-test-btn:active {
+    transform: scale(0.95);
+    box-shadow: 0 0 22px rgba(255, 220, 80, 0.95);
+}
+
+

@@ -72,26 +72,58 @@ function init() {
     // スタート画面操作のバインド
     const startScreen = document.getElementById('start-screen');
     const btnStart = document.getElementById('btn-start');
+    const btnScreamTest = document.getElementById('btn-scream-test');
+
+    const isScreamTestEvent = (e) => {
+        return e && e.target && typeof e.target.closest === 'function' && e.target.closest('#btn-scream-test');
+    };
+
+    if (btnScreamTest) {
+        let lastScreamTap = 0;
+        const triggerSoloScream = (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            const now = Date.now();
+            if (now - lastScreamTap < 250) return;
+            lastScreamTap = now;
+            if (typeof Sound !== 'undefined') {
+                Sound.unlockAudio();
+                Sound.playBossScream();
+            }
+            const origText = btnScreamTest.textContent;
+            btnScreamTest.textContent = '🗣️ ウワーーーー！！';
+            setTimeout(() => {
+                btnScreamTest.textContent = '🔊 叫び声だけ試聴 (ウワーーーー！)';
+            }, 1900);
+        };
+        btnScreamTest.addEventListener('pointerdown', triggerSoloScream);
+        btnScreamTest.addEventListener('touchstart', triggerSoloScream, { passive: false });
+        btnScreamTest.addEventListener('click', triggerSoloScream);
+    }
 
     if (startScreen) {
         startScreen.addEventListener('pointerdown', (e) => {
+            if (isScreamTestEvent(e)) return;
             e.preventDefault();
             startGame();
         });
         startScreen.addEventListener('touchstart', (e) => {
+            if (isScreamTestEvent(e)) return;
             e.preventDefault();
             startGame();
         }, { passive: false });
     }
     if (btnStart) {
         btnStart.addEventListener('click', (e) => {
+            if (isScreamTestEvent(e)) return;
             e.preventDefault();
             startGame();
         });
     }
 
     // 画面全体のどこをタップ・クリック・キー押ししても即座にゲーム開始＆BGM発音
-    const globalTrigger = () => {
+    const globalTrigger = (e) => {
+        if (isScreamTestEvent(e)) return;
         if (!gameStarted) {
             startGame();
         } else {
