@@ -453,12 +453,13 @@ class GarunEnemy extends Enemy {
 // ザブ小隊 (奇襲機: 見切りやすいサイズとスピード)
 // ------------------------------------------
 class ZabSquad extends FormationBase {
-    constructor(spawnSide, targetY, count = 3) {
+    constructor(spawnSide = 'ANYWHERE', targetY = 300, count = 3) {
         super(count);
         this.enemies = [];
 
         for (let i = 0; i < count; i++) {
-            const enemy = new ZabEnemy(spawnSide, targetY + (i - 1) * 45, this);
+            const isRed = (i === count - 1 && Math.random() < 0.55);
+            const enemy = new ZabEnemy('ANYWHERE', null, this, i * 10, isRed);
             this.enemies.push(enemy);
             enemies.push(enemy);
         }
@@ -466,30 +467,61 @@ class ZabSquad extends FormationBase {
 }
 
 class ZabEnemy extends Enemy {
-    constructor(spawnSide, targetY, formation = null) {
-        let sx = 820, sy = targetY;
-        if (spawnSide === 'BACK') { sx = -40; }
-        else if (spawnSide === 'TOP') { sx = Math.random() * 600 + 100; sy = -40; }
-        else if (spawnSide === 'BOTTOM') { sx = Math.random() * 600 + 100; sy = 640; }
+    constructor(spawnSide = 'ANYWHERE', targetY = null, formation = null, delay = 0, isRed = false) {
+        // 画面の外ではなく、画面内のどこからでもランダムにワープアウトさせる (x: 45〜740, y: 45〜525)
+        let sx, sy;
+        if (typeof spawnSide === 'number' && typeof targetY === 'number') {
+            sx = Math.max(40, Math.min(750, spawnSide));
+            sy = Math.max(40, Math.min(530, targetY));
+        } else {
+            const pX = (typeof player !== 'undefined' && player) ? (player.x + player.width / 2) : -999;
+            const pY = (typeof player !== 'undefined' && player) ? (player.y + player.height / 2) : -999;
+            sx = 45 + Math.random() * 695;
+            sy = 45 + Math.random() * 480;
+            // 自機の真上にいきなり重なって出現しないよう安全距離(115px)を確保しつつ画面全域どこからでも出現
+            for (let attempt = 0; attempt < 10; attempt++) {
+                const candX = 45 + Math.random() * 695;
+                const candY = 45 + Math.random() * 480;
+                if (Math.hypot(candX + 16 - pX, candY + 16 - pY) >= 115) {
+                    sx = candX;
+                    sy = candY;
+                    break;
+                }
+            }
+        }
 
-        super(sx, sy);
+        super(sx, sy, isRed);
         this.width = 32;
         this.height = 32;
         this.formation = formation;
-        this.spawnSide = spawnSide;
+        this.spawnSide = 'ANYWHERE';
+        this.delay = delay;
         this.state = 'WARP_IN';
         this.warpTimer = 0;
+        this.warpDuration = 38;
         this.vx = 0;
         this.vy = 0;
         this.rot = 0;
     }
 
     update() {
+        if (this.delay > 0) {
+            this.delay--;
+            return;
+        }
+
         this.rot += 0.15;
         if (this.state === 'WARP_IN') {
             this.warpTimer++;
-            if (this.warpTimer > 35) { // ワープ表示を長くして見やすく
+            if (this.warpTimer >= this.warpDuration) {
                 this.state = 'RUSH';
+                // ワープアウト完了時の空間スパーク粒子
+                if (typeof particles !== 'undefined' && typeof Particle !== 'undefined') {
+                    const pColor = this.isRed ? '#ff6688' : '#00ffff';
+                    for (let i = 0; i < 6; i++) {
+                        particles.push(new Particle(this.x + this.width / 2, this.y + this.height / 2, pColor));
+                    }
+                }
                 if (typeof player !== 'undefined') {
                     const dx = (player.x + player.width / 2) - (this.x + this.width / 2);
                     const dy = (player.y + player.height / 2) - (this.y + this.height / 2);
@@ -504,28 +536,52 @@ class ZabEnemy extends Enemy {
         } else {
             this.x += this.vx;
             this.y += this.vy;
+            // 画面外へ抜けたら消去
+            if (this.x < -80 || this.x > 880 || this.y < -80 || this.y > 680) {
+                this.active = false;
+            }
         }
     }
 
     draw(ctx) {
+        if (this.delay > 0) return;
         ctx.save();
         ctx.translate(this.x + this.width / 2, this.y + this.height / 2);
 
         if (this.state === 'WARP_IN') {
-            // 高エネルギー空間歪曲リング
-            const radius = Math.max(1, 38 - this.warpTimer);
-            ctx.strokeStyle = '#00ffff';
+            // 画面内のどこからでも空間が歪んでワープアウトしてくる実体化エフェクト
+            const progress = Math.min(1, this.warpTimer / this.warpDuration);
+            const ringColor = this.isRed ? '#ff3366' : '#00ffff';
+            const radius = Math.max(4, (1 - progress) * 40 + 6);
+
+            ctx.strokeStyle = ringColor;
             ctx.lineWidth = 2.5;
-            ctx.shadowColor = '#00ffff';
-            ctx.shadowBlur = 8;
+            ctx.shadowColor = ringColor;
+            ctx.shadowBlur = 10;
             ctx.beginPath();
             ctx.arc(0, 0, radius, 0, Math.PI * 2);
             ctx.stroke();
 
             ctx.strokeStyle = '#ffffff';
-            ctx.lineWidth = 1.2;
+            ctx.lineWidth = 1.4;
             ctx.beginPath();
             ctx.arc(0, 0, radius * 0.55, 0, Math.PI * 2);
+            ctx.stroke();
+
+            // ワープ中に徐々に実体化するザブのホログラムシルエット
+            ctx.globalAlpha = progress * 0.85;
+            const scale = 0.25 + progress * 0.75;
+            ctx.scale(scale, scale);
+            ctx.rotate(this.rot);
+            ctx.strokeStyle = '#ffffff';
+            ctx.fillStyle = this.isRed ? 'rgba(255, 50, 100, 0.5)' : 'rgba(0, 220, 255, 0.5)';
+            ctx.beginPath();
+            ctx.moveTo(0, -15);
+            ctx.lineTo(15, 0);
+            ctx.lineTo(0, 15);
+            ctx.lineTo(-15, 0);
+            ctx.closePath();
+            ctx.fill();
             ctx.stroke();
         } else {
             ctx.rotate(this.rot);
@@ -536,12 +592,17 @@ class ZabEnemy extends Enemy {
             ctx.shadowOffsetX = 3;
             ctx.shadowOffsetY = 3;
 
-            // 3D多面体メタリック結晶 (4つの独立した陰影ファセット)
-            // 1. 上ファセット (強いハイライト光: シルバーホワイト)
+            // 3D多面体メタリック結晶 (通常:シルバーブルー / 赤カプセル機:ルビーレッド)
             const facetTop = ctx.createLinearGradient(0, -15, 0, 0);
-            facetTop.addColorStop(0.0, '#ffffff');
-            facetTop.addColorStop(0.5, '#cbd5e1');
-            facetTop.addColorStop(1.0, '#94a3b8');
+            if (this.isRed) {
+                facetTop.addColorStop(0.0, '#ffffff');
+                facetTop.addColorStop(0.5, '#fda4af');
+                facetTop.addColorStop(1.0, '#f43f5e');
+            } else {
+                facetTop.addColorStop(0.0, '#ffffff');
+                facetTop.addColorStop(0.5, '#cbd5e1');
+                facetTop.addColorStop(1.0, '#94a3b8');
+            }
             ctx.fillStyle = facetTop;
             ctx.beginPath();
             ctx.moveTo(0, -15);
@@ -550,11 +611,16 @@ class ZabEnemy extends Enemy {
             ctx.closePath();
             ctx.fill();
 
-            // 2. 左ファセット (反射光: スレートブルー)
             const facetLeft = ctx.createLinearGradient(-15, 0, 0, 0);
-            facetLeft.addColorStop(0.0, '#e2e8f0');
-            facetLeft.addColorStop(0.6, '#64748b');
-            facetLeft.addColorStop(1.0, '#475569');
+            if (this.isRed) {
+                facetLeft.addColorStop(0.0, '#ffe4e6');
+                facetLeft.addColorStop(0.6, '#e11d48');
+                facetLeft.addColorStop(1.0, '#9f1239');
+            } else {
+                facetLeft.addColorStop(0.0, '#e2e8f0');
+                facetLeft.addColorStop(0.6, '#64748b');
+                facetLeft.addColorStop(1.0, '#475569');
+            }
             ctx.fillStyle = facetLeft;
             ctx.beginPath();
             ctx.moveTo(-15, 0);
@@ -563,11 +629,16 @@ class ZabEnemy extends Enemy {
             ctx.closePath();
             ctx.fill();
 
-            // 3. 右ファセット (斜光・影: ディープスレート)
             const facetRight = ctx.createLinearGradient(0, 0, 15, 0);
-            facetRight.addColorStop(0.0, '#475569');
-            facetRight.addColorStop(0.7, '#334155');
-            facetRight.addColorStop(1.0, '#1e293b');
+            if (this.isRed) {
+                facetRight.addColorStop(0.0, '#9f1239');
+                facetRight.addColorStop(0.7, '#881337');
+                facetRight.addColorStop(1.0, '#4c0519');
+            } else {
+                facetRight.addColorStop(0.0, '#475569');
+                facetRight.addColorStop(0.7, '#334155');
+                facetRight.addColorStop(1.0, '#1e293b');
+            }
             ctx.fillStyle = facetRight;
             ctx.beginPath();
             ctx.moveTo(0, 0);
@@ -576,11 +647,16 @@ class ZabEnemy extends Enemy {
             ctx.closePath();
             ctx.fill();
 
-            // 4. 下ファセット (最深影: ガンメタルブラック)
             const facetBottom = ctx.createLinearGradient(0, 0, 0, 15);
-            facetBottom.addColorStop(0.0, '#334155');
-            facetBottom.addColorStop(0.6, '#1e293b');
-            facetBottom.addColorStop(1.0, '#0f172a');
+            if (this.isRed) {
+                facetBottom.addColorStop(0.0, '#881337');
+                facetBottom.addColorStop(0.6, '#4c0519');
+                facetBottom.addColorStop(1.0, '#2a020d');
+            } else {
+                facetBottom.addColorStop(0.0, '#334155');
+                facetBottom.addColorStop(0.6, '#1e293b');
+                facetBottom.addColorStop(1.0, '#0f172a');
+            }
             ctx.fillStyle = facetBottom;
             ctx.beginPath();
             ctx.moveTo(-15, 0);
@@ -607,8 +683,8 @@ class ZabEnemy extends Enemy {
             // 中心エネルギーコア (高輝度プラズマジェム)
             const gemGrad = ctx.createRadialGradient(0, 0, 1, 0, 0, 5);
             gemGrad.addColorStop(0.0, '#ffffff');
-            gemGrad.addColorStop(0.4, '#38bdf8');
-            gemGrad.addColorStop(1.0, '#0284c7');
+            gemGrad.addColorStop(0.4, this.isRed ? '#fb7185' : '#38bdf8');
+            gemGrad.addColorStop(1.0, this.isRed ? '#be123c' : '#0284c7');
             ctx.fillStyle = gemGrad;
             ctx.beginPath();
             ctx.arc(0, 0, 4.5, 0, Math.PI * 2);

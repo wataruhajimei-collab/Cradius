@@ -307,7 +307,7 @@ class StonehengeStage {
                 this.state = 'ZAB_RUSH';
                 this.blocks = [];
                 this.zabTimer = 0;
-                this.zabWaveTimer = 0;
+                this.zabWaveTimer = 900;
             }
 
         } else if (this.state === 'ZAB_RUSH') {
@@ -315,16 +315,11 @@ class StonehengeStage {
             this.zabTimer += dt;
             this.zabWaveTimer += dt;
 
-            // 約1.0秒ごとに四方（前・後・上・下）からザブ小隊がワープ強襲！
-            if (this.zabWaveTimer >= 1050) {
+            // 約1.0秒ごとに画面の外からではなく、画面内のどこからでもザブ小隊がワープアウト強襲！
+            if (this.zabWaveTimer >= 1000) {
                 this.zabWaveTimer = 0;
                 if (typeof ZabSquad !== 'undefined') {
-                    const sides = ['FRONT', 'BACK', 'TOP', 'BOTTOM'];
-                    // 自機の現在Yに合わせて上下や前後から挟み撃ち！
-                    const side = sides[Math.floor(Math.random() * sides.length)];
-                    const curPlayerY = (typeof player !== 'undefined') ? player.y : 300;
-                    const safeY = Math.max(120, Math.min(this.height - 120, curPlayerY + (Math.random() - 0.5) * 120));
-                    new ZabSquad(side, safeY, 3);
+                    new ZabSquad('ANYWHERE', null, 3);
                 }
             }
 

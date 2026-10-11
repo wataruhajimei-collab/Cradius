@@ -24,14 +24,16 @@ images.terrain.src = 'img/terrain.jpg';
 images.capsule.src = 'img/capsule.png';
 
 let gameStarted = false;
+window.bgmModalOpen = false;
 
 function startGame() {
-    if (gameStarted) return;
+    if (gameStarted || window.bgmModalOpen) return;
     gameStarted = true;
 
     // Web Audioを確実にアンロック＆即座に「タララララン！」グラディウス開始音を再生！
     if (typeof Sound !== 'undefined') {
         Sound.unlockAudio();
+        Sound.stopBgm();
         Sound.playGameStart();
     }
 
@@ -69,61 +71,178 @@ function init() {
     window.capsules = capsules;
     window.getCapsules = () => capsules;
 
-    // スタート画面操作のバインド
+    // スタート画面 & BGM集モーダル操作のバインド
     const startScreen = document.getElementById('start-screen');
     const btnStart = document.getElementById('btn-start');
-    const btnScreamTest = document.getElementById('btn-scream-test');
+    const btnBgmCollection = document.getElementById('btn-bgm-collection');
+    const bgmModal = document.getElementById('bgm-modal');
+    const btnBgmClose = document.getElementById('btn-bgm-close');
+    const btnBgmCloseBottom = document.getElementById('btn-bgm-close-bottom');
+    const btnBgmStop = document.getElementById('btn-bgm-stop');
+    const bgmNowPlaying = document.getElementById('bgm-now-playing');
+    const bgmTrackBtns = bgmModal ? Array.from(bgmModal.querySelectorAll('.bgm-track-btn')) : [];
 
-    const isScreamTestEvent = (e) => {
-        return e && e.target && typeof e.target.closest === 'function' && e.target.closest('#btn-scream-test');
+    const isBgmUiEvent = (e) => {
+        if (window.bgmModalOpen) return true;
+        if (!e || !e.target || typeof e.target.closest !== 'function') return false;
+        return Boolean(e.target.closest('#btn-bgm-collection') || e.target.closest('#bgm-modal'));
     };
 
-    if (btnScreamTest) {
-        let lastScreamTap = 0;
-        const triggerSoloScream = (e) => {
+    const clearTrackSelection = () => {
+        bgmTrackBtns.forEach(btn => {
+            btn.classList.remove('playing');
+            const playBadge = btn.querySelector('.bgm-track-play');
+            if (playBadge) playBadge.textContent = '▶ 再生';
+        });
+    };
+
+    const openBgmModal = (e) => {
+        if (e) {
             e.preventDefault();
             e.stopPropagation();
-            const now = Date.now();
-            if (now - lastScreamTap < 250) return;
-            lastScreamTap = now;
-            if (typeof Sound !== 'undefined') {
-                Sound.unlockAudio();
-                Sound.playBossScream();
-            }
-            const origText = btnScreamTest.textContent;
-            btnScreamTest.textContent = '🗣️ ウワーーーー！！';
-            setTimeout(() => {
-                btnScreamTest.textContent = '🔊 叫び声だけ試聴 (ウワーーーー！)';
-            }, 1900);
-        };
-        btnScreamTest.addEventListener('pointerdown', triggerSoloScream);
-        btnScreamTest.addEventListener('touchstart', triggerSoloScream, { passive: false });
-        btnScreamTest.addEventListener('click', triggerSoloScream);
+        }
+        window.bgmModalOpen = true;
+        if (typeof Sound !== 'undefined') {
+            Sound.unlockAudio();
+        }
+        if (bgmModal) {
+            bgmModal.classList.add('open');
+            bgmModal.setAttribute('aria-hidden', 'false');
+        }
+    };
+
+    const closeBgmModal = (e) => {
+        if (e) {
+            e.preventDefault();
+            e.stopPropagation();
+        }
+        if (typeof Sound !== 'undefined') {
+            Sound.stopBgm();
+        }
+        clearTrackSelection();
+        if (bgmNowPlaying) {
+            bgmNowPlaying.textContent = '曲を選択して試聴できます';
+        }
+        if (bgmModal) {
+            bgmModal.classList.remove('open');
+            bgmModal.setAttribute('aria-hidden', 'true');
+        }
+        // 直後のイベント伝播でstartGameが誤発火しないよう微小ディレイで解除
+        setTimeout(() => {
+            window.bgmModalOpen = false;
+        }, 120);
+    };
+
+    if (btnBgmCollection) {
+        btnBgmCollection.addEventListener('pointerdown', openBgmModal);
+        btnBgmCollection.addEventListener('touchstart', openBgmModal, { passive: false });
+        btnBgmCollection.addEventListener('click', openBgmModal);
     }
+
+    if (btnBgmClose) {
+        btnBgmClose.addEventListener('click', closeBgmModal);
+        btnBgmClose.addEventListener('touchend', closeBgmModal, { passive: false });
+    }
+    if (btnBgmCloseBottom) {
+        btnBgmCloseBottom.addEventListener('click', closeBgmModal);
+        btnBgmCloseBottom.addEventListener('touchend', closeBgmModal, { passive: false });
+    }
+    if (bgmModal) {
+        bgmModal.addEventListener('click', (e) => {
+            if (e.target === bgmModal) {
+                closeBgmModal(e);
+            }
+        });
+    }
+
+    if (btnBgmStop) {
+        const handleStop = (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            if (typeof Sound !== 'undefined') {
+                Sound.stopBgm();
+            }
+            clearTrackSelection();
+            if (bgmNowPlaying) {
+                bgmNowPlaying.textContent = '⏹ 停止中（曲を選択して試聴できます）';
+            }
+        };
+        btnBgmStop.addEventListener('click', handleStop);
+        btnBgmStop.addEventListener('touchend', handleStop, { passive: false });
+    }
+
+    bgmTrackBtns.forEach(btn => {
+        const handlePlayTrack = (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            const trackId = btn.getAttribute('data-bgm');
+            if (typeof Sound === 'undefined') return;
+            Sound.unlockAudio();
+            if (Sound.ctx && Sound.ctx.state === 'suspended') {
+                Sound.ctx.resume().catch(() => {});
+            }
+
+            clearTrackSelection();
+            btn.classList.add('playing');
+            const playBadge = btn.querySelector('.bgm-track-play');
+            if (playBadge) playBadge.textContent = '🔊 再生中';
+
+            let label = '';
+            if (trackId === 'AIR') {
+                Sound.playAirBgm(true);
+                label = '♪ 再生中: 01. BEGINNING OF THE HISTORY (空中戦BGM)';
+            } else if (trackId === 'STAGE1') {
+                Sound.playStageBgm(true);
+                label = '♪ 再生中: 02. CHALLENGER 1985 (1面メインBGM)';
+            } else if (trackId === 'VOLCANO') {
+                Sound.playVolcanoSurvivalBgm(true);
+                label = '♪ 再生中: 03. VOLCANO INFERNO (1面・大噴火サバイバル)';
+            } else if (trackId === 'STAGE2') {
+                Sound.playStage2Bgm(true);
+                label = '♪ 再生中: 04. MAXIMUM SPEED (2面・ストーンヘンジ)';
+            } else if (trackId === 'STAGE3') {
+                Sound.playStage3Bgm(true);
+                label = '♪ 再生中: 05. BLANK MASK (3面・モアイ遺跡)';
+            } else if (trackId === 'BOSS') {
+                Sound.playBossBgm(true);
+                label = '♪ 再生中: 06. AIRCRAFT CARRIER (ボス戦BGM)';
+            }
+            if (bgmNowPlaying && label) {
+                bgmNowPlaying.textContent = label;
+            }
+        };
+        btn.addEventListener('click', handlePlayTrack);
+    });
+
+    window.addEventListener('keydown', (e) => {
+        if (window.bgmModalOpen && e.code === 'Escape') {
+            closeBgmModal(e);
+        }
+    });
 
     if (startScreen) {
         startScreen.addEventListener('pointerdown', (e) => {
-            if (isScreamTestEvent(e)) return;
+            if (isBgmUiEvent(e)) return;
             e.preventDefault();
             startGame();
         });
         startScreen.addEventListener('touchstart', (e) => {
-            if (isScreamTestEvent(e)) return;
+            if (isBgmUiEvent(e)) return;
             e.preventDefault();
             startGame();
         }, { passive: false });
     }
     if (btnStart) {
         btnStart.addEventListener('click', (e) => {
-            if (isScreamTestEvent(e)) return;
+            if (isBgmUiEvent(e)) return;
             e.preventDefault();
             startGame();
         });
     }
 
-    // 画面全体のどこをタップ・クリック・キー押ししても即座にゲーム開始＆BGM発音
+    // 画面全体のどこをタップ・クリック・キー押ししても即座にゲーム開始＆BGM発音（BGM集モーダル表示中を除く）
     const globalTrigger = (e) => {
-        if (isScreamTestEvent(e)) return;
+        if (isBgmUiEvent(e)) return;
         if (!gameStarted) {
             startGame();
         } else {
@@ -285,6 +404,7 @@ function handleCollisions() {
 
         enemies.forEach(enemy => {
             if (enemy instanceof FanEnemy && !enemy.visible) return;
+            if (typeof ZabEnemy !== 'undefined' && enemy instanceof ZabEnemy && enemy.delay > 0) return;
             if (typeof WarpSphereEnemy !== 'undefined' && enemy instanceof WarpSphereEnemy && enemy.state === 'WARPING') return;
 
             if (bullet.active && enemy.active && checkCollision(bullet, enemy)) {
@@ -316,6 +436,7 @@ function handleCollisions() {
     // プレイヤーと敵の当たり判定
     enemies.forEach(enemy => {
         if (enemy instanceof FanEnemy && !enemy.visible) return;
+        if (typeof ZabEnemy !== 'undefined' && enemy instanceof ZabEnemy && (enemy.delay > 0 || enemy.state === 'WARP_IN')) return;
         if (typeof WarpSphereEnemy !== 'undefined' && enemy instanceof WarpSphereEnemy && enemy.state === 'WARPING') return;
         if (typeof SuperVolcano !== 'undefined' && enemy instanceof SuperVolcano) return; // 火山山体はシールドで消滅させない
 

@@ -1639,8 +1639,8 @@ class SoundManager {
 
     // ステージBGM: 『SPACE BATTLE CRUISER (EXTENDED ROCK ORCHESTRA)』
     // 宇宙戦艦ヤマト戦闘シーンの熱き魂を受け継ぎ、テンポアップ(156BPM)＋熱狂のギターソロ＋炸裂のドラムソロを搭載した超大作！
-    playStageBgm() {
-        if (this.currentBgm === 'STAGE') return;
+    playStageBgm(forceRestart = false) {
+        if (!forceRestart && this.currentBgm === 'STAGE') return;
         this.currentBgm = 'STAGE';
 
         // テンポ 156 BPM (高揚感そのままに疾走感を倍増！)
@@ -2079,8 +2079,8 @@ class SoundManager {
 
     // ボス戦BGM: 『AIRCRAFT CARRIER (HEAVY ORCHESTRA & METAL)』
     // 巨大要塞ビッグコアとの死闘！楽器を容赦なく大量投入した超高速168BPMのヘヴィメタル・シンフォニー！
-    playBossBgm() {
-        if (this.currentBgm === 'BOSS') return;
+    playBossBgm(forceRestart = false) {
+        if (!forceRestart && this.currentBgm === 'BOSS') return;
         this.currentBgm = 'BOSS';
 
         // テンポ 168 BPM (超緊迫の高速ボスバトル)
@@ -2237,8 +2237,8 @@ class SoundManager {
     // 1面 火山大噴火サバイバルBGM: 『VOLCANO INFERNO : SURVIVAL COUNTDOWN』
     // 170 BPM！脈拍が跳ね上がる超アップテンポ・激しいソワソワ感と緊迫のパニック新曲！
     // =========================================================================
-    playVolcanoSurvivalBgm() {
-        if (this.currentBgm === 'VOLCANO_SURVIVAL') return;
+    playVolcanoSurvivalBgm(forceRestart = false) {
+        if (!forceRestart && this.currentBgm === 'VOLCANO_SURVIVAL') return;
         this.currentBgm = 'VOLCANO_SURVIVAL';
 
         const bpm = 170;
@@ -2348,106 +2348,249 @@ class SoundManager {
     }
 
     // =========================================================================
-    // 2面 メインBGM: 『STONEHENGE RUINS (MYSTIC PROG-ROCK)』
-    // 142 BPM！古代巨石遺跡の神秘と石堀りの疾走感を併せ持った完全新規オリジナル楽曲！
+    // 2面 メインBGM: 『MAXIMUM SPEED (1985 ARCADE GRADIUS STAGE 2 BEAT)』
+    // 1985年本家アーケード版『グラディウス』2面（ストーンヘンジ面）の
+    // 軽快でエッジの効いたシンコペーション16ビート・オクターブスラップベース・
+    // 2声パルス波ハーモニー＆電子タムフィルを忠実にオマージュしたビート楽曲！
     // =========================================================================
-    playStage2Bgm() {
-        if (this.currentBgm === 'STAGE2') return;
+    playStage2Bgm(forceRestart = false) {
+        if (!forceRestart && this.currentBgm === 'STAGE2') return;
         this.currentBgm = 'STAGE2';
 
-        const bpm = 142;
-        const totalSteps = 128; // 全8小節ループ
+        // テンポ 150 BPM（本家2面『MAXIMUM SPEED』特有の歯切れ良いアップビート）
+        const bpm = 150;
+        const totalSteps = 256; // 全16小節ループ (1小節=16ステップ)
 
-        // 1. ダンサブルな16ビート・エレクトロドラム
-        const dStg2_A = [
-            1,3,3,3, 2,3,1,3, 3,3,1,3, 2,3,3,4
-        ];
-        const dStg2_B = [
-            1,3,3,3, 2,3,1,3, 3,3,1,3, 2,2,4,4
-        ];
-        const dStg2_Fill = [
-            1,1,2,3, 6,6,2,3, 7,7,2,3, 8,8,5,2
-        ];
+        // === 1. 1985アーケード風 疾走シンコペーション16ビートドラム ===
+        // 1:キック, 2:スネア, 3:クローズハット, 4:オープンハット, 5:クラッシュ+キック,
+        // 6:ハイタム, 7:ミドルタム, 8:ロータム, 9:キック+オープンハット(裏拍アクセント)
+        const dIntro0  = [5,3,4,1, 2,3,9,3, 1,3,1,4, 2,3,2,4]; // イントロ開幕：シンコペーションビート！
+        const dIntro1  = [1,3,4,1, 2,3,9,3, 6,6,7,7, 8,8,2,5]; // コナミ伝統の電子タムロール！
+        const dBeatA   = [1,3,4,1, 2,3,9,3, 1,3,1,4, 2,3,4,3]; // 本家2面風バウンス16ビート
+        const dBeatB   = [1,3,4,1, 2,3,9,3, 1,3,1,4, 2,3,2,4]; // ダブルスネア・ピックアップ
+        const dBeatCym = [5,3,4,1, 2,3,9,3, 1,3,1,4, 2,3,4,3]; // 小節頭クラッシュ付きビート
+        const dFill1   = [1,3,4,1, 2,3,2,3, 6,6,7,7, 8,8,2,5]; // フレーズ末タムフィルイン
+        const dFill2   = [5,3,2,3, 1,2,9,2, 6,7,6,7, 8,8,2,5]; // ターンアラウンド・ブレイクフィル
 
         const drums = [
-            dStg2_A, dStg2_A, dStg2_B, dStg2_Fill,
-            dStg2_A, dStg2_A, dStg2_B, dStg2_Fill
+            // 0-1: イントロ（2小節の歯切れ良いリズムブレイク）
+            dIntro0,  dIntro1,
+            // 2-5: メインテーマA1
+            dBeatCym, dBeatA,  dBeatB,   dFill1,
+            // 6-9: メインテーマA2（高音展開）
+            dBeatCym, dBeatA,  dBeatB,   dFill1,
+            // 10-13: Bセクション（フュージョン・ブリッジ）
+            dBeatCym, dBeatB,  dBeatCym, dFill1,
+            // 14-15: リズムブレイク＆ターンアラウンド
+            dBeatCym, dFill2
         ].flat();
 
-        // 2. うねるシンセファンク・スラップベース (Eマイナー・ドリアン旋法)
-        const bStg2_1 = [E2,E2,_,E2, G2,_,E2,_, A2,A2,_,A2, B2,_,D3,_];
-        const bStg2_2 = [E2,E2,_,E2, G2,_,E2,_, D3,D3,_,D3, Cs3,_,B2,_];
-        const bStg2_3 = [C2,C2,_,C2, D2,_,D2,_, E2,E2,_,E2, G2,_,A2,_];
-        const bStg2_4 = [B1,B1,_,B1, D2,_,D2,_, E2,E2,E2,E2, E3,E3,D3,D3];
+        // === 2. 跳ねるオクターブ・シンコペーション・ベースライン ===
+        // 本家2面『MAXIMUM SPEED』の象徴である「ボン・ボ・ボン・ボ・ボ・ボン」と跳ねる16分ベース
+        const bInt0 = [A1,_,A2,A1, G1,_,A1,_, _,C2,_,D2, E2,_,G2,_];
+        const bInt1 = [A1,_,A2,A1, G1,_,A1,_, F1,F2,G1,G2, E1,E2,G2,Gs2];
+
+        const bAm   = [A1,_,A2,A1, _,A2,G1,_, A1,_,A2,A1, C2,_,D2,_];
+        const bG    = [G1,_,G2,G1, _,G2,D1,_, G1,_,G2,G1, A1,_,B1,_];
+        const bF    = [F1,_,F2,F1, _,F2,C2,_, F1,_,F2,F1, G1,_,A1,_];
+        const bE    = [E1,_,E2,E1, _,E2,B1,_, E1,_,E2,E1, Gs1,_,B1,_];
+        const bDm   = [D2,_,D3,D2, _,D3,A1,_, D2,_,D3,D2, E2,_,F2,_];
+
+        const bF_G  = [F1,F2,_,F1, _,F2,C2,F2, G1,G2,_,G1, _,G2,D2,G2];
+        const bEmAm = [E1,E2,_,E1, _,E2,B1,E2, A1,A2,_,A1, _,A2,G1,E1];
+        const bDmG  = [D2,D3,_,D2, _,D3,A1,D2, G1,G2,_,G1, _,G2,A1,B1];
+        const bCE   = [C2,C3,_,C2, B1,B2,_,B1, E1,E2,E1,E2, Gs1,A1,B1,E2];
+
+        const bBrk0 = [F1,_,F2,F1, G1,_,G2,G1, E1,_,E2,E1, A1,_,G1,_];
+        const bBrk1 = [D2,_,D3,D2, E2,_,E3,E2, A1,A2,G1,G2, F1,F2,E1,E2];
 
         const bass = [
-            bStg2_1, bStg2_2, bStg2_3, bStg2_4,
-            bStg2_1, bStg2_2, bStg2_3, bStg2_4
+            bInt0, bInt1,
+            bAm,   bG,    bF,   bE,
+            bAm,   bG,    bDm,  bE,
+            bF_G,  bEmAm, bDmG, bCE,
+            bBrk0, bBrk1
         ].flat();
 
-        // 3. 水晶巨石ベル・アルペジオ (きらびやかな古代遺跡の響き)
-        const aStg2_1 = [E4,B4,E5,G5, B5,G5,E5,B4, E4,B4,E5,G5, B5,G5,E5,B4];
-        const aStg2_2 = [D4,A4,D5,Fs5, A5,Fs5,D5,A4, D4,A4,D5,Fs5, A5,Fs5,D5,A4];
-        const aStg2_3 = [C4,G4,C5,E5, G5,E5,C5,G4, D4,A4,D5,Fs5, A5,Fs5,D5,A4];
-        const aStg2_4 = [B3,Fs4,B4,D5, Fs5,D5,B4,Fs4, E4,B4,E5,G5, B5,G5,E5,B4];
+        // === 3. 裏拍カッティング・ブラス＆シンセコード・スタブ ===
+        // ビートの裏拍（ステップ2, 6, 10, 14）に歯切れよく入るコードカッティング
+        const stOff = (n1, n2 = n1) => [_,_,n1,_, _,_,n1,_, _,_,n2,_, _,_,n2,_];
+        const stInt0_1 = [E4,_,E4,_, D4,_,E4,_, _,G4,_,A4, B4,_,D5,_];
+        const stInt1_1 = [E4,_,E4,_, D4,_,E4,_, A4,_,B4,_, Gs4,_,_,_];
+        const stInt0_2 = [C4,_,C4,_, B3,_,C4,_, _,E4,_,F4, G4,_,B4,_];
+        const stInt1_2 = [C4,_,C4,_, B3,_,C4,_, F4,_,G4,_, E4,_,_,_];
+
+        const stab1 = [
+            stInt0_1, stInt1_1,
+            stOff(E4), stOff(D4), stOff(C4), stOff(B3),
+            stOff(E4), stOff(D4), stOff(F4), stOff(E4),
+            stOff(A4, B4), stOff(G4, A4), stOff(F4, G4), stOff(G4, Gs4),
+            stOff(A4, B4), stInt1_1
+        ].flat();
+
+        const stab2 = [
+            stInt0_2, stInt1_2,
+            stOff(C4), stOff(B3), stOff(A3), stOff(Gs3),
+            stOff(C4), stOff(B3), stOff(D4), stOff(B3),
+            stOff(F4, G4), stOff(E4, E4), stOff(D4, D4), stOff(E4, E4),
+            stOff(F4, G4), stInt1_2
+        ].flat();
+
+        // === 4. 16分音符リズミック・シーケンスパルス ===
+        // ドラムのアタックを邪魔せずビートの隙間を軽快に駆け抜けるパルスシーケンス
+        const seqAm  = [_,E5,A4,E5, _,E5,C5,E5, _,E5,A4,E5, _,C5,D5,E5];
+        const seqG   = [_,D5,G4,D5, _,D5,B4,D5, _,D5,G4,D5, _,B4,C5,D5];
+        const seqF   = [_,C5,F4,C5, _,C5,A4,C5, _,C5,F4,C5, _,A4,B4,C5];
+        const seqE   = [_,B4,E4,B4, _,B4,Gs4,B4, _,B4,E4,B4, Gs4,B4,D5,E5];
+        const seqDm  = [_,A4,D4,A4, _,A4,F4,A4, _,A4,D4,A4, _,F4,G4,A4];
+        const seqFG  = [_,C5,F4,A4, _,C5,F5,C5, _,D5,G4,B4, _,D5,G5,D5];
+        const seqEA  = [_,B4,E4,G4, _,B4,E5,B4, _,C5,A4,E4, _,A4,C5,E5];
+        const seqDG  = [_,A4,D4,F4, _,A4,D5,A4, _,B4,G4,D4, _,G4,B4,D5];
+        const seqCE  = [_,G4,C4,E4, _,G4,C5,G4, _,Gs4,E4,B3, E4,Gs4,B4,E5];
 
         const arpeggio = [
-            aStg2_1, aStg2_2, aStg2_3, aStg2_4,
-            aStg2_1, aStg2_2, aStg2_3, aStg2_4
+            seqAm, seqE,
+            seqAm, seqG,  seqF,  seqE,
+            seqAm, seqG,  seqDm, seqE,
+            seqFG, seqEA, seqDG, seqCE,
+            seqFG, seqCE
         ].flat();
 
-        // 4. 古代遺跡主旋律 (PSGリード + ブラスによるエキゾチックで雄大なプログレッシブメロディ！)
+        // === 5. 1985本家2面風 シンコペーション主旋律 (25%パルス波リード) ===
         const lead = [
-            // 0-3: Aメロ (巨石群を縫って飛ぶ疾走フレーズ)
-            E5,_,_,E5, G5,_,A5,_, B5,_,_,D6, B5,_,A5,_,
-            G5,_,E5,_, D5,_,E5,_, G5,_,A5,_, G5,_,F5,_,
-            E5,_,_,E5, G5,_,A5,_, B5,_,_,D6, E6,_,D6,_,
-            B5,_,A5,_, G5,_,A5,_, B5,_,_,_, _,_,_,_,
+            // 0-1: イントロ（ビートに乗ったリズミックなシンセモチーフ）
+            A4,_,A4,_, G4,_,A4,_, _,C5,_,D5, E5,_,G5,_,
+            A5,_,A5,_, G5,_,E5,_, F5,_,G5,_, E5,_,A5,B5,
 
-            // 4-7: Bメロ (ストーンヘンジの神秘と高揚感あふれる展開)
-            C6,_,_,C6, B5,_,A5,_, G5,_,_,G5, Fs5,_,E5,_,
-            D5,_,Fs5,_, A5,_,C6,_, B5,_,_,B5, A5,_,G5,_,
-            A5,_,_,A5, B5,_,C6,_, D6,_,_,D6, E6,_,D6,_,
-            E6,_,_,_, B5,_,G5,_, E5,_,_,_, _,_,_,_
+            // 2-5: メインテーマA1（歯切れ良いスタッカート＋シンコペーション上昇フレーズ！）
+            C6,_,C6,_, B5,_,A5,_, _,E5,_,G5, A5,_,C6,D6,
+            B5,_,B5,_, A5,_,G5,_, _,D5,_,E5, G5,_,A5,B5,
+            A5,_,A5,_, G5,_,F5,_, E5,_,F5,_, G5,_,A5,C6,
+            B5,_,_,_,  E5,_,Gs5,_, B5,_,D6,_, C6,_,B5,_,
+
+            // 6-9: メインテーマA2（高音へ駆け上がる快活なメロディ展開）
+            C6,_,C6,_, D6,_,E6,_, _,C6,_,A5, E5,_,A5,C6,
+            D6,_,D6,_, C6,_,B5,_, _,G5,_,A5, B5,_,C6,D6,
+            F6,_,E6,_, D6,_,C6,_, B5,_,A5,_, G5,_,F5,E5,
+            E5,_,Gs5,_, B5,_,D6,_, E6,_,_,_, _,_,E5,G5,
+
+            // 10-13: Bセクション（フュージョン・シンコペーション・ブリッジ）
+            A5,_,_,C6, _,B5,_,A5, B5,_,_,D6, _,C6,_,B5,
+            G5,_,B5,_, E6,_,D6,_, C6,_,_,A5, _,G5,_,E5,
+            F5,_,A5,_, D6,_,C6,_, B5,_,G5,_, A5,_,B5,D6,
+            E6,_,_,E6, D6,_,C6,_, B5,_,_,_,  Gs5,_,B5,_,
+
+            // 14-15: ターンアラウンド・ビートブレイク
+            A5,_,C6,_, B5,_,D6,_, C6,_,E6,_, D6,_,C6,B5,
+            A5,_,G5,_, F5,_,E5,_, A5,_,_,_,  _,_,_,_
+        ];
+
+        // === 6. コナミ伝統の2チャンネル・ツインパルス平行ハーモニー (12.5%パルス波) ===
+        const harmony = [
+            // 0-1: イントロ（3度下・6度下のタイトなハモリ）
+            E4,_,E4,_, D4,_,E4,_, _,G4,_,A4, B4,_,D5,_,
+            E5,_,E5,_, D5,_,C5,_, C5,_,D5,_, B4,_,E5,Gs5,
+
+            // 2-5: メインテーマA1
+            A5,_,A5,_, G5,_,E5,_, _,C5,_,D5, E5,_,A5,B5,
+            G5,_,G5,_, F5,_,D5,_, _,B4,_,C5, D5,_,F5,G5,
+            F5,_,F5,_, E5,_,C5,_, C5,_,C5,_, E5,_,F5,A5,
+            Gs5,_,_,_, B4,_,E5,_, Gs5,_,B5,_, A5,_,Gs5,_,
+
+            // 6-9: メインテーマA2
+            A5,_,A5,_, B5,_,C6,_, _,A5,_,E5, C5,_,E5,A5,
+            B5,_,B5,_, A5,_,G5,_, _,D5,_,F5, G5,_,A5,B5,
+            D6,_,C6,_, B5,_,A5,_, G5,_,F5,_, E5,_,D5,C5,
+            B4,_,E5,_, Gs5,_,B5,_, B5,_,_,_, _,_,C5,E5,
+
+            // 10-13: Bセクション
+            F5,_,_,A5, _,G5,_,F5, G5,_,_,B5, _,A5,_,G5,
+            E5,_,G5,_, B5,_,B5,_, A5,_,_,E5, _,E5,_,C5,
+            D5,_,F5,_, A5,_,A5,_, G5,_,D5,_, F5,_,G5,B5,
+            C6,_,_,C6, B5,_,A5,_, Gs5,_,_,_, E5,_,Gs5,_,
+
+            // 14-15: ターンアラウンド
+            F5,_,A5,_, G5,_,B5,_, Gs5,_,B5,_, A5,_,E5,D5,
+            C5,_,B4,_, D5,_,Gs4,_, C5,_,_,_, _,_,_,_
         ];
 
         this.startScheduler(bpm, totalSteps, (step, time, stepDur) => {
-            // ドラム
+            // 1. パンチのある16ビート・ドラムセクション
             const d = drums[step];
-            if (d === 1) this.triggerKick(time);
-            else if (d === 2) this.triggerSnare(time);
-            else if (d === 3) this.triggerHiHat(time, false);
-            else if (d === 4) this.triggerHiHat(time, true);
-            else if (d === 5) this.triggerCymbal(time);
-            else if (d === 6) this.triggerTom(A3, time, stepDur * 0.95);
-            else if (d === 7) this.triggerTom(F3, time, stepDur * 0.95);
-            else if (d === 8) this.triggerTom(D3, time, stepDur * 0.95);
+            if (d === 1) {
+                this.triggerKick(time, 0.50);
+            } else if (d === 2) {
+                this.triggerSnare(time, 0.36);
+                this.triggerHiHat(time, false);
+            } else if (d === 3) {
+                this.triggerHiHat(time, false);
+            } else if (d === 4) {
+                this.triggerHiHat(time, true);
+            } else if (d === 5) {
+                this.triggerKick(time, 0.52);
+                this.triggerCymbal(time, 0.34);
+            } else if (d === 6) {
+                this.triggerTom(C4, time, stepDur * 0.92, 0.38);
+            } else if (d === 7) {
+                this.triggerTom(A3, time, stepDur * 0.92, 0.38);
+            } else if (d === 8) {
+                this.triggerTom(E3, time, stepDur * 0.92, 0.40);
+            } else if (d === 9) {
+                this.triggerKick(time, 0.48);
+                this.triggerHiHat(time, true);
+            }
 
-            // ベース
+            // 2. 歯切れ良く跳ねるオクターブ・スラップ／シンセベース
             const b = bass[step];
-            if (b > 0) this.triggerBass(b, time, stepDur * 1.4, 0.36);
+            if (b > 0) {
+                let bLen = 1;
+                if (bass[(step + 1) % totalSteps] === 0) bLen = 1.35;
+                this.triggerBass(b, time, stepDur * bLen * 0.82, 0.42);
+            }
 
-            // 水晶ベルアルペジオ
+            // 3. 裏拍カッティング・ブラスコード・スタブ
+            const st1 = stab1[step];
+            const st2 = stab2[step];
+            if (st1 > 0) this.triggerBrass(st1, time, stepDur * 0.72, 0.16);
+            if (st2 > 0) this.triggerBrass(st2, time, stepDur * 0.72, 0.13);
+
+            // 4. 軽快な16分リズミック・パルスシーケンス
             const a = arpeggio[step];
-            if (a > 0) this.triggerArp(a, time, stepDur * 0.85, 0.16);
+            if (a > 0) {
+                this.triggerArp(a, time, stepDur * 0.75, 0.13);
+            }
 
-            // メロディリード
+            // 5. 主旋律リード（短音はキレのあるスタッカート、長音は伸びやかに）
             const l = lead[step];
             if (l > 0) {
                 let lLen = 1;
-                for (let k = 1; k < 6; k++) {
+                for (let k = 1; k < 8; k++) {
                     if (lead[(step + k) % totalSteps] === 0) lLen++;
                     else break;
                 }
-                const dur = stepDur * lLen * 0.92;
-                this.triggerLead(l, time, dur, 0.32);
-                this.triggerBrass(l, time, dur, 0.20);
+                const gate = (lLen === 1) ? 0.75 : 0.90;
+                const dur = stepDur * lLen * gate;
+                this.triggerLead(l, time, dur, 0.34);
+                this.triggerBrass(l, time, dur, 0.16);
+            }
+
+            // 6. ツインパルス平行ハーモニー (12.5%パルス波)
+            const h = harmony[step];
+            if (h > 0) {
+                let hLen = 1;
+                for (let k = 1; k < 8; k++) {
+                    if (harmony[(step + k) % totalSteps] === 0) hLen++;
+                    else break;
+                }
+                const gate = (hLen === 1) ? 0.75 : 0.90;
+                const dur = stepDur * hLen * gate;
+                this.triggerHarmony(h, time, dur, 0.22);
             }
         });
     }
 
-    playStage3Bgm() {
-        if (this.currentBgm === 'STAGE3') return;
+    playStage3Bgm(forceRestart = false) {
+        if (!forceRestart && this.currentBgm === 'STAGE3') return;
         this.currentBgm = 'STAGE3';
 
         const bpm = 132;

@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>KONAMI風 本格BGM 試聴ツール</title>
+<title>クラディウス BGMコレクション 試聴ツール</title>
 <style>
   body {
     background: #0d1117;
@@ -19,7 +19,7 @@
     border-radius: 12px;
     padding: 20px;
     margin: 20px auto;
-    max-width: 600px;
+    max-width: 640px;
     box-shadow: 0 4px 20px rgba(0,0,0,0.4);
   }
   button {
@@ -56,24 +56,42 @@
 </head>
 <body>
 
-<h1>🎵 グラディウス 本格BGMコレクション 試聴</h1>
-<p>シーン展開に合わせた3曲のKONAMI矩形波倶楽部スタイルBGM</p>
+<h1>🎵 クラディウス 本格BGMコレクション 試聴</h1>
+<p>全6曲のKONAMI矩形波倶楽部スタイルBGM</p>
 
 <div class="card">
-  <h2>1. 空中戦BGM: 『BEGINNING OF THE HISTORY』</h2>
-  <p>雑魚シーン用 / 130 BPM / 弦楽3声和音・金管ブラス・ティンパニ・大シンバルが鳴り響くフルオーケストラ荘厳大音量版！</p>
+  <h2>01. 空中戦BGM: 『BEGINNING OF THE HISTORY』</h2>
+  <p>開幕空中戦用 / 130 BPM / 弦楽・金管ブラス・ティンパニ・大シンバルが鳴り響く荘厳テーマ</p>
   <button onclick="startAirBgm()">空中戦BGM 再生</button>
 </div>
 
 <div class="card">
-  <h2>2. メインBGM: 『SPACE BATTLE CRUISER (EXTENDED ROCK ORCHESTRA)』</h2>
-  <p>陸地シーン用 / 156 BPM / 宇宙戦艦ヤマト戦闘シーンの高揚感そのままにテンポアップ！熱狂のエレキギターソロ＆炸裂のドラムソロ搭載！</p>
-  <button onclick="startStageBgm()">メインBGM 再生</button>
+  <h2>02. 1面メインBGM: 『CHALLENGER 1985 / SPACE BATTLE CRUISER』</h2>
+  <p>1面進行用 / 156 BPM / 熱狂のエレキギターソロ＆炸裂のドラムソロ搭載！</p>
+  <button onclick="startStageBgm()">1面メインBGM 再生</button>
 </div>
 
 <div class="card">
-  <h2>3. ボス戦BGM: 『AIRCRAFT CARRIER (HEAVY ORCHESTRA & METAL)』</h2>
-  <p>要塞ボス用 / 168 BPM / 楽器を容赦なく大量投入！高速ツーバス・大シンバル・ティンパニ・金管ヒット・ディストーションギターによるガツンと響く死闘テーマ！</p>
+  <h2>03. 1面大噴火サバイバルBGM: 『VOLCANO INFERNO』</h2>
+  <p>1面火山耐久用 / 170 BPM / 超巨大火山30秒サバイバルの緊急パニックビート！</p>
+  <button onclick="startVolcanoBgm()">火山サバイバルBGM 再生</button>
+</div>
+
+<div class="card">
+  <h2>04. 2面メインBGM: 『MAXIMUM SPEED (1985 ARCADE BEAT)』</h2>
+  <p>2面ストーンヘンジ用 / 150 BPM / 本家1985年2面風の軽快な16ビート・シンコペーションベース＆2声パルスハーモニー！</p>
+  <button onclick="startStage2Bgm()">2面メインBGM 再生</button>
+</div>
+
+<div class="card">
+  <h2>05. 3面メインBGM: 『BLANK MASK』</h2>
+  <p>3面モアイ遺跡用 / 132 BPM / 神秘的なハープ風アルペジオと古代文明の旋律</p>
+  <button onclick="startStage3Bgm()">3面メインBGM 再生</button>
+</div>
+
+<div class="card">
+  <h2>06. ボス戦BGM: 『AIRCRAFT CARRIER』</h2>
+  <p>要塞ボス用 / 168 BPM / 高速ツーバス・大シンバル・ティンパニ・金管ヒット・ディストーションギターによる死闘テーマ！</p>
   <button onclick="startBossBgm()">ボス戦BGM 再生</button>
 </div>
 
@@ -82,7 +100,7 @@
   <div id="status-text" class="status">停止中（ボタンを押して再生）</div>
 </div>
 
-<script src="js/sound.js"></script>
+<script src="js/sound.js?v=4.5"></script>
 <script>
 window.onerror = function(msg, url, line, col, err) {
     const el = document.getElementById('status-text');
@@ -92,40 +110,45 @@ window.onerror = function(msg, url, line, col, err) {
     console.error('BGM Error:', msg, err);
 };
 
+function ensureAudio() {
+    Sound.init();
+    if (Sound.ctx && Sound.ctx.state === 'suspended') Sound.ctx.resume();
+}
+
 function startAirBgm() {
-    try {
-        Sound.init();
-        if (Sound.ctx && Sound.ctx.state === 'suspended') Sound.ctx.resume();
-        Sound.playAirBgm();
-        document.getElementById('status-text').innerHTML = '<span style="color:#58a6ff">再生中: 空中戦BGM『BEGINNING OF THE HISTORY』(グラディウス正統)</span>';
-    } catch (e) {
-        document.getElementById('status-text').innerHTML = '<span style="color:red">例外発生: ' + e.message + '</span>';
-        console.error(e);
-    }
+    ensureAudio();
+    Sound.playAirBgm(true);
+    document.getElementById('status-text').innerHTML = '<span style="color:#58a6ff">再生中: 01. 空中戦BGM『BEGINNING OF THE HISTORY』</span>';
 }
 
 function startStageBgm() {
-    try {
-        Sound.init();
-        if (Sound.ctx && Sound.ctx.state === 'suspended') Sound.ctx.resume();
-        Sound.playStageBgm();
-        document.getElementById('status-text').innerHTML = '<span style="color:#58a6ff">再生中: メインBGM『SPACE BATTLE CRUISER』(ヤマト戦闘風・重厚勇壮)</span>';
-    } catch (e) {
-        document.getElementById('status-text').innerHTML = '<span style="color:red">例外発生: ' + e.message + '</span>';
-        console.error(e);
-    }
+    ensureAudio();
+    Sound.playStageBgm(true);
+    document.getElementById('status-text').innerHTML = '<span style="color:#58a6ff">再生中: 02. 1面メインBGM『CHALLENGER 1985』</span>';
+}
+
+function startVolcanoBgm() {
+    ensureAudio();
+    Sound.playVolcanoSurvivalBgm(true);
+    document.getElementById('status-text').innerHTML = '<span style="color:#58a6ff">再生中: 03. 1面火山大噴火BGM『VOLCANO INFERNO』</span>';
+}
+
+function startStage2Bgm() {
+    ensureAudio();
+    Sound.playStage2Bgm(true);
+    document.getElementById('status-text').innerHTML = '<span style="color:#58a6ff">再生中: 04. 2面メインBGM『MAXIMUM SPEED』</span>';
+}
+
+function startStage3Bgm() {
+    ensureAudio();
+    Sound.playStage3Bgm(true);
+    document.getElementById('status-text').innerHTML = '<span style="color:#58a6ff">再生中: 05. 3面メインBGM『BLANK MASK』</span>';
 }
 
 function startBossBgm() {
-    try {
-        Sound.init();
-        if (Sound.ctx && Sound.ctx.state === 'suspended') Sound.ctx.resume();
-        Sound.playBossBgm();
-        document.getElementById('status-text').innerHTML = '<span style="color:#58a6ff">再生中: ボス戦BGM『AIRCRAFT CARRIER』(緊迫)</span>';
-    } catch (e) {
-        document.getElementById('status-text').innerHTML = '<span style="color:red">例外発生: ' + e.message + '</span>';
-        console.error(e);
-    }
+    ensureAudio();
+    Sound.playBossBgm(true);
+    document.getElementById('status-text').innerHTML = '<span style="color:#58a6ff">再生中: 06. ボス戦BGM『AIRCRAFT CARRIER』</span>';
 }
 
 function stopMusic() {
@@ -133,7 +156,6 @@ function stopMusic() {
     document.getElementById('status-text').innerText = '停止しました';
 }
 
-// 画面のどこをクリックしてもAudioContextアンロック
 window.addEventListener('click', () => {
     if (Sound.ctx && Sound.ctx.state === 'suspended') {
         Sound.ctx.resume();

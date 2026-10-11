@@ -16,7 +16,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="style.css?v=4.4">
+    <link rel="stylesheet" href="style.css?v=4.5">
 </head>
 <body>
     <div id="game-wrapper">
@@ -47,9 +47,9 @@
                         </div>
                     </div>
 
-                    <!-- ボス断末魔（叫び声単体）試聴ボタン -->
-                    <button id="btn-scream-test" type="button" class="arcade-scream-test-btn">
-                        🔊 叫び声だけ試聴 (ウワーーーー！)
+                    <!-- BGM集（サウンドテスト）を開くボタン -->
+                    <button id="btn-bgm-collection" type="button" class="arcade-bgm-collection-btn">
+                        🎵 BGM集を開く (SOUND TEST)
                     </button>
                 </div>
 
@@ -69,6 +69,71 @@
 
                 <!-- 操作ヒント -->
                 <div class="arcade-tap-hint">TAP SCREEN OR PRESS [SPACE] TO START</div>
+            </div>
+        </div>
+
+        <!-- BGM集（サウンドテスト）モーダル -->
+        <div id="bgm-modal" class="bgm-modal-overlay" aria-hidden="true">
+            <div class="bgm-modal-dialog" role="dialog" aria-labelledby="bgm-modal-title">
+                <div class="bgm-modal-header">
+                    <h2 id="bgm-modal-title" class="bgm-modal-title">🎵 BGM COLLECTION</h2>
+                    <button id="btn-bgm-close" type="button" class="bgm-modal-close-btn" aria-label="閉じる">✕ 閉じる</button>
+                </div>
+                <div id="bgm-now-playing" class="bgm-now-playing">曲を選択して試聴できます</div>
+                <div class="bgm-track-list">
+                    <button type="button" class="bgm-track-btn" data-bgm="AIR">
+                        <span class="bgm-track-num">01</span>
+                        <span class="bgm-track-info">
+                            <span class="bgm-track-name">BEGINNING OF THE HISTORY (空中戦BGM)</span>
+                            <span class="bgm-track-desc">130 BPM / 宇宙出撃・編隊迎撃テーマ</span>
+                        </span>
+                        <span class="bgm-track-play">▶ 再生</span>
+                    </button>
+                    <button type="button" class="bgm-track-btn" data-bgm="STAGE1">
+                        <span class="bgm-track-num">02</span>
+                        <span class="bgm-track-info">
+                            <span class="bgm-track-name">CHALLENGER 1985 (1面メインBGM)</span>
+                            <span class="bgm-track-desc">156 BPM / 1面火山＆浮遊大陸・ギター＆ドラムソロ搭載</span>
+                        </span>
+                        <span class="bgm-track-play">▶ 再生</span>
+                    </button>
+                    <button type="button" class="bgm-track-btn" data-bgm="VOLCANO">
+                        <span class="bgm-track-num">03</span>
+                        <span class="bgm-track-info">
+                            <span class="bgm-track-name">VOLCANO INFERNO (1面・大噴火サバイバル)</span>
+                            <span class="bgm-track-desc">170 BPM / 超巨大火山30秒耐久・緊急パニックビート</span>
+                        </span>
+                        <span class="bgm-track-play">▶ 再生</span>
+                    </button>
+                    <button type="button" class="bgm-track-btn" data-bgm="STAGE2">
+                        <span class="bgm-track-num">04</span>
+                        <span class="bgm-track-info">
+                            <span class="bgm-track-name">MAXIMUM SPEED (2面・ストーンヘンジ)</span>
+                            <span class="bgm-track-desc">150 BPM / 1985年本家2面風・疾走シンコペーションビート</span>
+                        </span>
+                        <span class="bgm-track-play">▶ 再生</span>
+                    </button>
+                    <button type="button" class="bgm-track-btn" data-bgm="STAGE3">
+                        <span class="bgm-track-num">05</span>
+                        <span class="bgm-track-info">
+                            <span class="bgm-track-name">BLANK MASK (3面・モアイ遺跡)</span>
+                            <span class="bgm-track-desc">132 BPM / イースター巨石群・神秘のアルペジオ</span>
+                        </span>
+                        <span class="bgm-track-play">▶ 再生</span>
+                    </button>
+                    <button type="button" class="bgm-track-btn" data-bgm="BOSS">
+                        <span class="bgm-track-num">06</span>
+                        <span class="bgm-track-info">
+                            <span class="bgm-track-name">AIRCRAFT CARRIER (ボス戦BGM)</span>
+                            <span class="bgm-track-desc">168 BPM / 巨大要塞との死闘・高速メタル＆ブラス</span>
+                        </span>
+                        <span class="bgm-track-play">▶ 再生</span>
+                    </button>
+                </div>
+                <div class="bgm-modal-footer">
+                    <button id="btn-bgm-stop" type="button" class="bgm-stop-btn">⏹ 停止 (STOP)</button>
+                    <button id="btn-bgm-close-bottom" type="button" class="bgm-return-btn">タイトル画面へ戻る</button>
+                </div>
             </div>
         </div>
 
@@ -97,20 +162,20 @@
         </div>
     </div>
 
-    <script src="js/sound.js?v=4.4"></script>
-    <script src="js/input.js?v=4.4"></script>
-    <script src="js/collision.js?v=4.4"></script>
-    <script src="js/particle.js?v=4.4"></script>
-    <script src="js/bullet.js?v=4.4"></script>
-    <script src="js/enemy.js?v=4.4"></script>
-    <script src="js/powerup.js?v=4.4"></script>
-    <script src="js/ui.js?v=4.4"></script>
-    <script src="js/option.js?v=4.4"></script>
-    <script src="js/boss.js?v=4.4"></script>
-    <script src="js/level.js?v=4.4"></script>
-    <script src="js/stonehenge.js?v=4.4"></script>
-    <script src="js/stage3.js?v=4.4"></script>
-    <script src="js/player.js?v=4.4"></script>
-    <script src="js/main.js?v=4.4"></script>
+    <script src="js/sound.js?v=4.5"></script>
+    <script src="js/input.js?v=4.5"></script>
+    <script src="js/collision.js?v=4.5"></script>
+    <script src="js/particle.js?v=4.5"></script>
+    <script src="js/bullet.js?v=4.5"></script>
+    <script src="js/enemy.js?v=4.5"></script>
+    <script src="js/powerup.js?v=4.5"></script>
+    <script src="js/ui.js?v=4.5"></script>
+    <script src="js/option.js?v=4.5"></script>
+    <script src="js/boss.js?v=4.5"></script>
+    <script src="js/level.js?v=4.5"></script>
+    <script src="js/stonehenge.js?v=4.5"></script>
+    <script src="js/stage3.js?v=4.5"></script>
+    <script src="js/player.js?v=4.5"></script>
+    <script src="js/main.js?v=4.5"></script>
 </body>
 </html>

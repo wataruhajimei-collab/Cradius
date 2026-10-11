@@ -444,27 +444,240 @@ html, body {
     }
 }
 
-.arcade-scream-test-btn {
+.arcade-bgm-collection-btn {
     margin-top: clamp(12px, 2.2vh, 22px);
-    padding: 10px 20px;
-    background: linear-gradient(180deg, #ff2244 0%, #aa0022 100%);
-    color: #ffffaa;
+    padding: 10px 22px;
+    background: linear-gradient(180deg, #0284c7 0%, #034582 100%);
+    color: #e0f2fe;
     font-family: 'Press Start 2P', "Hiragino Kaku Gothic ProN", "Meiryo", sans-serif;
     font-size: clamp(11px, 2.2vw, 15px);
     font-weight: 900;
-    border: 2px solid #ffcc44;
+    border: 2px solid #38bdf8;
     border-radius: 6px;
-    box-shadow: 0 0 14px rgba(255, 34, 68, 0.75);
+    box-shadow: 0 0 14px rgba(56, 189, 248, 0.65);
     cursor: pointer;
     z-index: 30;
     position: relative;
     pointer-events: auto;
-    transition: transform 0.1s ease, box-shadow 0.1s ease;
+    transition: transform 0.1s ease, box-shadow 0.1s ease, background 0.15s ease;
 }
 
-.arcade-scream-test-btn:active {
+.arcade-bgm-collection-btn:hover {
+    background: linear-gradient(180deg, #0ea5e9 0%, #0284c7 100%);
+    box-shadow: 0 0 20px rgba(56, 189, 248, 0.9);
+}
+
+.arcade-bgm-collection-btn:active {
     transform: scale(0.95);
-    box-shadow: 0 0 22px rgba(255, 220, 80, 0.95);
+    box-shadow: 0 0 24px rgba(125, 211, 252, 0.95);
+}
+
+/* ==========================================
+   BGM集（サウンドテスト）モーダル
+   ========================================== */
+.bgm-modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100dvh;
+    background: rgba(2, 6, 18, 0.88);
+    backdrop-filter: blur(4px);
+    display: none;
+    justify-content: center;
+    align-items: center;
+    z-index: 350;
+    padding: 12px;
+    touch-action: manipulation;
+}
+
+.bgm-modal-overlay.open {
+    display: flex;
+}
+
+.bgm-modal-dialog {
+    background: linear-gradient(180deg, #0b1329 0%, #050914 100%);
+    border: 2px solid #38bdf8;
+    border-radius: 10px;
+    box-shadow: 0 0 30px rgba(0, 180, 255, 0.45), inset 0 0 18px rgba(56, 189, 248, 0.12);
+    width: min(94vw, 580px);
+    max-height: 92dvh;
+    display: flex;
+    flex-direction: column;
+    padding: 14px 16px;
+    color: #e2e8f0;
+    font-family: "Hiragino Kaku Gothic ProN", "Meiryo", sans-serif;
+    overflow: hidden;
+}
+
+.bgm-modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid rgba(56, 189, 248, 0.35);
+    padding-bottom: 10px;
+    margin-bottom: 8px;
+}
+
+.bgm-modal-title {
+    margin: 0;
+    font-family: 'Press Start 2P', monospace;
+    font-size: clamp(13px, 2.5vw, 17px);
+    color: #38bdf8;
+    text-shadow: 0 0 10px rgba(56, 189, 248, 0.6);
+    letter-spacing: 1px;
+}
+
+.bgm-modal-close-btn {
+    background: rgba(30, 41, 59, 0.9);
+    color: #cbd5e1;
+    border: 1px solid #64748b;
+    border-radius: 5px;
+    padding: 6px 12px;
+    font-size: 12px;
+    font-weight: bold;
+    cursor: pointer;
+}
+
+.bgm-modal-close-btn:hover {
+    background: #334155;
+    color: #ffffff;
+}
+
+.bgm-now-playing {
+    background: rgba(3, 10, 26, 0.9);
+    border: 1px solid rgba(56, 189, 248, 0.35);
+    border-radius: 6px;
+    padding: 7px 10px;
+    margin-bottom: 10px;
+    font-size: clamp(11px, 2vw, 13px);
+    color: #7dd3fc;
+    text-align: center;
+    font-weight: bold;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.bgm-track-list {
+    display: flex;
+    flex-direction: column;
+    gap: 7px;
+    overflow-y: auto;
+    padding-right: 2px;
+    flex: 1;
+}
+
+.bgm-track-btn {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    text-align: left;
+    background: rgba(15, 23, 42, 0.85);
+    border: 1px solid rgba(56, 189, 248, 0.3);
+    border-radius: 7px;
+    padding: 8px 12px;
+    color: #f1f5f9;
+    cursor: pointer;
+    transition: background 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.bgm-track-btn:hover {
+    background: rgba(30, 58, 138, 0.55);
+    border-color: #38bdf8;
+}
+
+.bgm-track-btn.playing {
+    background: linear-gradient(90deg, rgba(2, 132, 199, 0.45) 0%, rgba(15, 23, 42, 0.9) 100%);
+    border-color: #ffea00;
+    box-shadow: 0 0 12px rgba(255, 234, 0, 0.35);
+}
+
+.bgm-track-num {
+    font-family: 'Press Start 2P', monospace;
+    font-size: 12px;
+    color: #38bdf8;
+    min-width: 26px;
+}
+
+.bgm-track-btn.playing .bgm-track-num {
+    color: #ffea00;
+}
+
+.bgm-track-info {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    flex: 1;
+    min-width: 0;
+}
+
+.bgm-track-name {
+    font-size: clamp(11px, 2.1vw, 13px);
+    font-weight: bold;
+    color: #ffffff;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.bgm-track-desc {
+    font-size: clamp(10px, 1.8vw, 11px);
+    color: #94a3b8;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.bgm-track-play {
+    font-size: 11px;
+    font-weight: bold;
+    color: #38bdf8;
+    background: rgba(2, 132, 199, 0.2);
+    border: 1px solid rgba(56, 189, 248, 0.45);
+    border-radius: 4px;
+    padding: 4px 8px;
+    white-space: nowrap;
+}
+
+.bgm-track-btn.playing .bgm-track-play {
+    color: #000000;
+    background: #ffea00;
+    border-color: #ffea00;
+}
+
+.bgm-modal-footer {
+    display: flex;
+    justify-content: space-between;
+    gap: 10px;
+    margin-top: 10px;
+    padding-top: 10px;
+    border-top: 1px solid rgba(56, 189, 248, 0.25);
+}
+
+.bgm-stop-btn {
+    flex: 1;
+    padding: 9px 12px;
+    background: linear-gradient(180deg, #dc2626 0%, #991b1b 100%);
+    color: #ffffff;
+    border: 1px solid #f87171;
+    border-radius: 6px;
+    font-size: 12px;
+    font-weight: bold;
+    cursor: pointer;
+}
+
+.bgm-return-btn {
+    flex: 1;
+    padding: 9px 12px;
+    background: linear-gradient(180deg, #334155 0%, #1e293b 100%);
+    color: #e2e8f0;
+    border: 1px solid #64748b;
+    border-radius: 6px;
+    font-size: 12px;
+    font-weight: bold;
+    cursor: pointer;
 }
 
 
