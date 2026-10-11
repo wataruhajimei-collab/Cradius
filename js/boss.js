@@ -165,6 +165,9 @@ class Boss {
             if (destroyed) {
                 createExplosion(hitX, bullet.y, '#99b3cc');
                 createExplosion(hitX, bullet.y, '#ffaa00');
+                if (typeof addScore === 'function') {
+                    addScore(1000, hitX, bullet.y, '#00ffff');
+                }
                 if (typeof Sound !== 'undefined') {
                     if (typeof Sound.playShieldBreak === 'function') Sound.playShieldBreak();
                     else if (typeof Sound.playExplosion === 'function') Sound.playExplosion();
@@ -891,6 +894,9 @@ class GolemBoss {
                     createExplosion(this.x + 60, this.y + 60, '#00ffff');
                     createExplosion(this.x + 60, this.y + 60, '#ffaa00');
                 }
+                if (typeof addScore === 'function') {
+                    addScore(3000, this.x + 60, this.y + 60, '#ffcc00');
+                }
             }
         } else {
             this.hitFlashTimer2 = 4;
@@ -899,6 +905,9 @@ class GolemBoss {
                 if (typeof createExplosion === 'function') {
                     createExplosion(this.x + 60, this.y + 170, '#00ffff');
                     createExplosion(this.x + 60, this.y + 170, '#ffaa00');
+                }
+                if (typeof addScore === 'function') {
+                    addScore(3000, this.x + 60, this.y + 170, '#ffcc00');
                 }
             }
         }
@@ -968,6 +977,7 @@ class GolemBoss {
             const hitX = Math.min(bullet.x + bullet.width, shield1Bounds.x + 10);
             const destroyed = this.hitShield(true, shieldDmg);
             createExplosion(hitX, bullet.y, destroyed ? '#ffaa00' : '#ffffaa');
+            if (destroyed && typeof addScore === 'function') addScore(1000, hitX, bullet.y, '#00ffff');
             if (typeof Sound !== 'undefined' && typeof Sound.playBossHit === 'function') Sound.playBossHit();
             return;
         }
@@ -978,6 +988,7 @@ class GolemBoss {
             const hitX = Math.min(bullet.x + bullet.width, shield2Bounds.x + 10);
             const destroyed = this.hitShield(false, shieldDmg);
             createExplosion(hitX, bullet.y, destroyed ? '#ffaa00' : '#ffffaa');
+            if (destroyed && typeof addScore === 'function') addScore(1000, hitX, bullet.y, '#00ffff');
             if (typeof Sound !== 'undefined' && typeof Sound.playBossHit === 'function') Sound.playBossHit();
             return;
         }
@@ -1731,6 +1742,9 @@ class BigCoreBoss {
             if (typeof createExplosion === 'function') {
                 createExplosion(scx, this.y, '#ff2266');
                 createExplosion(scx, this.y, '#00ffff');
+            }
+            if (typeof addScore === 'function') {
+                addScore(1500, scx, this.y, '#00ffff');
             }
             if (typeof Sound !== 'undefined' && typeof Sound.playExplosion === 'function') {
                 Sound.playExplosion();

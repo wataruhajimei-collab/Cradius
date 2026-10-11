@@ -251,13 +251,41 @@ html, body {
     font-family: 'Press Start 2P', monospace;
 }
 
+/* タイトル画面上部 スコアヘッダー (1P / HI / 2P) */
+.arcade-top-score-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    width: min(88vw, 620px);
+    font-size: clamp(11px, 2.2vw, 16px);
+    letter-spacing: clamp(1px, 0.25vw, 2px);
+    margin-bottom: clamp(4px, 1vh, 10px);
+}
+
+.arcade-score-item {
+    display: flex;
+    align-items: center;
+    gap: clamp(8px, 1.5vw, 16px);
+    white-space: nowrap;
+}
+
+.arcade-score-label {
+    color: #4ea8eb;
+    text-shadow: 2px 2px 0px #0b2247;
+}
+
+.arcade-score-value {
+    color: #ffffff;
+    text-shadow: 2px 2px 0px #1e293b;
+}
+
 /* メインウイングエンブレムロゴ */
 .arcade-title-block {
     display: flex;
     justify-content: center;
     align-items: center;
     width: 100%;
-    margin-top: clamp(6px, 1.8vh, 18px);
+    margin-top: clamp(2px, 1vh, 10px);
 }
 
 .arcade-title-logo {

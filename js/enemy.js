@@ -161,6 +161,9 @@ class FormationBase {
             if (typeof capsules !== 'undefined') {
                 capsules.push(new PowerUpCapsule(enemyX, enemyY));
             }
+            if (typeof addScore === 'function') {
+                addScore(500, enemyX, enemyY - 12, '#00ffff');
+            }
             this.active = false;
         }
     }

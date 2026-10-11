@@ -414,19 +414,27 @@ function handleCollisions() {
                 enemy.hp--;
                 if (enemy.hp <= 0) {
                     enemy.active = false;
-                    createExplosion(enemy.x + enemy.width / 2, enemy.y + enemy.height / 2, '#88ccff');
+                    const ex = enemy.x + enemy.width / 2;
+                    const ey = enemy.y + enemy.height / 2;
+                    createExplosion(ex, ey, '#88ccff');
                     
                     // 爆発音
                     if (typeof Sound !== 'undefined') Sound.playExplosion();
 
+                    // スコア加算＆ポップアップ演出
+                    if (typeof addScore === 'function') {
+                        const pts = getEnemyScore(enemy);
+                        addScore(pts, ex, ey, enemy.isRed ? '#ff99aa' : '#ffffaa');
+                    }
+
                     // 赤い敵（isRed）を倒した場合、確定でパワーアップカプセルをドロップ！
                     if (enemy.isRed && typeof capsules !== 'undefined') {
-                        capsules.push(new PowerUpCapsule(enemy.x + enemy.width / 2, enemy.y + enemy.height / 2));
+                        capsules.push(new PowerUpCapsule(ex, ey));
                     }
 
                     // 群れ（編隊・小隊）に所属している敵の場合、群れ全滅時にカプセル確定ドロップ！
                     if (enemy.formation) {
-                        enemy.formation.notifyDestroyed(enemy.x + enemy.width / 2, enemy.y + enemy.height / 2);
+                        enemy.formation.notifyDestroyed(ex, ey);
                     }
                 }
             }
@@ -445,8 +453,13 @@ function handleCollisions() {
                 if (enemy.x > player.x) {
                     player.shieldHp--;
                     enemy.active = false;
+                    const ex = enemy.x + enemy.width / 2;
+                    const ey = enemy.y + enemy.height / 2;
                     createExplosion(enemy.x, enemy.y, '#ffffff');
                     if (typeof Sound !== 'undefined') Sound.playExplosion();
+                    if (typeof addScore === 'function') {
+                        addScore(getEnemyScore(enemy), ex, ey, '#ffffff');
+                    }
                     if (enemy.isRed && typeof capsules !== 'undefined') {
                         capsules.push(new PowerUpCapsule(enemy.x, enemy.y));
                     }
@@ -499,6 +512,9 @@ function handleCollisions() {
             capsule.active = false;
             player.advancePowerUp();
             if (typeof Sound !== 'undefined') Sound.playCapsule();
+            if (typeof addScore === 'function') {
+                addScore(500, capsule.x + capsule.width / 2, capsule.y + capsule.height / 2, '#00ffff');
+            }
         }
     });
 
@@ -524,8 +540,11 @@ function handleCollisions() {
                             if (typeof Laser === 'undefined' || !(bullet instanceof Laser)) {
                                 bullet.active = false;
                             }
-                            createExplosion(bShot.x + bShot.width / 2, bShot.y + bShot.height / 2, bShot.color || '#38bdf8');
+                            const rx = bShot.x + bShot.width / 2;
+                            const ry = bShot.y + bShot.height / 2;
+                            createExplosion(rx, ry, bShot.color || '#38bdf8');
                             if (typeof Sound !== 'undefined' && typeof Sound.playBossHit === 'function') Sound.playBossHit();
+                            if (typeof addScore === 'function') addScore(100, rx, ry, '#38bdf8');
                             if (!bullet.active) break;
                         }
                     }
@@ -585,6 +604,20 @@ function handleCollisions() {
     }
 }
 
+function getEnemyScore(enemy) {
+    if (!enemy) return 100;
+    if (typeof HatcherEnemy !== 'undefined' && enemy instanceof HatcherEnemy) return 500;
+    if (typeof LaserTurretEnemy !== 'undefined' && enemy instanceof LaserTurretEnemy) return 400;
+    if (typeof RuneTurret !== 'undefined' && enemy instanceof RuneTurret) return 400;
+    if (typeof StoneEyeEnemy !== 'undefined' && enemy instanceof StoneEyeEnemy) return 300;
+    if (typeof DuckerEnemy !== 'undefined' && enemy instanceof DuckerEnemy) return 200;
+    if (typeof TurretEnemy !== 'undefined' && enemy instanceof TurretEnemy) return 200;
+    if (typeof WarpSphereEnemy !== 'undefined' && enemy instanceof WarpSphereEnemy) return 200;
+    if (typeof RugraEnemy !== 'undefined' && enemy instanceof RugraEnemy) return 200;
+    if (enemy.isRed) return 300;
+    return 100;
+}
+
 function createExplosion(x, y, color) {
     for (let i = 0; i < 18; i++) {
         particles.push(new Particle(x, y, color));
@@ -616,6 +649,13 @@ function triggerBossDefeatExplosion(boss) {
         cx: isStage2 ? (boss.x + boss.width / 2) : boss.x,
         cy: isStage2 ? (boss.y + boss.height / 2) : boss.y
     });
+
+    // ボス撃破特大ボーナススコア加算！
+    if (typeof addScore === 'function') {
+        const { cx, cy } = getBossCenter();
+        const bossPts = isStage3 ? 30000 : (isStage2 ? 20000 : 10000);
+        addScore(bossPts, cx, cy - 20, '#ffea00');
+    }
 
     // 撃破した瞬間にも第1波として部品・岩石/砂・内臓/血液が激しく飛び散る！
     if (!boss._initialDismembered && typeof spawnBossDismembermentWave === 'function') {

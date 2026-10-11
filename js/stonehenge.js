@@ -160,6 +160,9 @@ class StoneBlock {
             if (typeof Sound !== 'undefined' && typeof Sound.playExplosion === 'function') {
                 Sound.playExplosion();
             }
+            if (typeof addScore === 'function') {
+                addScore(100, this.x + this.width / 2, this.y, '#ffcc66');
+            }
             return true;
         }
         return false;

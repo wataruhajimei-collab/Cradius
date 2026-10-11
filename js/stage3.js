@@ -175,6 +175,9 @@ class MoaiEnemy {
             if (typeof Sound !== 'undefined' && typeof Sound.playExplosion === 'function') {
                 Sound.playExplosion();
             }
+            if (typeof addScore === 'function') {
+                addScore(2000, cx, cy, '#ffcc00');
+            }
 
             // 40%の確率でパワーアップカプセルをドロップ！
             if (Math.random() < 0.40 && typeof capsules !== 'undefined' && typeof PowerUpCapsule !== 'undefined') {
@@ -1142,6 +1145,9 @@ class Stage3 {
                 if (!this.boss.active) {
                     this.state = 'ALL_CLEAR';
                     this.stageClearTimer = 0;
+                    if (typeof addScore === 'function') {
+                        addScore(100000, this.width / 2, this.height / 2 - 40, '#ffdd00');
+                    }
                     setTimeout(() => {
                         if (this.active && typeof Sound !== 'undefined' && typeof Sound.playStageBgm === 'function') {
                             Sound.playStageBgm();
