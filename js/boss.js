@@ -1492,7 +1492,7 @@ class BigCoreBoss {
         while (state.targetUnwrapped - state.angle < -Math.PI * 1.35) state.targetUnwrapped += Math.PI * 2;
 
         const diff = state.targetUnwrapped - state.angle;
-        const desiredVel = Math.max(-maxSpeed, Math.min(maxSpeed, diff * 0.075));
+        const desiredVel = Math.max(-maxSpeed, Math.min(maxSpeed, diff * 0.038));
         if (state.vel < desiredVel) {
             state.vel = Math.min(desiredVel, state.vel + accel);
         } else {
@@ -1531,7 +1531,7 @@ class BigCoreBoss {
             const nodes = [];
             let nx = cx + cfg.baseOx + blend * cfg.rearShift;
             let ny = cy + cfg.oy;
-            const leadDiff = Math.max(-0.55, Math.min(0.55, (state.targetUnwrapped || targetDir) - targetDir));
+            const leadDiff = Math.max(-0.28, Math.min(0.28, (state.targetUnwrapped || targetDir) - targetDir));
             const curveSign = -cfg.sign * Math.cos(targetDir);
 
             nodes.push({ x: nx, y: ny, angle: targetDir, radius: 13 * thickScale });
@@ -1539,7 +1539,7 @@ class BigCoreBoss {
             for (let i = 1; i <= segs; i++) {
                 const t = i / segs;
                 const whip = Math.sin(this.moveTimer * 1.35 - i * 0.50 + cfg.phase) * (0.26 + t * 0.16);
-                const ang = targetDir + leadDiff * t * 0.35 + curveSign * (0.36 - t * 0.42) + whip;
+                const ang = targetDir + leadDiff * t * 0.175 + curveSign * (0.36 - t * 0.42) + whip;
                 nx += Math.cos(ang) * cfg.len;
                 ny += Math.sin(ang) * cfg.len;
                 const r = Math.max(5, 13 - i * 0.9) * thickScale;
@@ -1573,18 +1573,18 @@ class BigCoreBoss {
         this.y = 300 + Math.sin(this.moveTimer) * 65;
         this.rotationAngle += 0.035;
 
-        // 自機位置を取得し、4本の触手が上回り・下回りで自機をゆっくり追いかけるように更新
+        // 自機位置を取得し、4本の触手が上回り・下回りで自機を従来の半分の速度でゆっくり追いかけるように更新
         const px = (typeof player !== 'undefined' && player) ? (player.x + player.width / 2) : 120;
         const py = (typeof player !== 'undefined' && player) ? (player.y + player.height / 2) : 300;
-        this.trackedPlayerX += (px - this.trackedPlayerX) * 0.02;
-        this.trackedPlayerY += (py - this.trackedPlayerY) * 0.02;
+        this.trackedPlayerX += (px - this.trackedPlayerX) * 0.01;
+        this.trackedPlayerY += (py - this.trackedPlayerY) * 0.01;
 
         const refX = this.x;
         const bossCenterY = this.y;
-        this._updateTentacleState(this.tentacleStates[0], -1, 32, px, py, refX, bossCenterY, 0.0205, 0.00072);
-        this._updateTentacleState(this.tentacleStates[1], -1, 20, px, py, refX, bossCenterY, 0.0195, 0.00068);
-        this._updateTentacleState(this.tentacleStates[2],  1, 20, px, py, refX, bossCenterY, 0.0195, 0.00068);
-        this._updateTentacleState(this.tentacleStates[3],  1, 32, px, py, refX, bossCenterY, 0.0205, 0.00072);
+        this._updateTentacleState(this.tentacleStates[0], -1, 32, px, py, refX, bossCenterY, 0.0102, 0.00036);
+        this._updateTentacleState(this.tentacleStates[1], -1, 20, px, py, refX, bossCenterY, 0.0097, 0.00034);
+        this._updateTentacleState(this.tentacleStates[2],  1, 20, px, py, refX, bossCenterY, 0.0097, 0.00034);
+        this._updateTentacleState(this.tentacleStates[3],  1, 32, px, py, refX, bossCenterY, 0.0102, 0.00036);
 
         let sumBlend = 0;
         for (let i = 0; i < this.tentacleStates.length; i++) {
