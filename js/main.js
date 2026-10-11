@@ -254,8 +254,8 @@ function update(dt) {
 
     particles.forEach(p => p.update());
     particles = particles.filter(p => p.active);
-    if (particles.length > 300) {
-        particles = particles.slice(particles.length - 300);
+    if (particles.length > 900) {
+        particles = particles.slice(particles.length - 900);
     }
 
     handleCollisions();
@@ -470,7 +470,7 @@ function createExplosion(x, y, color) {
     }
 }
 
-// グラディウス風 ボス撃破時の超巨大連鎖爆発
+// グラディウス風 ボス撃破時の超巨大連鎖爆発＆部位飛散演出
 function triggerBossDefeatExplosion(boss) {
     if (boss.isDying) return;
     boss.isDying = true;
@@ -489,38 +489,58 @@ function triggerBossDefeatExplosion(boss) {
     // サウンド再生（重低音連続大爆発）
     if (typeof Sound !== 'undefined') Sound.playBossExplode();
 
-    // 1. ボス各部（遮蔽板、上下アーム、外装、コア）から次々と巨大火炎球が炸裂！（計28発）
+    const isStage2 = (typeof GolemBoss !== 'undefined' && boss instanceof GolemBoss);
+    const isStage3 = (typeof BigCoreBoss !== 'undefined' && boss instanceof BigCoreBoss);
+    const getBossCenter = () => ({
+        cx: isStage2 ? (boss.x + boss.width / 2) : boss.x,
+        cy: isStage2 ? (boss.y + boss.height / 2) : boss.y
+    });
+
+    // 撃破した瞬間にも第1波として部品・岩石/砂・内臓/血液が激しく飛び散る！
+    if (!boss._initialDismembered && typeof spawnBossDismembermentWave === 'function') {
+        boss._initialDismembered = true;
+        spawnBossDismembermentWave(boss, true);
+    }
+
+    // 1. ボス各部（遮蔽板、上下アーム、外装、コア）から次々と巨大火炎球と破片・内容物が炸裂！（計28発）
     for (let i = 0; i < 28; i++) {
         setTimeout(() => {
             if (!boss) return;
-            const offsetX = (Math.random() - 0.3) * (boss.width + 40);
-            const offsetY = (Math.random() - 0.2) * (boss.height + 40);
-            const explosionX = boss.x + offsetX;
-            const explosionY = boss.y + offsetY;
+            const { cx, cy } = getBossCenter();
+            const offsetX = (Math.random() - 0.5) * (boss.width + 40);
+            const offsetY = (Math.random() - 0.5) * (boss.height + 40);
+            const explosionX = cx + offsetX;
+            const explosionY = cy + offsetY;
             const radius = 35 + Math.random() * 30; // 半径35〜65pxの巨大火球
             if (typeof BossExplosion !== 'undefined') {
                 particles.push(new BossExplosion(explosionX, explosionY, radius));
             }
-            createExplosion(explosionX, explosionY, '#ffaa00');
+            const sparkColor = isStage3 ? '#ff1144' : (isStage2 ? '#e6ccb2' : '#ffaa00');
+            createExplosion(explosionX, explosionY, sparkColor);
+            if (i % 3 === 0 && typeof spawnBossDismembermentWave === 'function') {
+                spawnBossDismembermentWave(boss, false);
+            }
         }, i * 45);
     }
 
-    // 2. 最後に中心で超特大のファイナル大爆発！（半径85〜100px）
+    // 2. 最後に中心で超特大のファイナル大爆発＆全身の部品・岩石砂・内臓血液が完全にバラバラに四散！
     setTimeout(() => {
         if (!boss) return;
-        const centerX = boss.x + boss.width / 2;
-        const centerY = boss.y + boss.height / 2;
+        const { cx: centerX, cy: centerY } = getBossCenter();
         if (typeof BossExplosion !== 'undefined') {
             particles.push(new BossExplosion(centerX, centerY, 90));
             particles.push(new BossExplosion(centerX - 20, centerY, 75));
             particles.push(new BossExplosion(centerX + 20, centerY, 75));
         }
-        for (let j = 0; j < 30; j++) {
-            createExplosion(centerX, centerY, '#ffffff');
+        if (typeof spawnBossDismembermentWave === 'function') {
+            spawnBossDismembermentWave(boss, true);
+        }
+        for (let j = 0; j < 20; j++) {
+            createExplosion(centerX, centerY, isStage3 ? '#dc143c' : (isStage2 ? '#ddb892' : '#ffffff'));
         }
     }, 1100);
 
-    // 3. 大爆発の後にボス本体が完全に消滅
+    // 3. 大爆発の後にボス本体が完全に消滅（飛び散った部品・岩石・砂・内臓・血しぶきは画面上を舞い続ける）
     setTimeout(() => {
         boss.active = false;
     }, 1400);

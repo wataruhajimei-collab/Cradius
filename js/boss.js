@@ -115,6 +115,10 @@ class Boss {
         if (typeof Sound !== 'undefined' && typeof Sound.playBossScream === 'function') {
             Sound.playBossScream();
         }
+        if (!this._initialDismembered && typeof spawnBossDismembermentWave === 'function') {
+            this._initialDismembered = true;
+            spawnBossDismembermentWave(this, true);
+        }
     }
 
     // コアダメージ処理
@@ -577,6 +581,10 @@ class GolemBoss {
         this.screamText = 'ウワーーーー！';
         if (typeof Sound !== 'undefined' && typeof Sound.playBossScream === 'function') {
             Sound.playBossScream();
+        }
+        if (!this._initialDismembered && typeof spawnBossDismembermentWave === 'function') {
+            this._initialDismembered = true;
+            spawnBossDismembermentWave(this, true);
         }
     }
 
@@ -1425,6 +1433,10 @@ class BigCoreBoss {
         this.screamText = 'ウワーーーー！';
         if (typeof Sound !== 'undefined' && typeof Sound.playBossScream === 'function') {
             Sound.playBossScream();
+        }
+        if (!this._initialDismembered && typeof spawnBossDismembermentWave === 'function') {
+            this._initialDismembered = true;
+            spawnBossDismembermentWave(this, true);
         }
     }
 
