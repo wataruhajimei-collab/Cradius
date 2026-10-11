@@ -611,7 +611,7 @@ class SoundManager {
 
         // 声帯ミックス＆倍音強化シェイパー（フォルマントフィルターの「前」に配置して母音特性を潰さない！）
         const sourceMix = this.ctx.createGain();
-        sourceMix.gain.setValueAtTime(0.85, now);
+        sourceMix.gain.setValueAtTime(1.6, now);
         glottis1.connect(sourceMix);
         glottis2.connect(sourceMix);
         glottis3.connect(sourceMix);
@@ -658,14 +658,15 @@ class SoundManager {
         f4.frequency.linearRampToValueAtTime(3550, now + 0.30);
         f4.frequency.setValueAtTime(3400, now + dur);
 
+        // フォルマント各帯域ゲイン（バンドパス減衰を補償しつつ10倍の音圧へ大幅ブースト）
         const f1Gain = this.ctx.createGain();
         const f2Gain = this.ctx.createGain();
         const f3Gain = this.ctx.createGain();
         const f4Gain = this.ctx.createGain();
-        f1Gain.gain.setValueAtTime(2.4, now);
-        f2Gain.gain.setValueAtTime(2.1, now);
-        f3Gain.gain.setValueAtTime(1.4, now);
-        f4Gain.gain.setValueAtTime(1.1, now);
+        f1Gain.gain.setValueAtTime(12.0, now);
+        f2Gain.gain.setValueAtTime(10.5, now);
+        f3Gain.gain.setValueAtTime(7.5, now);
+        f4Gain.gain.setValueAtTime(6.0, now);
 
         preShaper.connect(f1);
         preShaper.connect(f2);
@@ -676,21 +677,44 @@ class SoundManager {
         f3.connect(f3Gain);
         f4.connect(f4Gain);
 
-        // 大声マスターエンベロープ（「ウ」→「ワーーーー！」で一気に最大声量へ立ち上がる）
+        // 10倍大音量マスターエンベロープ（「ウ」→「ワーーーー！」の音質・母音推移はそのままに音圧10倍化）
         const screamGain = this.ctx.createGain();
-        screamGain.gain.setValueAtTime(0.01, now);
-        screamGain.gain.linearRampToValueAtTime(1.35, now + 0.03); // 「ウ」
-        screamGain.gain.linearRampToValueAtTime(1.05, now + 0.16); // 「w」のくびれ（これで「ウ・ワ」の二音節がハッキリ聴こえる！）
-        screamGain.gain.linearRampToValueAtTime(1.85, now + 0.27); // 「ワーーーー！」最大声量
-        screamGain.gain.setValueAtTime(1.70, now + 1.35);
-        screamGain.gain.exponentialRampToValueAtTime(0.001, now + dur);
+        screamGain.gain.setValueAtTime(0.05, now);
+        screamGain.gain.linearRampToValueAtTime(13.5, now + 0.03); // 「ウ」
+        screamGain.gain.linearRampToValueAtTime(10.5, now + 0.16); // 「w」のくびれ（二音節を明瞭に維持）
+        screamGain.gain.linearRampToValueAtTime(18.5, now + 0.27); // 「ワーーーー！」10倍最大声量
+        screamGain.gain.setValueAtTime(17.0, now + 1.35);
+        screamGain.gain.exponentialRampToValueAtTime(0.01, now + dur);
 
         f1Gain.connect(screamGain);
         f2Gain.connect(screamGain);
         f3Gain.connect(screamGain);
         f4Gain.connect(screamGain);
 
-        screamGain.connect(this.masterGain || this.seGain);
+        // 音質（母音フォルマント比）を一切崩さずに最大音圧で出力するマキシマイザー段
+        const maximizer = this.ctx.createDynamicsCompressor();
+        maximizer.threshold.setValueAtTime(-2.0, now);
+        maximizer.knee.setValueAtTime(3.0, now);
+        maximizer.ratio.setValueAtTime(12.0, now);
+        maximizer.attack.setValueAtTime(0.002, now);
+        maximizer.release.setValueAtTime(0.06, now);
+
+        const outBoost = this.ctx.createGain();
+        outBoost.gain.setValueAtTime(3.2, now);
+
+        screamGain.connect(maximizer);
+        maximizer.connect(outBoost);
+        // masterGainやseGainの減衰を通さず、ctx.destinationへ直結して最大音量で鳴らす
+        outBoost.connect(this.ctx.destination);
+
+        // 叫び声の間、BGMを自動で絞って断末魔を圧倒的に際立たせる
+        if (this.bgmGain) {
+            try {
+                this.bgmGain.gain.cancelScheduledValues(now);
+                this.bgmGain.gain.setValueAtTime(0.10, now);
+                this.bgmGain.gain.linearRampToValueAtTime(0.70, now + dur + 0.2);
+            } catch (e) {}
+        }
 
         glottis1.start(now);
         glottis2.start(now);
@@ -703,7 +727,7 @@ class SoundManager {
         vib.stop(now + dur);
         growl.stop(now + dur);
 
-        this.autoClean(glottis1, dur, glottis2, glottis3, vib, vibGain, growl, growlGain, sourceMix, preShaper, f1, f2, f3, f4, f1Gain, f2Gain, f3Gain, f4Gain, screamGain);
+        this.autoClean(glottis1, dur, glottis2, glottis3, vib, vibGain, growl, growlGain, sourceMix, preShaper, f1, f2, f3, f4, f1Gain, f2Gain, f3Gain, f4Gain, screamGain, maximizer, outBoost);
     }
 
     // --- BGM エンジン (本格 KONAMI 矩形波倶楽部スタイル) ---
