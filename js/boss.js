@@ -559,8 +559,14 @@ class GolemBoss {
         this.shieldFlashTimer2 = 0;
         this.hasTentacles = true;
         this.rearTentacleBlend = 0;
+        this._computedRearBlend = 0;
         this.trackedPlayerX = 120;
         this.trackedPlayerY = 300;
+        // 上下各触手の追従角度・角速度ステート（上からも下からも自機をゆっくり追いかける）
+        this.tentacleStates = [
+            { angle: -Math.PI, vel: 0, prevRaw: -Math.PI, targetUnwrapped: -Math.PI }, // 上触手
+            { angle: Math.PI,  vel: 0, prevRaw: Math.PI,  targetUnwrapped: Math.PI }   // 下触手
+        ];
         this.isScreaming = false;
         this.screamText = '';
     }
@@ -581,37 +587,87 @@ class GolemBoss {
         }
     }
 
+    _updateTentacleState(state, sign, px, py, refX, bossCenterY, maxSpeed, accel) {
+        // 上触手(sign=-1)はやや下寄り、下触手(sign=+1)はやや上寄りを基準にすることで、
+        // 自機が上から回り込めば全触手が上から、下から回り込めば全触手が下から、
+        // 中央付近なら上触手は上から・下触手は下から自機を追いかける
+        const refY = bossCenterY - sign * 28;
+        const dx = px - refX;
+        const dy = py - refY;
+        const rawAngle = Math.atan2(dy, dx);
+
+        let dRaw = Math.atan2(Math.sin(rawAngle - state.prevRaw), Math.cos(rawAngle - state.prevRaw));
+        // 1フレームで前後へ大きく移動した場合も、自機の上下位置に応じた回転方向（上回り／下回り）を維持
+        if (Math.cos(state.prevRaw) < -0.2 && Math.cos(rawAngle) > 0.2) {
+            if (dy < 0 && dRaw < 0) dRaw += Math.PI * 2;
+            else if (dy >= 0 && dRaw > 0) dRaw -= Math.PI * 2;
+        } else if (Math.cos(state.prevRaw) > 0.2 && Math.cos(rawAngle) < -0.2) {
+            if (dy < 0 && dRaw > 0) dRaw -= Math.PI * 2;
+            else if (dy >= 0 && dRaw < 0) dRaw += Math.PI * 2;
+        }
+        state.prevRaw = rawAngle;
+        state.targetUnwrapped += dRaw;
+
+        // 触手がまだ前方を向いている状態で自機が背後へ回り込んだ際、
+        // 自機がボスより上なら必ず上回り(角度増加: -π -> -π/2 -> 0)、下なら必ず下回り(角度減少: +π -> +π/2 -> 0)に誘導
+        if (Math.cos(state.angle) < -0.25 && dx > -20) {
+            const k = Math.round(state.angle / (Math.PI * 2));
+            const rearAligned = k * Math.PI * 2 + rawAngle;
+            if (dy < 0) {
+                state.targetUnwrapped = (rearAligned > state.angle) ? rearAligned : (rearAligned + Math.PI * 2);
+            } else {
+                state.targetUnwrapped = (rearAligned < state.angle) ? rearAligned : (rearAligned - Math.PI * 2);
+            }
+        }
+
+        // 複数周回の蓄積防止（上回り・下回りの経路記憶を保てる ±1.35π の範囲に収める）
+        while (state.targetUnwrapped - state.angle > Math.PI * 1.35) state.targetUnwrapped -= Math.PI * 2;
+        while (state.targetUnwrapped - state.angle < -Math.PI * 1.35) state.targetUnwrapped += Math.PI * 2;
+
+        const diff = state.targetUnwrapped - state.angle;
+        const desiredVel = Math.max(-maxSpeed, Math.min(maxSpeed, diff * 0.075));
+        if (state.vel < desiredVel) {
+            state.vel = Math.min(desiredVel, state.vel + accel);
+        } else {
+            state.vel = Math.max(desiredVel, state.vel - accel);
+        }
+        state.angle += state.vel;
+    }
+
     // 上下2本の多関節メカニカル触手アームの関節座標を計算
-    // （機体を一瞬で追いかけないよう、ゆっくり穏やかにしなる動きに調整）
+    // （自機の位置を追いかけるように上からも下からもゆっくり追随して回る）
     _getTentacleNodes(isBottom) {
-        const isBehind = (typeof player !== 'undefined' && player && player.x > this.x - 40);
-        const blend = (typeof this.rearTentacleBlend === 'number') ? this.rearTentacleBlend : (isBehind ? 1 : 0);
+        const idx = isBottom ? 1 : 0;
+        const sign = isBottom ? 1 : -1;
+        const state = (this.tentacleStates && this.tentacleStates[idx])
+            ? this.tentacleStates[idx]
+            : { angle: sign * Math.PI, vel: 0, targetUnwrapped: sign * Math.PI };
+
+        let targetDir = state.angle;
+        let blend = (1 + Math.cos(targetDir)) * 0.5;
+
+        // 外部テスト等から rearTentacleBlend が直接書き換えられた場合の互換サポート
+        if (typeof this.rearTentacleBlend === 'number' && Math.abs(this.rearTentacleBlend - (this._computedRearBlend || 0)) > 0.05) {
+            blend = this.rearTentacleBlend;
+            targetDir = sign * Math.PI * (1 - blend);
+        }
 
         const baseX = this.x + 38 + blend * 75;
         const baseY = isBottom ? (this.y + this.height - 14) : (this.y + 14);
-        const sign = isBottom ? 1 : -1;
         const nodes = [{ x: baseX, y: baseY }];
         const segCount = 8;
         const segLen = 20;
 
-        // ゆっくり追従する遅延座標を用いて、急激な方向転換を防止
-        const tx = (typeof this.trackedPlayerX === 'number') ? this.trackedPlayerX : 120;
-        const ty = (typeof this.trackedPlayerY === 'number') ? this.trackedPlayerY : 300;
-        let targetDir = Math.PI * (1 - blend);
-        if (blend > 0.2) {
-            const rawAim = Math.atan2(ty - baseY, tx - baseX);
-            // 角度変化も穏やかに抑える
-            const clampedAim = Math.max(-0.55, Math.min(0.55, rawAim));
-            targetDir = clampedAim * blend + Math.PI * (1 - blend);
-        }
+        // 回転中は先端が自機の方向へしなるように追随
+        const leadDiff = Math.max(-0.55, Math.min(0.55, (state.targetUnwrapped || targetDir) - targetDir));
+        const curveSign = -sign * Math.cos(targetDir);
 
         let curX = baseX;
         let curY = baseY;
         for (let i = 1; i <= segCount; i++) {
             const ratio = i / segCount;
             const wave = Math.sin(this.moveTimer * 1.45 - i * 0.50 + (isBottom ? Math.PI * 0.7 : 0)) * (0.28 + ratio * 0.16);
-            const curveSign = sign * (1 - 2 * blend);
-            const baseAngle = targetDir + curveSign * (0.38 - ratio * 0.42) + wave;
+            const baseAngle = targetDir + leadDiff * ratio * 0.35 + curveSign * (0.38 - ratio * 0.42) + wave;
             curX += Math.cos(baseAngle) * segLen;
             curY += Math.sin(baseAngle) * segLen;
             nodes.push({ x: curX, y: curY, angle: baseAngle });
@@ -651,18 +707,21 @@ class GolemBoss {
         this.rotationAngle += 0.035;
         this.monolithAngle += 0.025;
 
-        // 自機位置への追従を非常にゆっくり補間（一瞬で機体を追いかけないようにする）
-        if (typeof player !== 'undefined' && player) {
-            const px = player.x + player.width / 2;
-            const py = player.y + player.height / 2;
-            this.trackedPlayerX += (px - this.trackedPlayerX) * 0.02;
-            this.trackedPlayerY += (py - this.trackedPlayerY) * 0.02;
-        }
+        // 自機位置を取得し、上下の触手がそれぞれ上回り・下回りでゆっくり自機を追いかけるように更新
+        const px = (typeof player !== 'undefined' && player) ? (player.x + player.width / 2) : 120;
+        const py = (typeof player !== 'undefined' && player) ? (player.y + player.height / 2) : 300;
+        this.trackedPlayerX += (px - this.trackedPlayerX) * 0.02;
+        this.trackedPlayerY += (py - this.trackedPlayerY) * 0.02;
 
-        // 自機が後ろに回り込んだ場合も、触手がゆっくり時間をかけて振り向くように調整
-        const playerBehind = Boolean(typeof player !== 'undefined' && player && player.x > this.x - 40);
-        const targetBlend = playerBehind ? 1.0 : 0.0;
-        this.rearTentacleBlend = (this.rearTentacleBlend || 0) + (targetBlend - (this.rearTentacleBlend || 0)) * 0.025;
+        const refX = this.x + 55;
+        const bossCenterY = this.y + this.height / 2;
+        this._updateTentacleState(this.tentacleStates[0], -1, px, py, refX, bossCenterY, 0.0205, 0.00072);
+        this._updateTentacleState(this.tentacleStates[1],  1, px, py, refX, bossCenterY, 0.0195, 0.00068);
+
+        const b0 = (1 + Math.cos(this.tentacleStates[0].angle)) * 0.5;
+        const b1 = (1 + Math.cos(this.tentacleStates[1].angle)) * 0.5;
+        this.rearTentacleBlend = (b0 + b1) * 0.5;
+        this._computedRearBlend = this.rearTentacleBlend;
 
         if (this.shieldHitCooldown > 0) this.shieldHitCooldown--;
         if (this.hitFlashTimer1 > 0) this.hitFlashTimer1--;
@@ -1345,8 +1404,16 @@ class BigCoreBoss {
         this.tentacleLengthScale = 1.5;
         this.tentacleThicknessScale = 1.8;
         this.rearTentacleBlend = 0;
+        this._computedRearBlend = 0;
         this.trackedPlayerX = 120;
         this.trackedPlayerY = 300;
+        // 4本の各触手の追従角度・角速度ステート（上からも下からも自機をゆっくり追いかける）
+        this.tentacleStates = [
+            { angle: -Math.PI, vel: 0, prevRaw: -Math.PI, targetUnwrapped: -Math.PI }, // 上外（機械）
+            { angle: -Math.PI, vel: 0, prevRaw: -Math.PI, targetUnwrapped: -Math.PI }, // 上内（生体）
+            { angle: Math.PI,  vel: 0, prevRaw: Math.PI,  targetUnwrapped: Math.PI },  // 下内（生体）
+            { angle: Math.PI,  vel: 0, prevRaw: Math.PI,  targetUnwrapped: Math.PI }   // 下外（機械）
+        ];
         this.volleyIndex = 0;
         this.isScreaming = false;
         this.screamText = '';
@@ -1380,43 +1447,87 @@ class BigCoreBoss {
         return this.allShieldsDestroyed;
     }
 
-    // 4本のうねる機械触手＆生体触手（長さを以前の半分に短縮し、機体を一瞬で追いかけないようゆっくり穏やかに動く）
+    _updateTentacleState(state, sign, biasY, px, py, refX, bossCenterY, maxSpeed, accel) {
+        const refY = bossCenterY - sign * biasY;
+        const dx = px - refX;
+        const dy = py - refY;
+        const rawAngle = Math.atan2(dy, dx);
+
+        let dRaw = Math.atan2(Math.sin(rawAngle - state.prevRaw), Math.cos(rawAngle - state.prevRaw));
+        if (Math.cos(state.prevRaw) < -0.2 && Math.cos(rawAngle) > 0.2) {
+            if (dy < 0 && dRaw < 0) dRaw += Math.PI * 2;
+            else if (dy >= 0 && dRaw > 0) dRaw -= Math.PI * 2;
+        } else if (Math.cos(state.prevRaw) > 0.2 && Math.cos(rawAngle) < -0.2) {
+            if (dy < 0 && dRaw > 0) dRaw -= Math.PI * 2;
+            else if (dy >= 0 && dRaw < 0) dRaw += Math.PI * 2;
+        }
+        state.prevRaw = rawAngle;
+        state.targetUnwrapped += dRaw;
+
+        // 触手がまだ前方を向いている状態で自機が背後へ回り込んだ際、
+        // 自機が基準より上なら必ず上回り(角度増加: -π -> -π/2 -> 0)、下なら必ず下回り(角度減少: +π -> +π/2 -> 0)に誘導
+        if (Math.cos(state.angle) < -0.25 && dx > -20) {
+            const k = Math.round(state.angle / (Math.PI * 2));
+            const rearAligned = k * Math.PI * 2 + rawAngle;
+            if (dy < 0) {
+                state.targetUnwrapped = (rearAligned > state.angle) ? rearAligned : (rearAligned + Math.PI * 2);
+            } else {
+                state.targetUnwrapped = (rearAligned < state.angle) ? rearAligned : (rearAligned - Math.PI * 2);
+            }
+        }
+
+        while (state.targetUnwrapped - state.angle > Math.PI * 1.35) state.targetUnwrapped -= Math.PI * 2;
+        while (state.targetUnwrapped - state.angle < -Math.PI * 1.35) state.targetUnwrapped += Math.PI * 2;
+
+        const diff = state.targetUnwrapped - state.angle;
+        const desiredVel = Math.max(-maxSpeed, Math.min(maxSpeed, diff * 0.075));
+        if (state.vel < desiredVel) {
+            state.vel = Math.min(desiredVel, state.vel + accel);
+        } else {
+            state.vel = Math.max(desiredVel, state.vel - accel);
+        }
+        state.angle += state.vel;
+    }
+
+    // 4本のうねる機械触手＆生体触手（長さを以前の半分に短縮し、自機を追いかけるように上からも下からもゆっくり追随）
     _getBioMechaTentacles() {
         const cx = this.x;
         const cy = this.y;
         const lenScale = this.tentacleLengthScale || 1.5;
         const thickScale = this.tentacleThicknessScale || 1.8;
-        const isBehind = (typeof player !== 'undefined' && player && player.x > this.x - 40);
-        const blend = (typeof this.rearTentacleBlend === 'number') ? this.rearTentacleBlend : (isBehind ? 1 : 0);
+        const hasManualOverride = (typeof this.rearTentacleBlend === 'number' && Math.abs(this.rearTentacleBlend - (this._computedRearBlend || 0)) > 0.05);
 
-        const configs = [
-            { ox: -15 + blend * 75, oy: -82, sign: -1, isBio: false, phase: 0.0, baseLen: 21, len: 21 * lenScale },
-            { ox: 20 + blend * 55,  oy: -58, sign: -1, isBio: true,  phase: 1.6, baseLen: 19, len: 19 * lenScale },
-            { ox: 20 + blend * 55,  oy: 58,  sign: 1,  isBio: true,  phase: 3.1, baseLen: 19, len: 19 * lenScale },
-            { ox: -15 + blend * 75, oy: 82,  sign: 1,  isBio: false, phase: 4.7, baseLen: 21, len: 21 * lenScale }
+        const baseConfigs = [
+            { baseOx: -15, rearShift: 75, oy: -82, sign: -1, isBio: false, phase: 0.0, baseLen: 21, len: 21 * lenScale },
+            { baseOx: 20,  rearShift: 55, oy: -58, sign: -1, isBio: true,  phase: 1.6, baseLen: 19, len: 19 * lenScale },
+            { baseOx: 20,  rearShift: 55, oy: 58,  sign: 1,  isBio: true,  phase: 3.1, baseLen: 19, len: 19 * lenScale },
+            { baseOx: -15, rearShift: 75, oy: 82,  sign: 1,  isBio: false, phase: 4.7, baseLen: 21, len: 21 * lenScale }
         ];
 
-        const tx = (typeof this.trackedPlayerX === 'number') ? this.trackedPlayerX : 120;
-        const ty = (typeof this.trackedPlayerY === 'number') ? this.trackedPlayerY : 300;
+        return baseConfigs.map((cfg, idx) => {
+            const state = (this.tentacleStates && this.tentacleStates[idx])
+                ? this.tentacleStates[idx]
+                : { angle: cfg.sign * Math.PI, vel: 0, targetUnwrapped: cfg.sign * Math.PI };
 
-        return configs.map(cfg => {
-            const nodes = [];
-            let nx = cx + cfg.ox;
-            let ny = cy + cfg.oy;
-            let targetDir = Math.PI * (1 - blend);
-            if (blend > 0.2) {
-                const rawAim = Math.atan2(ty - ny, tx - nx);
-                const clampedAim = Math.max(-0.55, Math.min(0.55, rawAim));
-                targetDir = clampedAim * blend + Math.PI * (1 - blend);
+            let targetDir = state.angle;
+            let blend = (1 + Math.cos(targetDir)) * 0.5;
+            if (hasManualOverride) {
+                blend = this.rearTentacleBlend;
+                targetDir = cfg.sign * Math.PI * (1 - blend);
             }
+
+            const nodes = [];
+            let nx = cx + cfg.baseOx + blend * cfg.rearShift;
+            let ny = cy + cfg.oy;
+            const leadDiff = Math.max(-0.55, Math.min(0.55, (state.targetUnwrapped || targetDir) - targetDir));
+            const curveSign = -cfg.sign * Math.cos(targetDir);
 
             nodes.push({ x: nx, y: ny, angle: targetDir, radius: 13 * thickScale });
             const segs = 9;
             for (let i = 1; i <= segs; i++) {
                 const t = i / segs;
                 const whip = Math.sin(this.moveTimer * 1.35 - i * 0.50 + cfg.phase) * (0.26 + t * 0.16);
-                const curveSign = cfg.sign * (1 - 2 * blend);
-                const ang = targetDir + curveSign * (0.36 - t * 0.42) + whip;
+                const ang = targetDir + leadDiff * t * 0.35 + curveSign * (0.36 - t * 0.42) + whip;
                 nx += Math.cos(ang) * cfg.len;
                 ny += Math.sin(ang) * cfg.len;
                 const r = Math.max(5, 13 - i * 0.9) * thickScale;
@@ -1450,18 +1561,25 @@ class BigCoreBoss {
         this.y = 300 + Math.sin(this.moveTimer) * 65;
         this.rotationAngle += 0.035;
 
-        // 機体の位置を一瞬で追いかけないよう、非常にゆっくり追従させる
-        if (typeof player !== 'undefined' && player) {
-            const px = player.x + player.width / 2;
-            const py = player.y + player.height / 2;
-            this.trackedPlayerX += (px - this.trackedPlayerX) * 0.02;
-            this.trackedPlayerY += (py - this.trackedPlayerY) * 0.02;
-        }
+        // 自機位置を取得し、4本の触手が上回り・下回りで自機をゆっくり追いかけるように更新
+        const px = (typeof player !== 'undefined' && player) ? (player.x + player.width / 2) : 120;
+        const py = (typeof player !== 'undefined' && player) ? (player.y + player.height / 2) : 300;
+        this.trackedPlayerX += (px - this.trackedPlayerX) * 0.02;
+        this.trackedPlayerY += (py - this.trackedPlayerY) * 0.02;
 
-        // 自機が後ろに回り込んだ場合も、触手がゆっくり時間をかけて振り向く
-        const playerBehind = Boolean(typeof player !== 'undefined' && player && player.x > this.x - 40);
-        const targetBlend = playerBehind ? 1.0 : 0.0;
-        this.rearTentacleBlend = (this.rearTentacleBlend || 0) + (targetBlend - (this.rearTentacleBlend || 0)) * 0.025;
+        const refX = this.x;
+        const bossCenterY = this.y;
+        this._updateTentacleState(this.tentacleStates[0], -1, 32, px, py, refX, bossCenterY, 0.0205, 0.00072);
+        this._updateTentacleState(this.tentacleStates[1], -1, 20, px, py, refX, bossCenterY, 0.0195, 0.00068);
+        this._updateTentacleState(this.tentacleStates[2],  1, 20, px, py, refX, bossCenterY, 0.0195, 0.00068);
+        this._updateTentacleState(this.tentacleStates[3],  1, 32, px, py, refX, bossCenterY, 0.0205, 0.00072);
+
+        let sumBlend = 0;
+        for (let i = 0; i < this.tentacleStates.length; i++) {
+            sumBlend += (1 + Math.cos(this.tentacleStates[i].angle)) * 0.5;
+        }
+        this.rearTentacleBlend = sumBlend / this.tentacleStates.length;
+        this._computedRearBlend = this.rearTentacleBlend;
 
         // 顎の開閉アニメーション
         const targetJaw = (this.bioRingTimer > 80 || this.coreOpen) ? 1.0 : 0.25 + Math.sin(this.organPulse * 0.5) * 0.2;
