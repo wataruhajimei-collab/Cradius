@@ -309,14 +309,14 @@ function handleCollisions() {
     // 敵の弾とプレイヤー
     enemyBullets.forEach(bullet => {
         if (bullet.active && checkCollision(player, bullet)) {
-            if (player.shieldActive) {
+            bullet.active = false;
+            createExplosion(bullet.x, bullet.y, player.shieldActive ? '#ffffff' : '#ff5500');
+            if (typeof player.onHit === 'function') {
+                player.onHit(bullet.x);
+            } else if (player.shieldActive) {
                 player.shieldHp--;
-                bullet.active = false;
-                createExplosion(bullet.x, bullet.y, '#ffffff');
                 if (typeof Sound !== 'undefined') Sound.playBossHit();
                 if (player.shieldHp <= 0) player.shieldActive = false;
-            } else {
-                console.log("Player hit by enemy bullet!");
             }
         }
         
@@ -384,14 +384,46 @@ function handleCollisions() {
                     }
                 }
             });
+
+            // ボスの触手と自機の直接接触ダメージ判定（2面・3面ボス）
+            const px = player.x + player.width / 2;
+            const py = player.y + player.height / 2;
+            if (typeof boss._getTentacleNodes === 'function') {
+                [false, true].forEach(isBot => {
+                    const nodes = boss._getTentacleNodes(isBot);
+                    for (let i = 0; i < nodes.length; i++) {
+                        const n = nodes[i];
+                        if (Math.hypot(px - n.x, py - n.y) < 22) {
+                            if (typeof player.onHit === 'function') player.onHit(n.x);
+                            break;
+                        }
+                    }
+                });
+            }
+            if (typeof boss._getBioMechaTentacles === 'function') {
+                const tents = boss._getBioMechaTentacles();
+                tents.forEach(t => {
+                    for (let i = 0; i < t.nodes.length; i++) {
+                        const n = t.nodes[i];
+                        const r = (n.radius || 24) * 0.75;
+                        if (Math.hypot(px - n.x, py - n.y) < r + 10) {
+                            if (typeof player.onHit === 'function') player.onHit(n.x);
+                            break;
+                        }
+                    }
+                });
+            }
         }
 
+        // ボスの弾と自機の当たり判定（シールド有無に関わらず確実に着弾・被弾処理！）
         boss.bullets.forEach(bullet => {
             if (bullet.active && checkCollision(player, bullet)) {
-                if (player.shieldActive) {
+                bullet.active = false;
+                createExplosion(bullet.x, bullet.y, player.shieldActive ? '#ffffff' : '#ff3300');
+                if (typeof player.onHit === 'function') {
+                    player.onHit(bullet.x);
+                } else if (player.shieldActive) {
                     player.shieldHp--;
-                    bullet.active = false;
-                    createExplosion(bullet.x, bullet.y, '#ffffff');
                     if (typeof Sound !== 'undefined') Sound.playBossHit();
                     if (player.shieldHp <= 0) player.shieldActive = false;
                 }
@@ -411,23 +443,14 @@ function triggerBossDefeatExplosion(boss) {
     if (boss.isDying) return;
     boss.isDying = true;
 
-    // 触手のあるボス（2面 GolemBoss・3面 BigCoreBoss 等）を倒した時は大声で「ウワーーーー！」と叫ぶ！
-    const hasTentacles = Boolean(
-        boss.hasTentacles ||
-        (typeof GolemBoss !== 'undefined' && boss instanceof GolemBoss) ||
-        (typeof BigCoreBoss !== 'undefined' && boss instanceof BigCoreBoss) ||
-        typeof boss._getTentacleNodes === 'function' ||
-        typeof boss._getBioMechaTentacles === 'function'
-    );
-    if (hasTentacles) {
-        if (typeof boss.triggerDeathScream === 'function') {
-            boss.triggerDeathScream();
-        } else {
-            boss.isScreaming = true;
-            boss.screamText = 'ウワーーーー！';
-            if (typeof Sound !== 'undefined' && typeof Sound.playBossScream === 'function') {
-                Sound.playBossScream();
-            }
+    // ボスを倒した時は大声で「ウワーーーー！」と断末魔の叫び声をあげる！
+    if (typeof boss.triggerDeathScream === 'function') {
+        boss.triggerDeathScream();
+    } else {
+        boss.isScreaming = true;
+        boss.screamText = 'ウワーーーー！';
+        if (typeof Sound !== 'undefined' && typeof Sound.playBossScream === 'function') {
+            Sound.playBossScream();
         }
     }
 

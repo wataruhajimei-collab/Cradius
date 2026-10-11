@@ -23,9 +23,49 @@ class Player {
         this.maxShieldHp = 3;
 
         this.hasMissile = false; // ミサイルを持っているか
+        this.hitFlashTimer = 0;  // 被弾時の赤白フラッシュ＆シェイク演出タイマー
+        this.hitCooldown = 0;    // 連続被弾クールダウン
+        this.hitCount = 0;
+    }
+
+    onHit(sourceX) {
+        if (this.shieldActive) {
+            this.shieldHp--;
+            if (typeof Sound !== 'undefined' && typeof Sound.playBossHit === 'function') {
+                Sound.playBossHit();
+            }
+            if (this.shieldHp <= 0) {
+                this.shieldActive = false;
+            }
+            return true;
+        }
+
+        if (this.hitCooldown > 0) return false;
+        this.hitCooldown = 18;
+        this.hitFlashTimer = 18;
+        this.hitCount++;
+
+        const cx = this.x + this.width / 2;
+        const cy = this.y + this.height / 2;
+        if (typeof createExplosion === 'function') {
+            createExplosion(cx, cy, '#ff3300');
+            createExplosion(cx, cy, '#ffdd00');
+        }
+        if (typeof Sound !== 'undefined' && typeof Sound.playExplosion === 'function') {
+            Sound.playExplosion();
+        }
+
+        // ボスの背後（画面右側）に回り込んで被弾した場合は衝撃で弾き飛ばされるノックバック
+        if (this.x > 460) {
+            this.x = Math.max(40, this.x - 28);
+        }
+        return true;
     }
 
     update(canvasWidth, canvasHeight) {
+        if (this.hitFlashTimer > 0) this.hitFlashTimer--;
+        if (this.hitCooldown > 0) this.hitCooldown--;
+
         // 入力による移動処理
         if (Input.isDown('ArrowUp')) {
             this.y -= this.speed;
@@ -274,6 +314,12 @@ class Player {
         this.options.forEach(opt => opt.draw(ctx));
 
         ctx.save();
+        if (this.hitFlashTimer > 0) {
+            ctx.translate((Math.random() - 0.5) * 8, (Math.random() - 0.5) * 8);
+            if (this.hitFlashTimer % 2 === 0) {
+                ctx.filter = 'brightness(2.5) saturate(2.5) hue-rotate(-30deg)';
+            }
+        }
         if (typeof images !== 'undefined' && images.player && images.player.complete && images.player.naturalWidth > 0) {
             // 通常描画（高速・低負荷）
             ctx.drawImage(images.player, this.x - 8, this.y - 18, 56, 56);
@@ -308,6 +354,16 @@ class Player {
             ctx.fillStyle = '#ffffff';
             ctx.fillRect(this.x + 10, this.y + 5, 10, 10);
         }
+
+        // 被弾時のショックウェーブリング描画
+        if (this.hitFlashTimer > 0) {
+            ctx.strokeStyle = (this.hitFlashTimer % 2 === 0) ? '#ff2200' : '#ffea00';
+            ctx.lineWidth = 3;
+            ctx.beginPath();
+            ctx.arc(this.x + this.width / 2, this.y + this.height / 2, 22 + (18 - this.hitFlashTimer) * 1.2, 0, Math.PI * 2);
+            ctx.stroke();
+        }
+
         ctx.restore();
 
         // シールドの描画

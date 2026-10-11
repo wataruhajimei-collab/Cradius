@@ -1142,9 +1142,11 @@ class Stage3 {
                 if (!this.boss.active) {
                     this.state = 'ALL_CLEAR';
                     this.stageClearTimer = 0;
-                    if (typeof Sound !== 'undefined' && typeof Sound.playStageBgm === 'function') {
-                        Sound.playStageBgm();
-                    }
+                    setTimeout(() => {
+                        if (this.active && typeof Sound !== 'undefined' && typeof Sound.playStageBgm === 'function') {
+                            Sound.playStageBgm();
+                        }
+                    }, 650);
                 }
             }
 

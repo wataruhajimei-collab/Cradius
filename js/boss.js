@@ -108,10 +108,25 @@ class Boss {
         return destroyedAny;
     }
 
+    triggerDeathScream() {
+        if (this.isScreaming) return;
+        this.isScreaming = true;
+        this.screamText = 'ウワーーーー！';
+        if (typeof Sound !== 'undefined' && typeof Sound.playBossScream === 'function') {
+            Sound.playBossScream();
+        }
+    }
+
     // コアダメージ処理
     hitCore(damage = 1) {
         this.hitFlashTimer = 4;
         this.hp -= damage;
+        if (this.hp <= 0 && !this.isDying) {
+            this.triggerDeathScream();
+            if (typeof triggerBossDefeatExplosion === 'function') {
+                triggerBossDefeatExplosion(this);
+            }
+        }
     }
 
     // プレイヤーの弾との当たり判定処理（遮蔽板によるコアの確実な保護＆登場中無敵）
@@ -169,6 +184,7 @@ class Boss {
             if (typeof Sound !== 'undefined') Sound.playBossHit();
 
             if (this.hp <= 0) {
+                this.triggerDeathScream();
                 if (typeof triggerBossDefeatExplosion === 'function') {
                     triggerBossDefeatExplosion(this);
                 }
@@ -227,6 +243,24 @@ class Boss {
 
         // 3. コア前方（左側）に並ぶ5枚の金属風遮蔽板（シールドプレート）
         this.drawShieldPlates(ctx, coreX, coreY);
+
+        // 撃破時の大声断末魔シャウト演出（「ウワーーーー！」）
+        if (this.isDying || this.isScreaming) {
+            ctx.save();
+            const sx = this.x + (Math.random() - 0.5) * 16;
+            const sy = Math.max(60, this.y - 115) + (Math.random() - 0.5) * 16;
+            ctx.font = '900 42px "Impact", "Arial Black", sans-serif';
+            ctx.textAlign = 'center';
+            ctx.shadowColor = '#ff0000';
+            ctx.shadowBlur = 22;
+            ctx.strokeStyle = '#ffffff';
+            ctx.lineWidth = 6;
+            const txt = this.screamText || 'ウワーーーー！';
+            ctx.strokeText(txt, sx, sy);
+            ctx.fillStyle = '#ff2200';
+            ctx.fillText(txt, sx, sy);
+            ctx.restore();
+        }
 
         ctx.restore();
         
@@ -524,6 +558,7 @@ class GolemBoss {
         this.shieldFlashTimer1 = 0;
         this.shieldFlashTimer2 = 0;
         this.hasTentacles = true;
+        this.rearTentacleBlend = 0;
         this.isScreaming = false;
         this.screamText = '';
     }
@@ -545,21 +580,32 @@ class GolemBoss {
     }
 
     // 上下2本の多関節メカニカル触手アームの関節座標を計算
+    // （自機が後ろに回り込んだ時は触手が背後・右方向へギュンとしなって自機へ襲いかかる！）
     _getTentacleNodes(isBottom) {
-        const baseX = this.x + 38;
+        const isBehind = (typeof player !== 'undefined' && player && player.x > this.x - 40);
+        const blend = (typeof this.rearTentacleBlend === 'number') ? this.rearTentacleBlend : (isBehind ? 1 : 0);
+
+        const baseX = this.x + 38 + blend * 75;
         const baseY = isBottom ? (this.y + this.height - 14) : (this.y + 14);
         const sign = isBottom ? 1 : -1;
         const nodes = [{ x: baseX, y: baseY }];
         const segCount = 8;
         const segLen = 22;
 
+        // 通常時は前方(Math.PI)、自機が背後に回り込んだ時は背後(0)または自機方向へしなる
+        let targetDir = Math.PI * (1 - blend);
+        if (blend > 0.3 && typeof player !== 'undefined' && player) {
+            const aimAng = Math.atan2((player.y + player.height / 2) - baseY, (player.x + player.width / 2) - baseX);
+            targetDir = aimAng * blend + Math.PI * (1 - blend);
+        }
+
         let curX = baseX;
         let curY = baseY;
         for (let i = 1; i <= segCount; i++) {
             const ratio = i / segCount;
             const wave = Math.sin(this.moveTimer * 3.2 - i * 0.55 + (isBottom ? Math.PI * 0.7 : 0)) * (0.42 + ratio * 0.25);
-            // 前方（左方向）へ大きくうねりながら伸びる機械触手
-            const baseAngle = Math.PI + sign * (0.45 - ratio * 0.52) + wave;
+            const curveSign = sign * (1 - 2 * blend);
+            const baseAngle = targetDir + curveSign * (0.45 - ratio * 0.52) + wave;
             curX += Math.cos(baseAngle) * segLen;
             curY += Math.sin(baseAngle) * segLen;
             nodes.push({ x: curX, y: curY, angle: baseAngle });
@@ -599,6 +645,11 @@ class GolemBoss {
         this.rotationAngle += 0.045;
         this.monolithAngle += 0.032;
 
+        // 自機が後ろに回り込んだ場合は触手を背後へ素早く振り向かせる
+        const playerBehind = Boolean(typeof player !== 'undefined' && player && player.x > this.x - 40);
+        const targetBlend = playerBehind ? 1.0 : 0.0;
+        this.rearTentacleBlend = (this.rearTentacleBlend || 0) + (targetBlend - (this.rearTentacleBlend || 0)) * 0.15;
+
         if (this.shieldHitCooldown > 0) this.shieldHitCooldown--;
         if (this.hitFlashTimer1 > 0) this.hitFlashTimer1--;
         if (this.hitFlashTimer2 > 0) this.hitFlashTimer2--;
@@ -607,23 +658,23 @@ class GolemBoss {
 
         const isEnraged = (this.core1Hp <= 0 || this.core2Hp <= 0 || (this.shields1 === 0 && this.shields2 === 0));
 
-        // 攻撃1: 古代ルーン・イオンリング拡散弾幕 + 遺跡プラズマ扇状弾
+        // 攻撃1: 古代ルーン・イオンリング拡散弾幕 + 遺跡プラズマ扇状弾（前後全方位＆自機狙い対応）
         this.ringTimer++;
-        if (this.ringTimer > (isEnraged ? 72 : 95)) {
+        if (this.ringTimer > (isEnraged ? 65 : 85)) {
             this.ringTimer = 0;
             this.shootRings();
         }
 
-        // 攻撃2: 多関節メカニカル触手先端クローからの自機狙い＆後方同時高速レーザー連射
+        // 攻撃2: 多関節メカニカル触手先端クロー＆背面砲門からの自機狙い＆後方同時高速レーザー連射
         this.tentacleFireTimer++;
-        if (this.tentacleFireTimer > (isEnraged ? 48 : 65)) {
+        if (this.tentacleFireTimer > (isEnraged ? 38 : 52)) {
             this.tentacleFireTimer = 0;
             this.shootTentacleWeapons();
         }
 
-        // 攻撃3: 古代モノリス重粒子ツインレーザー＆クロス弾幕
+        // 攻撃3: 古代モノリス重粒子ツインレーザー＆クロス弾幕（前後両方向対応）
         this.laserTimer++;
-        if (this.laserTimer > (isEnraged ? 85 : 115)) {
+        if (this.laserTimer > (isEnraged ? 75 : 100)) {
             this.laserTimer = 0;
             this.shootLasers();
         }
@@ -634,29 +685,50 @@ class GolemBoss {
 
     shootRings() {
         const cx = this.x - 10;
+        const rearX = this.x + this.width - 10;
         const cy1 = this.y + 60;
         const cy2 = this.y + 170;
+        const midY = this.y + this.height / 2;
+        const ShotClass = (typeof EnemyBullet !== 'undefined') ? EnemyBullet : Bullet;
 
-        // 上下ルーンコアから扇状に古代イオンリング弾（撃ち落とし可能）を発射！
+        // 1. 上下ルーンコアから前方（左）および後方（右）へ扇状に古代イオンリング弾を発射！
         if (typeof RingBullet !== 'undefined') {
             const angles = [-0.32, -0.11, 0.11, 0.32];
             angles.forEach(ang => {
                 const spd = 4.3;
                 const vx = -Math.cos(ang) * spd;
                 const vy = Math.sin(ang) * spd;
-                if (this.core1Hp > 0) this.bullets.push(new RingBullet(cx, cy1, vx, vy, '#38bdf8'));
-                if (this.core2Hp > 0) this.bullets.push(new RingBullet(cx, cy2, vx, vy, '#ffaa00'));
+                if (this.core1Hp > 0) {
+                    this.bullets.push(new RingBullet(cx, cy1, vx, vy, '#38bdf8'));
+                    this.bullets.push(new RingBullet(rearX, cy1, -vx, vy, '#38bdf8'));
+                }
+                if (this.core2Hp > 0) {
+                    this.bullets.push(new RingBullet(cx, cy2, vx, vy, '#ffaa00'));
+                    this.bullets.push(new RingBullet(rearX, cy2, -vx, vy, '#ffaa00'));
+                }
             });
         }
 
-        // 中央の古代遺跡コア顎から自機方向へ5WAYエネルギー弾を発射
-        const midY = this.y + this.height / 2;
+        // 2. 中央から前方＆後方へ5WAYエネルギー弾を発射
         const spreadAngles = [-0.36, -0.18, 0, 0.18, 0.36];
         spreadAngles.forEach(a => {
             const spd = 5.2;
-            const ShotClass = (typeof EnemyBullet !== 'undefined') ? EnemyBullet : Bullet;
             this.bullets.push(new ShotClass(this.x - 12, midY, -Math.cos(a) * spd, Math.sin(a) * spd));
+            this.bullets.push(new ShotClass(rearX, midY, Math.cos(a) * spd, Math.sin(a) * spd));
         });
+
+        // 3. 自機が後ろ（右側）に回り込んでいる場合、自機の現在位置へ直接イオンリング＆3WAY弾を狙い撃ち！
+        if (typeof player !== 'undefined' && player && player.x > this.x - 60) {
+            const tx = player.x + player.width / 2;
+            const ty = player.y + player.height / 2;
+            const aimAng = Math.atan2(ty - midY, tx - rearX);
+            if (typeof RingBullet !== 'undefined') {
+                this.bullets.push(new RingBullet(rearX, midY, Math.cos(aimAng) * 4.8, Math.sin(aimAng) * 4.8, '#ff2266'));
+            }
+            [-0.22, 0, 0.22].forEach(da => {
+                this.bullets.push(new ShotClass(rearX, midY, Math.cos(aimAng + da) * 5.8, Math.sin(aimAng + da) * 5.8));
+            });
+        }
     }
 
     shootTentacleWeapons() {
@@ -668,18 +740,22 @@ class GolemBoss {
         const targetX = (typeof player !== 'undefined' && player) ? (player.x + player.width / 2) : 120;
         const targetY = (typeof player !== 'undefined' && player) ? (player.y + player.height / 2) : 300;
         const LaserClass = (typeof EnemyLaser !== 'undefined') ? EnemyLaser : Bullet;
+        const ShotClass = (typeof EnemyBullet !== 'undefined') ? EnemyBullet : Bullet;
 
         [topTip, botTip].forEach((tip, idx) => {
             const dx = targetX - tip.x;
             const dy = targetY - tip.y;
             const dist = Math.sqrt(dx * dx + dy * dy) || 1;
-            const spd = 6.8;
+            const spd = 7.0;
             const vx = (dx / dist) * spd;
             const vy = (dy / dist) * spd;
+            const aimAng = Math.atan2(dy, dx);
             const color = (idx === 0) ? '#00ffee' : '#ffaa00';
 
-            // 1. 自機狙いレーザー（自機が後ろに回り込んだ場合も制限なく後方へ撃つ！）
+            // 1. 自機狙いレーザー＋3WAY扇状レーザー（自機が後ろに回り込んだ場合も正確に自機を撃ち抜く！）
             this.bullets.push(new LaserClass(tip.x, tip.y, vx, vy, color));
+            this.bullets.push(new LaserClass(tip.x, tip.y, Math.cos(aimAng - 0.20) * spd, Math.sin(aimAng - 0.20) * spd, color));
+            this.bullets.push(new LaserClass(tip.x, tip.y, Math.cos(aimAng + 0.20) * spd, Math.sin(aimAng + 0.20) * spd, color));
 
             // 2. 後方（右方向・逆方向）へも同時に触手レーザーを発射！
             const rearVx = vx < 0 ? -vx : Math.abs(spd * 0.95);
@@ -691,6 +767,18 @@ class GolemBoss {
             }
         });
 
+        // 3. ボス背面スラスター砲門からも自機の位置へ直接レーザー＆弾を発射（背後の安全地帯を完全排除！）
+        const rearPortX = this.x + this.width - 10;
+        [this.y + 45, this.y + this.height - 45].forEach((py, idx) => {
+            const rdx = targetX - rearPortX;
+            const rdy = targetY - py;
+            const rdist = Math.sqrt(rdx * rdx + rdy * rdy) || 1;
+            const rspd = 6.6;
+            const col = idx === 0 ? '#00ffee' : '#ffaa00';
+            this.bullets.push(new LaserClass(rearPortX, py, (rdx / rdist) * rspd, (rdy / rdist) * rspd, col));
+            this.bullets.push(new ShotClass(rearPortX, py, (rdx / rdist) * 5.5, (rdy / rdist) * 5.5));
+        });
+
         if (typeof Sound !== 'undefined' && typeof Sound.playLaser === 'function') {
             Sound.playLaser();
         }
@@ -698,12 +786,20 @@ class GolemBoss {
 
     shootLasers() {
         const startX = this.x - 24;
+        const rearX = this.x + this.width - 10;
         const LaserClass = (typeof EnemyLaser !== 'undefined') ? EnemyLaser : Bullet;
-        // 上下メカホーン砲門＆中央砲門から高速重レーザー斉射
+        // 前方：上下メカホーン砲門＆中央砲門から高速重レーザー斉射
         this.bullets.push(new LaserClass(startX, this.y + 22, -7.8, 0, '#00ffff'));
         this.bullets.push(new LaserClass(startX, this.y + 92, -7.2, -0.6, '#ffaa00'));
         this.bullets.push(new LaserClass(startX, this.y + 138, -7.2, 0.6, '#ffaa00'));
         this.bullets.push(new LaserClass(startX, this.y + this.height - 22, -7.8, 0, '#00ffff'));
+
+        // 後方（右方向）：背面砲門からも4連重レーザー斉射！
+        this.bullets.push(new LaserClass(rearX, this.y + 22, 7.8, 0, '#00ffff'));
+        this.bullets.push(new LaserClass(rearX, this.y + 92, 7.2, -0.8, '#ffaa00'));
+        this.bullets.push(new LaserClass(rearX, this.y + 138, 7.2, 0.8, '#ffaa00'));
+        this.bullets.push(new LaserClass(rearX, this.y + this.height - 22, 7.8, 0, '#00ffff'));
+
         if (typeof Sound !== 'undefined' && typeof Sound.playLaser === 'function') {
             Sound.playLaser();
         }
@@ -1305,17 +1401,20 @@ class BigCoreBoss {
         return this.allShieldsDestroyed;
     }
 
-    // 4本のうねる機械触手＆生体触手（太さ3倍・長さ3倍の超巨大触手！）
+    // 4本のうねる機械触手＆生体触手（太さ3倍・長さ3倍の超巨大触手！自機が背後に回り込むと後ろへギュンとしなって襲いかかる！）
     _getBioMechaTentacles() {
         const cx = this.x;
         const cy = this.y;
         const lenScale = this.tentacleLengthScale || 3;
         const thickScale = this.tentacleThicknessScale || 3;
+        const isBehind = (typeof player !== 'undefined' && player && player.x > this.x - 40);
+        const blend = (typeof this.rearTentacleBlend === 'number') ? this.rearTentacleBlend : (isBehind ? 1 : 0);
+
         const configs = [
-            { ox: -15, oy: -82, sign: -1, isBio: false, phase: 0.0, baseLen: 21, len: 21 * lenScale },
-            { ox: 20,  oy: -58, sign: -1, isBio: true,  phase: 1.6, baseLen: 19, len: 19 * lenScale },
-            { ox: 20,  oy: 58,  sign: 1,  isBio: true,  phase: 3.1, baseLen: 19, len: 19 * lenScale },
-            { ox: -15, oy: 82,  sign: 1,  isBio: false, phase: 4.7, baseLen: 21, len: 21 * lenScale }
+            { ox: -15 + blend * 90, oy: -82, sign: -1, isBio: false, phase: 0.0, baseLen: 21, len: 21 * lenScale },
+            { ox: 20 + blend * 65,  oy: -58, sign: -1, isBio: true,  phase: 1.6, baseLen: 19, len: 19 * lenScale },
+            { ox: 20 + blend * 65,  oy: 58,  sign: 1,  isBio: true,  phase: 3.1, baseLen: 19, len: 19 * lenScale },
+            { ox: -15 + blend * 90, oy: 82,  sign: 1,  isBio: false, phase: 4.7, baseLen: 21, len: 21 * lenScale }
         ];
         const speedMult = this.coreOpen ? 1.55 : 1.0;
 
@@ -1323,12 +1422,19 @@ class BigCoreBoss {
             const nodes = [];
             let nx = cx + cfg.ox;
             let ny = cy + cfg.oy;
-            nodes.push({ x: nx, y: ny, angle: Math.PI, radius: 15 * thickScale });
+            let targetDir = Math.PI * (1 - blend);
+            if (blend > 0.3 && typeof player !== 'undefined' && player) {
+                const aimAng = Math.atan2((player.y + player.height / 2) - ny, (player.x + player.width / 2) - nx);
+                targetDir = aimAng * blend + Math.PI * (1 - blend);
+            }
+
+            nodes.push({ x: nx, y: ny, angle: targetDir, radius: 15 * thickScale });
             const segs = 9;
             for (let i = 1; i <= segs; i++) {
                 const t = i / segs;
                 const whip = Math.sin(this.moveTimer * 3.8 * speedMult - i * 0.58 + cfg.phase) * (0.46 + t * 0.32);
-                const ang = Math.PI + cfg.sign * (0.42 - t * 0.55) + whip;
+                const curveSign = cfg.sign * (1 - 2 * blend);
+                const ang = targetDir + curveSign * (0.42 - t * 0.55) + whip;
                 nx += Math.cos(ang) * cfg.len;
                 ny += Math.sin(ang) * cfg.len;
                 const r = Math.max(6, 15 - i * 1.0) * thickScale;
@@ -1362,32 +1468,37 @@ class BigCoreBoss {
         this.y = 300 + Math.sin(this.moveTimer) * 72;
         this.rotationAngle += 0.05;
 
+        // 自機が後ろに回り込んだ場合は4本の超巨大触手を背後へ素早く振り向かせる
+        const playerBehind = Boolean(typeof player !== 'undefined' && player && player.x > this.x - 40);
+        const targetBlend = playerBehind ? 1.0 : 0.0;
+        this.rearTentacleBlend = (this.rearTentacleBlend || 0) + (targetBlend - (this.rearTentacleBlend || 0)) * 0.15;
+
         // 顎の開閉アニメーション（バイオ・イオンリング発射前後に大きく開く）
-        const targetJaw = (this.bioRingTimer > 65 || this.coreOpen) ? 1.0 : 0.25 + Math.sin(this.organPulse * 0.5) * 0.2;
+        const targetJaw = (this.bioRingTimer > 55 || this.coreOpen) ? 1.0 : 0.25 + Math.sin(this.organPulse * 0.5) * 0.2;
         this.jawOpen += (targetJaw - this.jawOpen) * 0.12;
 
         this.shieldCores.forEach(c => { if (c.flashTimer > 0) c.flashTimer--; });
         if (this.hitFlashTimer > 0) this.hitFlashTimer--;
 
-        // 武器1: 4連装サイバー・バイオレーザー斉射
+        // 武器1: 4連装サイバー・バイオレーザー斉射（前後両方向＆自機狙い対応）
         this.fireTimer++;
-        const interval = this.coreOpen ? 58 : 82;
+        const interval = this.coreOpen ? 52 : 74;
         if (this.fireTimer >= interval) {
             this.fireTimer = 0;
             this.shoot();
         }
 
-        // 武器2: 4本の超巨大機械＆生体触手からの自機狙い＆後方同時ニードルレーザー＆生体胞子弾幕
+        // 武器2: 4本の超巨大機械＆生体触手＋背面脳幹からの自機狙い＆後方同時ニードルレーザー＆生体胞子弾幕
         this.tentacleTimer++;
-        const tentacleInterval = this.coreOpen ? 46 : 68;
+        const tentacleInterval = this.coreOpen ? 36 : 52;
         if (this.tentacleTimer >= tentacleInterval) {
             this.tentacleTimer = 0;
             this.shootTentacleBarrage();
         }
 
-        // 武器3: 古代モアイ顎＆巨大脳みそからの「バイオ・イオンリング暴風弾幕」
+        // 武器3: 古代モアイ顎＆巨大脳みそからの「バイオ・イオンリング暴風弾幕」（前後両方向＆自機狙い対応）
         this.bioRingTimer++;
-        const ringInterval = this.coreOpen ? 76 : 105;
+        const ringInterval = this.coreOpen ? 68 : 92;
         if (this.bioRingTimer >= ringInterval) {
             this.bioRingTimer = 0;
             this.shootBioRingStorm();
@@ -1399,13 +1510,34 @@ class BigCoreBoss {
 
     shoot() {
         const bx = this.x - this.width / 2 + 10;
+        const rearX = this.x + this.width / 2 - 10;
         const by = this.y;
         const spd = this.coreOpen ? -8.5 : -7.0;
+        const rearSpd = Math.abs(spd);
         const LaserClass = (typeof EnemyLaser !== 'undefined') ? EnemyLaser : Bullet;
+
+        // 前方4連レーザー
         this.bullets.push(new LaserClass(bx, by - 56, spd, 0, '#00ffff'));
         this.bullets.push(new LaserClass(bx, by - 20, spd, 0, '#ff2266'));
         this.bullets.push(new LaserClass(bx, by + 20, spd, 0, '#ff2266'));
         this.bullets.push(new LaserClass(bx, by + 56, spd, 0, '#00ffff'));
+
+        // 後方（背面）4連レーザー
+        this.bullets.push(new LaserClass(rearX, by - 56, rearSpd, 0, '#00ffff'));
+        this.bullets.push(new LaserClass(rearX, by - 20, rearSpd, 0, '#ff2266'));
+        this.bullets.push(new LaserClass(rearX, by + 20, rearSpd, 0, '#ff2266'));
+        this.bullets.push(new LaserClass(rearX, by + 56, rearSpd, 0, '#00ffff'));
+
+        // 自機が背後にいる場合は自機の座標へも直接バイオレーザーを斉射！
+        if (typeof player !== 'undefined' && player && player.x > this.x - 60) {
+            const tx = player.x + player.width / 2;
+            const ty = player.y + player.height / 2;
+            [by - 40, by + 40].forEach((py, i) => {
+                const ang = Math.atan2(ty - py, tx - rearX);
+                this.bullets.push(new LaserClass(rearX, py, Math.cos(ang) * rearSpd, Math.sin(ang) * rearSpd, i === 0 ? '#00ffff' : '#ff2266'));
+            });
+        }
+
         if (typeof Sound !== 'undefined' && typeof Sound.playLaser === 'function') {
             Sound.playLaser();
         }
@@ -1423,56 +1555,82 @@ class BigCoreBoss {
             const dx = targetX - tip.x;
             const dy = targetY - tip.y;
             const dist = Math.sqrt(dx * dx + dy * dy) || 1;
-            const spd = this.coreOpen ? 7.2 : 6.0;
+            const spd = this.coreOpen ? 7.4 : 6.2;
             const vx = (dx / dist) * spd;
             const vy = (dy / dist) * spd;
+            const aimAng = Math.atan2(dy, dx);
             const rearVx = vx < 0 ? -vx : Math.abs(spd * 0.95);
             const rearVy = vx < 0 ? -vy : vy * 0.5;
+            const col = t.isBio ? '#ff2266' : '#00ffee';
+
+            // 1. 自機狙いレーザー＋3WAY扇状レーザー（自機が背後・右下・右上にいても正確に狙い撃つ！）
+            this.bullets.push(new LaserClass(tip.x, tip.y, vx, vy, col));
+            this.bullets.push(new LaserClass(tip.x, tip.y, Math.cos(aimAng - 0.22) * spd, Math.sin(aimAng - 0.22) * spd, col));
+            this.bullets.push(new LaserClass(tip.x, tip.y, Math.cos(aimAng + 0.22) * spd, Math.sin(aimAng + 0.22) * spd, col));
+
+            // 2. 逆方向（後方／前方）へも同時発射
+            this.bullets.push(new LaserClass(tip.x, tip.y, rearVx, rearVy, col));
+            if (vx >= 0) {
+                this.bullets.push(new LaserClass(tip.x, tip.y, -Math.abs(vx || spd), vy, col));
+            }
 
             if (t.isBio) {
-                // 生体触手先端からは赤紫の高速バイオレーザー＋上下拡散弾（前方・自機狙い＆後方へ同時発射！）
-                this.bullets.push(new LaserClass(tip.x, tip.y, vx, vy, '#ff2266'));
-                this.bullets.push(new LaserClass(tip.x, tip.y, rearVx, rearVy, '#ff2266'));
-                if (vx >= 0) {
-                    this.bullets.push(new LaserClass(tip.x, tip.y, -Math.abs(vx || spd), vy, '#ff2266'));
-                }
-                if (this.coreOpen) {
-                    this.bullets.push(new ShotClass(tip.x, tip.y, vx * 0.85, vy - 1.4));
-                    this.bullets.push(new ShotClass(tip.x, tip.y, vx * 0.85, vy + 1.4));
-                    this.bullets.push(new ShotClass(tip.x, tip.y, rearVx * 0.85, rearVy - 1.4));
-                    this.bullets.push(new ShotClass(tip.x, tip.y, rearVx * 0.85, rearVy + 1.4));
-                }
-            } else {
-                // 機械触手先端からはシアンレーザー（前方・自機狙い＆後方へ同時発射！）
-                this.bullets.push(new LaserClass(tip.x, tip.y, vx, vy, '#00ffee'));
-                this.bullets.push(new LaserClass(tip.x, tip.y, rearVx, rearVy, '#00ffee'));
-                if (vx >= 0) {
-                    this.bullets.push(new LaserClass(tip.x, tip.y, -Math.abs(vx || spd), vy, '#00ffee'));
-                }
+                this.bullets.push(new ShotClass(tip.x, tip.y, vx * 0.88, vy - 1.4));
+                this.bullets.push(new ShotClass(tip.x, tip.y, vx * 0.88, vy + 1.4));
+                this.bullets.push(new ShotClass(tip.x, tip.y, rearVx * 0.88, rearVy - 1.4));
+                this.bullets.push(new ShotClass(tip.x, tip.y, rearVx * 0.88, rearVy + 1.4));
             }
+        });
+
+        // 3. ボス後部の巨大脳幹・脊椎ノズルからも自機へ直接バイオレーザー＆神経パルス弾を発射（背後の安全地帯を完全排除！）
+        const rearBrainX = this.x + 95;
+        [this.y - 42, this.y + 42].forEach((py, idx) => {
+            const rdx = targetX - rearBrainX;
+            const rdy = targetY - py;
+            const rdist = Math.sqrt(rdx * rdx + rdy * rdy) || 1;
+            const rspd = 6.8;
+            const col = idx === 0 ? '#ff2266' : '#00ffee';
+            this.bullets.push(new LaserClass(rearBrainX, py, (rdx / rdist) * rspd, (rdy / rdist) * rspd, col));
+            this.bullets.push(new ShotClass(rearBrainX, py, (rdx / rdist) * 5.6, (rdy / rdist) * 5.6));
         });
     }
 
     shootBioRingStorm() {
         const mouthX = this.x - 88;
+        const rearBrainX = this.x + 95;
         const mouthY = this.y;
+        const ShotClass = (typeof EnemyBullet !== 'undefined') ? EnemyBullet : Bullet;
 
-        // 撃ち落とし可能なバイオ・イオンリング弾を扇状に連射！
+        // 1. 前方（口）および後方（脳幹）へ撃ち落とし可能なバイオ・イオンリング弾を扇状に連射！
         if (typeof RingBullet !== 'undefined') {
             const angles = this.coreOpen ? [-0.38, -0.19, 0, 0.19, 0.38] : [-0.28, 0, 0.28];
             angles.forEach((a, i) => {
                 const spd = 4.5;
                 const col = (i % 2 === 0) ? '#ff2266' : '#00e5ff';
                 this.bullets.push(new RingBullet(mouthX, mouthY, -Math.cos(a) * spd, Math.sin(a) * spd, col));
+                this.bullets.push(new RingBullet(rearBrainX, mouthY, Math.cos(a) * spd, Math.sin(a) * spd, col));
             });
         }
 
-        // 脳みそ眼球コアから自機狙いの神経パルス弾
-        const ShotClass = (typeof EnemyBullet !== 'undefined') ? EnemyBullet : Bullet;
+        // 2. 前後両方向へ神経パルス弾
         const spread = [-0.22, 0, 0.22];
         spread.forEach(a => {
             this.bullets.push(new ShotClass(this.x - 30, this.y, -Math.cos(a) * 5.6, Math.sin(a) * 5.6));
+            this.bullets.push(new ShotClass(rearBrainX, this.y, Math.cos(a) * 5.6, Math.sin(a) * 5.6));
         });
+
+        // 3. 自機が背後に回り込んでいる場合は自機の現在座標へ直接イオンリング＆3WAY弾を撃ち込む！
+        if (typeof player !== 'undefined' && player && player.x > this.x - 60) {
+            const tx = player.x + player.width / 2;
+            const ty = player.y + player.height / 2;
+            const aimAng = Math.atan2(ty - mouthY, tx - rearBrainX);
+            if (typeof RingBullet !== 'undefined') {
+                this.bullets.push(new RingBullet(rearBrainX, mouthY, Math.cos(aimAng) * 5.0, Math.sin(aimAng) * 5.0, '#ff2266'));
+            }
+            [-0.22, 0, 0.22].forEach(da => {
+                this.bullets.push(new ShotClass(rearBrainX, mouthY, Math.cos(aimAng + da) * 6.0, Math.sin(aimAng + da) * 6.0));
+            });
+        }
     }
 
     _getShieldCoreX(index) {

@@ -346,15 +346,17 @@ class StonehengeStage {
             }
 
         } else if (this.state === 'BOSS') {
-            // --- フェーズ5: ビッグコア戦 ---
+            // --- フェーズ5: ボス戦 ---
             if (this.boss) {
                 this.boss.update();
                 if (!this.boss.active) {
                     this.state = 'STAGE_CLEAR';
                     this.stageClearTimer = 0;
-                    if (typeof Sound !== 'undefined' && typeof Sound.playStageBgm === 'function') {
-                        Sound.playStageBgm();
-                    }
+                    setTimeout(() => {
+                        if (this.active && typeof Sound !== 'undefined' && typeof Sound.playStageBgm === 'function') {
+                            Sound.playStageBgm();
+                        }
+                    }, 650);
                 }
             }
 
