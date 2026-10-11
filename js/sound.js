@@ -8,6 +8,8 @@ const C5 = 72, Cs5 = 73, D5 = 74, Eb5 = 75, E5 = 76, F5 = 77, Fs5 = 78, G5 = 79,
 const C6 = 84, Cs6 = 85, D6 = 86, Eb6 = 87, E6 = 88, F6 = 89, Fs6 = 90, G6 = 91, Gs6 = 92, A6 = 93, Bb6 = 94, B6 = 95, C7 = 96;
 const Ds1 = Eb1, Ds2 = Eb2, Ds3 = Eb3, Ds4 = Eb4, Ds5 = Eb5, Ds6 = Eb6;
 const Ab1 = Gs1, Ab2 = Gs2, Ab3 = Gs3, Ab4 = Gs4, Ab5 = Gs5, Ab6 = Gs6;
+const Db1 = Cs1, Db2 = Cs2, Db3 = Cs3, Db4 = Cs4, Db5 = Cs5, Db6 = Cs6;
+const Gb1 = Fs1, Gb2 = Fs2, Gb3 = Fs3, Gb4 = Fs4, Gb5 = Fs5, Gb6 = Fs6;
 
 class SoundManager {
     constructor() {
@@ -65,17 +67,67 @@ class SoundManager {
         try {
             const AudioCtx = window.AudioContext || window.webkitAudioContext;
             this.ctx = new AudioCtx();
+
+            // マスターコンプレッサー（重低音ベース・ドラムを極限までブーストしても音割れさせず塊感のある音圧にまとめる）
+            this.masterCompressor = this.ctx.createDynamicsCompressor();
+            this.masterCompressor.threshold.setValueAtTime(-5.0, this.ctx.currentTime);
+            this.masterCompressor.knee.setValueAtTime(8.0, this.ctx.currentTime);
+            this.masterCompressor.ratio.setValueAtTime(6.0, this.ctx.currentTime);
+            this.masterCompressor.attack.setValueAtTime(0.002, this.ctx.currentTime);
+            this.masterCompressor.release.setValueAtTime(0.09, this.ctx.currentTime);
+            this.masterCompressor.connect(this.ctx.destination);
+
             this.masterGain = this.ctx.createGain();
-            this.masterGain.gain.setValueAtTime(0.95, this.ctx.currentTime); // しっかり聴こえる大音量へブースト
-            this.masterGain.connect(this.ctx.destination);
+            this.masterGain.gain.setValueAtTime(0.98, this.ctx.currentTime); // しっかり聴こえる大音量へブースト
+            this.masterGain.connect(this.masterCompressor);
 
             this.bgmGain = this.ctx.createGain();
-            this.bgmGain.gain.setValueAtTime(0.70, this.ctx.currentTime);
+            this.bgmGain.gain.setValueAtTime(0.76, this.ctx.currentTime);
             this.bgmGain.connect(this.masterGain);
 
             this.seGain = this.ctx.createGain();
             this.seGain.gain.setValueAtTime(0.85, this.ctx.currentTime);
             this.seGain.connect(this.masterGain);
+
+            // ディストーション・エレキギター用オーバードライブカーブ
+            this.distortionCurve = this.createDistortionCurve(55);
+            // 重低音ベース・ドラム専用アナログ・ウォームサチュレーションカーブ（お腹に響く倍音・太さを生成）
+            this.bassSaturationCurve = this.createBassSaturationCurve(2.2);
+
+            // お腹の底にズシンと響く重低音リズム＆ベース専用バス (Rhythm & Sub-Bass Bus)
+            this.rhythmBus = this.ctx.createGain();
+            this.rhythmBus.gain.setValueAtTime(1.15, this.ctx.currentTime);
+
+            // 1段目: 95Hz以下の重低音サブベース・ローシェルフブースト
+            this.subBassBoost = this.ctx.createBiquadFilter();
+            this.subBassBoost.type = 'lowshelf';
+            this.subBassBoost.frequency.setValueAtTime(95, this.ctx.currentTime);
+            this.subBassBoost.gain.setValueAtTime(6.5, this.ctx.currentTime);
+
+            // 2段目: お腹・胸に物理的に響く68Hzチェスト・パンチ共鳴ブースト
+            this.chestPunchEQ = this.ctx.createBiquadFilter();
+            this.chestPunchEQ.type = 'peaking';
+            this.chestPunchEQ.frequency.setValueAtTime(68, this.ctx.currentTime);
+            this.chestPunchEQ.Q.setValueAtTime(1.25, this.ctx.currentTime);
+            this.chestPunchEQ.gain.setValueAtTime(5.0, this.ctx.currentTime);
+
+            // 3段目: 175Hzローミッドの太さ・ボディ感補強（PCやスマホスピーカーでも分厚く響かせる）
+            this.bassPunchMidEQ = this.ctx.createBiquadFilter();
+            this.bassPunchMidEQ.type = 'peaking';
+            this.bassPunchMidEQ.frequency.setValueAtTime(175, this.ctx.currentTime);
+            this.bassPunchMidEQ.Q.setValueAtTime(1.1, this.ctx.currentTime);
+            this.bassPunchMidEQ.gain.setValueAtTime(3.5, this.ctx.currentTime);
+
+            // 4段目: アナログ・ソフトサチュレーション（低域の密度と輪郭を濃密化）
+            this.rhythmSaturation = this.ctx.createWaveShaper();
+            this.rhythmSaturation.curve = this.bassSaturationCurve;
+            this.rhythmSaturation.oversample = 'none';
+
+            this.rhythmBus.connect(this.subBassBoost);
+            this.subBassBoost.connect(this.chestPunchEQ);
+            this.chestPunchEQ.connect(this.bassPunchMidEQ);
+            this.bassPunchMidEQ.connect(this.rhythmSaturation);
+            this.rhythmSaturation.connect(this.bgmGain);
 
             // パルス波（デューティ比12.5% & 25%）の生成（コナミカスタム波形メモリ・PSGの倍音再現）
             try {
@@ -113,13 +165,21 @@ class SoundManager {
                 ndata[i] = Math.random() * 2 - 1;
             }
 
-            // ディストーション・エレキギター用オーバードライブカーブ
-            this.distortionCurve = this.createDistortionCurve(55);
-
             this.initialized = true;
         } catch (e) {
             console.warn('Web Audio API not supported:', e);
         }
+    }
+
+    createBassSaturationCurve(drive = 2.2) {
+        const n_samples = 44100;
+        const curve = new Float32Array(n_samples);
+        const norm = Math.tanh(drive);
+        for (let i = 0; i < n_samples; ++i) {
+            const x = (i * 2) / n_samples - 1;
+            curve[i] = Math.tanh(x * drive) / norm;
+        }
+        return curve;
     }
 
     createDistortionCurve(amount = 50) {
@@ -1189,114 +1249,331 @@ class SoundManager {
         this.triggerGuitar(rootMidi + 7, time, dur, gainVal * 0.65);
     }
 
-    // ドライブベース (三角波 + パルス波オクターブ上)
-    triggerBass(midi, time, dur, gainVal = 0.30) {
+    // 不協和音クラスター・スタブ (短2度・減5度トライトーン・長7度の凶悪な衝突和音)
+    triggerDissonantCluster(notesArray, time, dur, gainVal = 0.22) {
+        if (!notesArray || !notesArray.length) return;
+        const filter = this.ctx.createBiquadFilter();
+        filter.type = 'bandpass';
+        filter.frequency.setValueAtTime(1650, time);
+        filter.Q.setValueAtTime(1.1, time);
+
+        const gain = this.ctx.createGain();
+        gain.gain.setValueAtTime(0, time);
+        gain.gain.linearRampToValueAtTime(gainVal, time + 0.004);
+        gain.gain.setValueAtTime(gainVal * 0.88, time + dur * 0.65);
+        gain.gain.exponentialRampToValueAtTime(0.001, time + dur);
+
+        let dist = null;
+        if (this.distortionCurve) {
+            dist = this.ctx.createWaveShaper();
+            dist.curve = this.distortionCurve;
+            dist.oversample = 'none';
+            filter.connect(dist);
+            dist.connect(gain);
+        } else {
+            filter.connect(gain);
+        }
+        gain.connect(this.bgmGain);
+        if (this.delaySend) gain.connect(this.delaySend);
+
+        const oscs = [];
+        for (let i = 0; i < notesArray.length; i++) {
+            const freq = this.m2f(notesArray[i]);
+            if (freq <= 0) continue;
+            const osc = this.ctx.createOscillator();
+            osc.type = (i % 2 === 0) ? 'sawtooth' : 'square';
+            // わずかな不気味デチューンでうねりと不協和音感を増幅
+            const detuneHz = (i % 2 === 0) ? 1.8 : -2.1;
+            osc.frequency.setValueAtTime(freq + detuneHz, time);
+            osc.connect(filter);
+            osc.start(time);
+            osc.stop(time + dur);
+            oscs.push(osc);
+        }
+        if (oscs.length > 0) {
+            this.autoClean(oscs[0], dur, ...oscs.slice(1), filter, dist, gain);
+        }
+    }
+
+    // 重低音アナログ＆FMハイブリッド・ドライブベース (サブベース正弦波 + レゾナントSawtoothグロウ + スラップアタックパルス)
+    // お腹の底にズシン！と響く極太の低音と歯切れ良いアタックを両立
+    triggerBass(midi, time, dur, gainVal = 0.48) {
         const freq = this.m2f(midi);
         if (freq <= 0) return;
 
-        const oscTri = this.ctx.createOscillator();
+        const targetBus = this.rhythmBus || this.bgmGain;
+        const masterBassGain = this.ctx.createGain();
+
+        // 1. お腹の底を揺らす重低音サブベースレイヤー (Sine波)
+        // G2(98Hz)以上の高音ベースノートの時は自動的に1オクターブ下のサブベース(49Hz〜)をユニゾン補強し、常に腹に響く重低音感を持続！
+        const oscSub = this.ctx.createOscillator();
+        const subGain = this.ctx.createGain();
+        oscSub.type = 'sine';
+        const subFreq = (freq > 95) ? (freq * 0.5) : freq;
+        // 弦を弾いた瞬間の微細なピッチアタック（1.28倍→基本周波数）でゴリッとした塊感を出す
+        oscSub.frequency.setValueAtTime(subFreq * 1.28, time);
+        oscSub.frequency.exponentialRampToValueAtTime(subFreq, time + 0.018);
+        subGain.gain.setValueAtTime(0.88, time);
+
+        // 2. 唸るアナログ・シンセベース／エレキベース・ボディレイヤー (Sawtooth + レゾナントLPFエンベロープ)
+        const oscSaw = this.ctx.createOscillator();
+        const filter = this.ctx.createBiquadFilter();
+        const sawGain = this.ctx.createGain();
+        oscSaw.type = 'sawtooth';
+        oscSaw.frequency.setValueAtTime(freq, time);
+
+        filter.type = 'lowpass';
+        const peakCutoff = Math.min(3400, Math.max(520, freq * 11.0));
+        const sustainCutoff = Math.max(190, freq * 3.4);
+        filter.frequency.setValueAtTime(peakCutoff, time);
+        filter.frequency.exponentialRampToValueAtTime(sustainCutoff, time + Math.min(0.085, dur * 0.75));
+        filter.Q.setValueAtTime(3.5, time); // ブリッとした気持ちいいベースレゾナンス
+        sawGain.gain.setValueAtTime(0.68, time);
+
+        // 3. ピック／スラップのアタックバイト成分 (25%パルス波倍音)
         const oscPulse = this.ctx.createOscillator();
-        const gain = this.ctx.createGain();
-
-        oscTri.type = 'triangle';
-        oscTri.frequency.setValueAtTime(freq, time);
-
+        const pulseGain = this.ctx.createGain();
         if (this.pulseWave25) oscPulse.setPeriodicWave(this.pulseWave25);
         else oscPulse.type = 'square';
         oscPulse.frequency.setValueAtTime(freq * 2, time);
+        pulseGain.gain.setValueAtTime(0.24, time);
+        pulseGain.gain.exponentialRampToValueAtTime(0.03, time + Math.min(0.06, dur * 0.7));
 
-        const pulseGain = this.ctx.createGain();
-        pulseGain.gain.setValueAtTime(0.08, time);
+        oscSub.connect(subGain);
+        subGain.connect(masterBassGain);
+
+        oscSaw.connect(filter);
+        filter.connect(sawGain);
+        sawGain.connect(masterBassGain);
 
         oscPulse.connect(pulseGain);
-        pulseGain.connect(gain);
-        oscTri.connect(gain);
+        pulseGain.connect(masterBassGain);
 
-        gain.gain.setValueAtTime(0, time);
-        gain.gain.linearRampToValueAtTime(gainVal, time + 0.005);
-        gain.gain.setValueAtTime(gainVal * 0.85, time + dur - 0.015);
-        gain.gain.linearRampToValueAtTime(0.01, time + dur);
+        // 音圧が途中で痩せないファットなエンベロープ
+        const boostedGain = gainVal * 1.25;
+        masterBassGain.gain.setValueAtTime(0, time);
+        masterBassGain.gain.linearRampToValueAtTime(boostedGain, time + 0.003);
+        masterBassGain.gain.setValueAtTime(boostedGain * 0.90, time + Math.max(0.006, dur - 0.014));
+        masterBassGain.gain.linearRampToValueAtTime(0.005, time + dur);
 
-        gain.connect(this.bgmGain);
+        masterBassGain.connect(targetBus);
 
-        oscTri.start(time);
-        oscTri.stop(time + dur);
+        oscSub.start(time);
+        oscSub.stop(time + dur);
+        oscSaw.start(time);
+        oscSaw.stop(time + dur);
         oscPulse.start(time);
         oscPulse.stop(time + dur);
-        this.autoClean(oscTri, dur, oscPulse, pulseGain, gain);
+        this.autoClean(oscSub, dur, oscSaw, oscPulse, filter, subGain, sawGain, pulseGain, masterBassGain);
     }
 
-    // ドラム: パンチのあるサイン波キック
-    triggerKick(time, gainVal = 0.42) {
-        const osc = this.ctx.createOscillator();
-        const gain = this.ctx.createGain();
+    // ドラム: お腹の底にズシン！！と響く超重低音・高音圧バスドラム（キック）
+    // (3段ピッチエンベロープ正弦波 + チェストパンチ三角波 + ビーターアタッククリック)
+    triggerKick(time, gainVal = 0.65) {
+        const targetBus = this.rhythmBus || this.bgmGain;
+        const dur = 0.165;
 
-        osc.type = 'sine';
-        osc.frequency.setValueAtTime(155, time);
-        osc.frequency.exponentialRampToValueAtTime(36, time + 0.09);
+        // 1. メイン・サブベース胴鳴り (Sine波: 360Hzスナップ -> 115Hz胸アタック -> 52Hz腹落ち -> 33Hz重低音)
+        const oscSub = this.ctx.createOscillator();
+        const subGain = this.ctx.createGain();
+        oscSub.type = 'sine';
+        oscSub.frequency.setValueAtTime(360, time);
+        oscSub.frequency.exponentialRampToValueAtTime(115, time + 0.014);
+        oscSub.frequency.exponentialRampToValueAtTime(52, time + 0.065);
+        oscSub.frequency.exponentialRampToValueAtTime(33, time + dur);
 
-        gain.gain.setValueAtTime(gainVal, time);
-        gain.gain.exponentialRampToValueAtTime(0.001, time + 0.10);
+        // 50〜90Hzの「お腹に響く帯域」で音量をしっかりホールドしてから減衰させるのが重低音キックの秘訣！
+        const kGain = gainVal * 1.28;
+        subGain.gain.setValueAtTime(kGain, time);
+        subGain.gain.setValueAtTime(kGain * 0.94, time + 0.055);
+        subGain.gain.exponentialRampToValueAtTime(0.001, time + dur);
 
-        osc.connect(gain);
-        gain.connect(this.bgmGain);
+        // 2. ローミッドの押し出し・チェストパンチレイヤー (Triangle波)
+        const oscPunch = this.ctx.createOscillator();
+        const punchGain = this.ctx.createGain();
+        oscPunch.type = 'triangle';
+        oscPunch.frequency.setValueAtTime(220, time);
+        oscPunch.frequency.exponentialRampToValueAtTime(56, time + 0.055);
+        punchGain.gain.setValueAtTime(gainVal * 0.62, time);
+        punchGain.gain.exponentialRampToValueAtTime(0.001, time + 0.065);
 
-        osc.start(time);
-        osc.stop(time + 0.10);
-        this.autoClean(osc, 0.10, gain);
+        // 3. バスドラ・ビーターアタック（皮を叩く「ドッ！」の鮮明な輪郭）
+        let click = null, clickFilter = null, clickGain = null;
+        if (this.noiseBuffer) {
+            click = this.ctx.createBufferSource();
+            click.buffer = this.noiseBuffer;
+            clickFilter = this.ctx.createBiquadFilter();
+            clickFilter.type = 'lowpass';
+            clickFilter.frequency.setValueAtTime(1900, time);
+            clickGain = this.ctx.createGain();
+            clickGain.gain.setValueAtTime(gainVal * 0.55, time);
+            clickGain.gain.exponentialRampToValueAtTime(0.001, time + 0.018);
+            click.connect(clickFilter);
+            clickFilter.connect(clickGain);
+            clickGain.connect(targetBus);
+            click.start(time);
+            click.stop(time + 0.018);
+        }
+
+        oscSub.connect(subGain);
+        subGain.connect(targetBus);
+        oscPunch.connect(punchGain);
+        punchGain.connect(targetBus);
+
+        oscSub.start(time);
+        oscSub.stop(time + dur);
+        oscPunch.start(time);
+        oscPunch.stop(time + 0.065);
+        this.autoClean(oscSub, dur, subGain, oscPunch, punchGain, click, clickFilter, clickGain);
     }
 
-    // ドラム: 切れ味鋭いノイズ+トーンスネア
-    triggerSnare(time, gainVal = 0.28) {
+    // ドラム: 腹に響く太い胴鳴り＋鮮烈なスナッピーの爆音ロック・スネア
+    triggerSnare(time, gainVal = 0.46) {
         if (!this.noiseBuffer) return;
+        const targetBus = this.rhythmBus || this.bgmGain;
+        const sGain = gainVal * 1.25;
+
+        // 1. ワイドレンジ・ファットスナッピーノイズ (250Hz以下のみカット＋1300Hzアタックピーク強調)
         const noise = this.ctx.createBufferSource();
         noise.buffer = this.noiseBuffer;
 
-        const filter = this.ctx.createBiquadFilter();
-        filter.type = 'bandpass';
-        filter.frequency.setValueAtTime(2400, time);
-        filter.Q.setValueAtTime(1.6, time);
+        const hpFilter = this.ctx.createBiquadFilter();
+        hpFilter.type = 'highpass';
+        hpFilter.frequency.setValueAtTime(240, time);
 
-        const gain = this.ctx.createGain();
-        gain.gain.setValueAtTime(gainVal, time);
-        gain.gain.exponentialRampToValueAtTime(0.001, time + 0.14);
+        const bodyPeak = this.ctx.createBiquadFilter();
+        bodyPeak.type = 'peaking';
+        bodyPeak.frequency.setValueAtTime(1300, time);
+        bodyPeak.Q.setValueAtTime(1.1, time);
+        bodyPeak.gain.setValueAtTime(5.5, time);
 
-        // トーン成分
-        const osc = this.ctx.createOscillator();
-        const oscGain = this.ctx.createGain();
-        osc.type = 'triangle';
-        osc.frequency.setValueAtTime(200, time);
-        osc.frequency.exponentialRampToValueAtTime(65, time + 0.06);
-        oscGain.gain.setValueAtTime(gainVal * 0.75, time);
-        oscGain.gain.exponentialRampToValueAtTime(0.001, time + 0.06);
+        const noiseGain = this.ctx.createGain();
+        noiseGain.gain.setValueAtTime(sGain, time);
+        noiseGain.gain.setValueAtTime(sGain * 0.85, time + 0.025);
+        noiseGain.gain.exponentialRampToValueAtTime(0.001, time + 0.165);
 
-        osc.connect(oscGain);
-        oscGain.connect(this.bgmGain);
-        osc.start(time);
-        osc.stop(time + 0.06);
+        // 2. お腹に響くスネアの太いシェル胴鳴りトーン (2階層のTriangle + Sine)
+        const osc1 = this.ctx.createOscillator();
+        const osc1Gain = this.ctx.createGain();
+        osc1.type = 'triangle';
+        osc1.frequency.setValueAtTime(265, time);
+        osc1.frequency.exponentialRampToValueAtTime(110, time + 0.075);
+        osc1Gain.gain.setValueAtTime(sGain * 0.95, time);
+        osc1Gain.gain.setValueAtTime(sGain * 0.80, time + 0.025);
+        osc1Gain.gain.exponentialRampToValueAtTime(0.001, time + 0.085);
 
-        noise.connect(filter);
-        filter.connect(gain);
-        gain.connect(this.bgmGain);
+        const osc2 = this.ctx.createOscillator();
+        const osc2Gain = this.ctx.createGain();
+        osc2.type = 'sine';
+        osc2.frequency.setValueAtTime(175, time);
+        osc2.frequency.exponentialRampToValueAtTime(68, time + 0.07);
+        osc2Gain.gain.setValueAtTime(sGain * 0.72, time);
+        osc2Gain.gain.exponentialRampToValueAtTime(0.001, time + 0.075);
 
+        osc1.connect(osc1Gain);
+        osc1Gain.connect(targetBus);
+        osc2.connect(osc2Gain);
+        osc2Gain.connect(targetBus);
+
+        noise.connect(hpFilter);
+        hpFilter.connect(bodyPeak);
+        bodyPeak.connect(noiseGain);
+        noiseGain.connect(targetBus);
+
+        osc1.start(time);
+        osc1.stop(time + 0.085);
+        osc2.start(time);
+        osc2.stop(time + 0.075);
         noise.start(time);
-        noise.stop(time + 0.14);
-        this.autoClean(noise, 0.14, filter, gain, osc, oscGain);
+        noise.stop(time + 0.165);
+        this.autoClean(noise, 0.165, hpFilter, bodyPeak, noiseGain, osc1, osc1Gain, osc2, osc2Gain);
     }
 
-    // ドラム: ハイハット (クローズ / オープン)
-    triggerHiHat(time, isOpen = false) {
+    // ボス戦専用・強靭な金属インダストリアル・リムショット／アンビル打撃パーカッション
+    // (非整数倍の不協和金属クランク音 + 高圧リムショットノイズ + 重低音ボディ)
+    triggerIndustrialPerc(time, pitchMult = 1.0, gainVal = 0.48) {
+        const targetBus = this.rhythmBus || this.bgmGain;
+        const dur = 0.095;
+
+        // トライトーン（減5度・非調和比 1 : 1.414 : 2.09）の金属打撃オシレーター
+        const osc1 = this.ctx.createOscillator();
+        const osc2 = this.ctx.createOscillator();
+        const clankFilter = this.ctx.createBiquadFilter();
+        const clankGain = this.ctx.createGain();
+
+        osc1.type = 'square';
+        osc2.type = 'sawtooth';
+        const baseF = 540 * pitchMult;
+        osc1.frequency.setValueAtTime(baseF, time);
+        osc1.frequency.exponentialRampToValueAtTime(baseF * 0.42, time + dur);
+        osc2.frequency.setValueAtTime(baseF * 1.414, time); // トライトーン金属干渉
+        osc2.frequency.exponentialRampToValueAtTime(baseF * 0.60, time + dur);
+
+        clankFilter.type = 'bandpass';
+        clankFilter.frequency.setValueAtTime(2100 * pitchMult, time);
+        clankFilter.Q.setValueAtTime(2.8, time);
+
+        clankGain.gain.setValueAtTime(gainVal * 0.85, time);
+        clankGain.gain.exponentialRampToValueAtTime(0.001, time + dur);
+
+        osc1.connect(clankFilter);
+        osc2.connect(clankFilter);
+        clankFilter.connect(clankGain);
+        clankGain.connect(targetBus);
+
+        // 重低音パンチ（打撃の重み）
+        const punchOsc = this.ctx.createOscillator();
+        const punchGain = this.ctx.createGain();
+        punchOsc.type = 'sine';
+        punchOsc.frequency.setValueAtTime(240 * pitchMult, time);
+        punchOsc.frequency.exponentialRampToValueAtTime(58, time + 0.06);
+        punchGain.gain.setValueAtTime(gainVal * 0.90, time);
+        punchGain.gain.exponentialRampToValueAtTime(0.001, time + 0.065);
+        punchOsc.connect(punchGain);
+        punchGain.connect(targetBus);
+
+        // 鋭いリムショットノイズ
+        let nSrc = null, nFilter = null, nGain = null;
+        if (this.noiseBuffer) {
+            nSrc = this.ctx.createBufferSource();
+            nSrc.buffer = this.noiseBuffer;
+            nFilter = this.ctx.createBiquadFilter();
+            nFilter.type = 'bandpass';
+            nFilter.frequency.setValueAtTime(3200, time);
+            nFilter.Q.setValueAtTime(1.5, time);
+            nGain = this.ctx.createGain();
+            nGain.gain.setValueAtTime(gainVal * 0.75, time);
+            nGain.gain.exponentialRampToValueAtTime(0.001, time + 0.055);
+            nSrc.connect(nFilter);
+            nFilter.connect(nGain);
+            nGain.connect(targetBus);
+            nSrc.start(time);
+            nSrc.stop(time + 0.055);
+        }
+
+        osc1.start(time);
+        osc1.stop(time + dur);
+        osc2.start(time);
+        osc2.stop(time + dur);
+        punchOsc.start(time);
+        punchOsc.stop(time + 0.065);
+        this.autoClean(osc1, dur, osc2, clankFilter, clankGain, punchOsc, punchGain, nSrc, nFilter, nGain);
+    }
+
+    // ドラム: ハイハット (クローズ / オープン) - 切れ味と存在感を強化
+    triggerHiHat(time, isOpen = false, gainMult = 1.0) {
         if (!this.noiseBuffer) return;
         const noise = this.ctx.createBufferSource();
         noise.buffer = this.noiseBuffer;
 
         const filter = this.ctx.createBiquadFilter();
         filter.type = 'highpass';
-        filter.frequency.setValueAtTime(7500, time);
+        filter.frequency.setValueAtTime(6800, time);
 
         const gain = this.ctx.createGain();
-        const dur = isOpen ? 0.11 : 0.035;
-        gain.gain.setValueAtTime(isOpen ? 0.18 : 0.11, time);
+        const dur = isOpen ? 0.12 : 0.04;
+        const baseG = (isOpen ? 0.24 : 0.15) * gainMult;
+        gain.gain.setValueAtTime(baseG, time);
         gain.gain.exponentialRampToValueAtTime(0.001, time + dur);
 
         noise.connect(filter);
@@ -1313,58 +1590,76 @@ class SoundManager {
         this.triggerHiHat(time, isOpen);
     }
 
-    // オーケストラ打楽器: ティンパニ (重低音・音程感のある轟音)
-    triggerTimpani(midi, time, dur = 0.42, gainVal = 0.44) {
+    // オーケストラ打楽器: ティンパニ (重低音・音程感のある地鳴り轟音)
+    triggerTimpani(midi, time, dur = 0.45, gainVal = 0.58) {
         const freq = this.m2f(midi || 38);
         if (freq <= 0) return;
 
+        const targetBus = this.rhythmBus || this.bgmGain;
+        const tGain = gainVal * 1.25;
+
         const osc = this.ctx.createOscillator();
+        const oscSub = this.ctx.createOscillator();
         const gain = this.ctx.createGain();
 
         osc.type = 'sine';
-        osc.frequency.setValueAtTime(freq * 1.9, time);
-        osc.frequency.exponentialRampToValueAtTime(freq, time + 0.05);
+        osc.frequency.setValueAtTime(freq * 1.85, time);
+        osc.frequency.exponentialRampToValueAtTime(freq, time + 0.045);
+
+        // 釜の重低音胴鳴り倍音
+        oscSub.type = 'triangle';
+        const lowFreq = (freq > 80) ? freq * 0.5 : freq;
+        oscSub.frequency.setValueAtTime(lowFreq * 1.4, time);
+        oscSub.frequency.exponentialRampToValueAtTime(lowFreq, time + 0.04);
+
+        const subG = this.ctx.createGain();
+        subG.gain.setValueAtTime(0.55, time);
+        oscSub.connect(subG);
+        subG.connect(gain);
 
         gain.gain.setValueAtTime(0, time);
-        gain.gain.linearRampToValueAtTime(gainVal, time + 0.008);
+        gain.gain.linearRampToValueAtTime(tGain, time + 0.005);
+        gain.gain.setValueAtTime(tGain * 0.85, time + 0.06);
         gain.gain.exponentialRampToValueAtTime(0.001, time + dur);
 
         let hit = null, hitFilter = null, hitGain = null;
-        // マレット打撃の短いインパクト
+        // マレット打撃の強烈なインパクト
         if (this.noiseBuffer) {
             hit = this.ctx.createBufferSource();
             hit.buffer = this.noiseBuffer;
             hitFilter = this.ctx.createBiquadFilter();
             hitFilter.type = 'lowpass';
-            hitFilter.frequency.setValueAtTime(550, time);
+            hitFilter.frequency.setValueAtTime(680, time);
             hitGain = this.ctx.createGain();
-            hitGain.gain.setValueAtTime(gainVal * 0.65, time);
-            hitGain.gain.exponentialRampToValueAtTime(0.001, time + 0.04);
+            hitGain.gain.setValueAtTime(tGain * 0.75, time);
+            hitGain.gain.exponentialRampToValueAtTime(0.001, time + 0.045);
             hit.connect(hitFilter);
             hitFilter.connect(hitGain);
-            hitGain.connect(this.bgmGain);
+            hitGain.connect(targetBus);
             hit.start(time);
-            hit.stop(time + 0.04);
+            hit.stop(time + 0.045);
         }
 
         osc.connect(gain);
-        gain.connect(this.bgmGain);
+        gain.connect(targetBus);
 
         osc.start(time);
         osc.stop(time + dur);
-        this.autoClean(osc, dur, gain, hit, hitFilter, hitGain);
+        oscSub.start(time);
+        oscSub.stop(time + dur);
+        this.autoClean(osc, dur, oscSub, subG, gain, hit, hitFilter, hitGain);
     }
 
     // オーケストラ打楽器: クラッシュ大シンバル (バシャァァァン！！)
-    triggerCymbal(time, gainVal = 0.38) {
+    triggerCymbal(time, gainVal = 0.44) {
         if (!this.noiseBuffer) return;
         const noise = this.ctx.createBufferSource();
         noise.buffer = this.noiseBuffer;
 
         const filter = this.ctx.createBiquadFilter();
         filter.type = 'bandpass';
-        filter.frequency.setValueAtTime(8000, time);
-        filter.Q.setValueAtTime(0.9, time);
+        filter.frequency.setValueAtTime(7600, time);
+        filter.Q.setValueAtTime(0.75, time);
 
         const gain = this.ctx.createGain();
         gain.gain.setValueAtTime(gainVal, time);
@@ -1380,25 +1675,39 @@ class SoundManager {
         this.autoClean(noise, 0.95, filter, gain);
     }
 
-    // 打楽器: ロートタム (トコトコピッチベンド)
-    triggerTom(midi, time, dur = 0.16, gainVal = 0.34) {
+    // 打楽器: 重低音フロア＆ロートタム (腹に響く「ドコドコ！」タムアタック)
+    triggerTom(midi, time, dur = 0.19, gainVal = 0.52) {
         const freq = this.m2f(midi);
+        const targetBus = this.rhythmBus || this.bgmGain;
         const osc = this.ctx.createOscillator();
+        const oscBody = this.ctx.createOscillator();
         const gain = this.ctx.createGain();
 
         osc.type = 'sine';
-        osc.frequency.setValueAtTime(freq * 1.5, time);
-        osc.frequency.exponentialRampToValueAtTime(freq * 0.7, time + dur);
+        osc.frequency.setValueAtTime(freq * 1.65, time);
+        osc.frequency.exponentialRampToValueAtTime(freq * 0.65, time + dur);
 
-        gain.gain.setValueAtTime(gainVal, time);
+        oscBody.type = 'triangle';
+        oscBody.frequency.setValueAtTime(freq * 1.2, time);
+        oscBody.frequency.exponentialRampToValueAtTime(freq * 0.5, time + dur * 0.8);
+        const bodyG = this.ctx.createGain();
+        bodyG.gain.setValueAtTime(0.45, time);
+        oscBody.connect(bodyG);
+        bodyG.connect(gain);
+
+        const tGain = gainVal * 1.25;
+        gain.gain.setValueAtTime(tGain, time);
+        gain.gain.setValueAtTime(tGain * 0.88, time + 0.035);
         gain.gain.exponentialRampToValueAtTime(0.001, time + dur);
 
         osc.connect(gain);
-        gain.connect(this.bgmGain);
+        gain.connect(targetBus);
 
         osc.start(time);
         osc.stop(time + dur);
-        this.autoClean(osc, dur, gain);
+        oscBody.start(time);
+        oscBody.stop(time + dur);
+        this.autoClean(osc, dur, oscBody, bodyG, gain);
     }
 
     // 空中戦BGM: 『BEGINNING OF THE HISTORY』(グラディウス伝統・宇宙出撃空中戦テーマ フルオーケストラ荘厳大音量版！)
@@ -1578,29 +1887,42 @@ class SoundManager {
 
         this.startScheduler(bpm, totalSteps, (step, time, stepDur) => {
             // 1. ドラム & パーカッション (キック, スネア, ハット, 大シンバル, タム)
+            // シンバル(5)の時も必ず重低音キックを同時発音し、1拍目の腹に響くアタックを強化！
             const d = drums[step];
-            if (d === 1) this.triggerKick(time);
-            else if (d === 2) this.triggerSnare(time);
-            else if (d === 3) this.triggerHiHat(time, false);
-            else if (d === 4) this.triggerHiHat(time, true);
-            else if (d === 5) this.triggerCymbal(time);
-            else if (d === 6) this.triggerTom(A3, time, stepDur * 0.95);
-            else if (d === 7) this.triggerTom(F3, time, stepDur * 0.95);
-            else if (d === 8) this.triggerTom(D3, time, stepDur * 0.95);
+            if (d === 1) {
+                this.triggerKick(time, 0.68);
+                this.triggerHiHat(time, false, 0.75);
+            } else if (d === 2) {
+                this.triggerSnare(time, 0.50);
+                this.triggerHiHat(time, false, 0.75);
+            } else if (d === 3) {
+                this.triggerHiHat(time, false, 1.0);
+            } else if (d === 4) {
+                this.triggerHiHat(time, true, 1.05);
+            } else if (d === 5) {
+                this.triggerKick(time, 0.72);
+                this.triggerCymbal(time, 0.46);
+            } else if (d === 6) {
+                this.triggerTom(A3, time, stepDur * 0.98, 0.56);
+            } else if (d === 7) {
+                this.triggerTom(F3, time, stepDur * 0.98, 0.56);
+            } else if (d === 8) {
+                this.triggerTom(D3, time, stepDur * 0.98, 0.58);
+            }
 
             // 2. オーケストラ打楽器: ティンパニ (重低音轟音)
             const tp = timpani[step];
             if (tp > 0) {
-                this.triggerTimpani(tp, time, stepDur * 2.4);
+                this.triggerTimpani(tp, time, stepDur * 2.4, 0.60);
             }
 
-            // 3. 重低音ドライブベース (タイトな推進力)
+            // 3. お腹に響く重低音ドライブベース (タイトな推進力)
             const b = bass[step];
             if (b > 0) {
-                this.triggerBass(b, time, stepDur * 1.5, 0.38);
+                this.triggerBass(b, time, stepDur * 1.45, 0.52);
             }
 
-                        // 4. Arpeggio
+            // 4. Arpeggio
             const a = arp[step];
             if (a > 0) {
                 this.triggerArp(a, time, stepDur * 0.85, 0.14);
@@ -1621,7 +1943,7 @@ class SoundManager {
                     else break;
                 }
                 const dur = stepDur * lLen * 0.95;
-                this.triggerLead(l, time, dur, 0.38);
+                this.triggerLead(l, time, dur, 0.36);
             }
 
             // 7. 金管対旋律・ハーモニー
@@ -1985,34 +2307,46 @@ class SoundManager {
             const isGtrSolo = (step >= 448 && step < 576);
             const isDrumSolo = (step >= 576 && step < 640);
 
-            // ユーザー指定: ドラムソロは「3倍くらい大きい音」にブースト！
-            const kickGain  = isDrumSolo ? 0.95 : 0.42;
-            const snareGain = isDrumSolo ? 0.84 : 0.28;
-            const cymGain   = isDrumSolo ? 0.88 : 0.38;
-            const tomGain   = isDrumSolo ? 0.92 : 0.34;
+            // お腹に響く重低音ドラム＆ドラムソロ特大ブースト！
+            const kickGain  = isDrumSolo ? 1.05 : 0.68;
+            const snareGain = isDrumSolo ? 0.92 : 0.50;
+            const cymGain   = isDrumSolo ? 0.90 : 0.46;
+            const tomGain   = isDrumSolo ? 0.96 : 0.58;
 
             // 1. ドラム & パーカッション (キック, スネア, ハット, 大シンバル, タム)
             const d = drums[step];
-            if (d === 1) this.triggerKick(time, kickGain);
-            else if (d === 2) this.triggerSnare(time, snareGain);
-            else if (d === 3) this.triggerHiHat(time, false);
-            else if (d === 4) this.triggerHiHat(time, true);
-            else if (d === 5) this.triggerCymbal(time, cymGain);
-            else if (d === 6) this.triggerTom(A3, time, stepDur * 0.95, tomGain);
-            else if (d === 7) this.triggerTom(F3, time, stepDur * 0.95, tomGain);
-            else if (d === 8) this.triggerTom(D3, time, stepDur * 0.95, tomGain);
+            if (d === 1) {
+                this.triggerKick(time, kickGain);
+                if (!isDrumSolo) this.triggerHiHat(time, false, 0.75);
+            } else if (d === 2) {
+                this.triggerSnare(time, snareGain);
+                if (!isDrumSolo) this.triggerHiHat(time, false, 0.75);
+            } else if (d === 3) {
+                this.triggerHiHat(time, false, 1.0);
+            } else if (d === 4) {
+                this.triggerHiHat(time, true, 1.05);
+            } else if (d === 5) {
+                this.triggerKick(time, kickGain * 1.05);
+                this.triggerCymbal(time, cymGain);
+            } else if (d === 6) {
+                this.triggerTom(A3, time, stepDur * 0.98, tomGain);
+            } else if (d === 7) {
+                this.triggerTom(F3, time, stepDur * 0.98, tomGain);
+            } else if (d === 8) {
+                this.triggerTom(D3, time, stepDur * 0.98, tomGain);
+            }
 
             // 2. オーケストラ打楽器: ティンパニ (重低音轟音)
             const tp = timpani[step];
             if (tp > 0) {
-                const tpGain = isDrumSolo ? 0.85 : 0.44;
+                const tpGain = isDrumSolo ? 0.92 : 0.60;
                 this.triggerTimpani(tp, time, stepDur * 2.2, tpGain);
             }
 
-            // 3. 重低音ベース (タイトな推進力)
+            // 3. お腹の底に響く重低音ベース (タイトな推進力)
             const b = bass[step];
             if (b > 0) {
-                this.triggerBass(b, time, stepDur * 1.6, 0.38);
+                this.triggerBass(b, time, stepDur * 1.5, 0.54);
             }
 
             // 4. 金管ブラスセクション (ホルン・トロンボーン和音ヒット)
@@ -2038,7 +2372,6 @@ class SoundManager {
             }
 
             // 7. エレキギター (熱狂のギターソロ ＆ ラストサビ・オブリガート！)
-            // ユーザー指定: ギターソロは「3倍くらい大きい音」にブースト！(0.25 -> 0.82)
             const g = guitar[step];
             if (g > 0) {
                 let gLen = 1;
@@ -2071,160 +2404,244 @@ class SoundManager {
                     else break;
                 }
                 const dur = stepDur * lLen * 0.92;
-                this.triggerBrass(l, time, dur, 0.26); // 金管リードの重厚な咆哮
-                this.triggerLead(l, time, dur, 0.34);  // トップノートの抜け
+                this.triggerBrass(l, time, dur, 0.25); // 金管リードの重厚な咆哮
+                this.triggerLead(l, time, dur, 0.33);  // トップノートの抜け
             }
         });
     }
 
-    // ボス戦BGM: 『AIRCRAFT CARRIER (HEAVY ORCHESTRA & METAL)』
-    // 巨大要塞ビッグコアとの死闘！楽器を容赦なく大量投入した超高速168BPMのヘヴィメタル・シンフォニー！
+    // =========================================================================
+    // ボス戦BGM: 『AIRCRAFT CARRIER : DISSONANT FORTRESS ASSAULT』
+    // 176 BPM！強烈な不協和音（減5度トライトーン・短2度・減7度クラスター）と
+    // 腹の底をえぐる爆音パーカッション群＆16分小刻み重低音スラップ／ファズベースが
+    // 容赦なく刻み続ける、息もつかせぬ超緊迫・小刻みボスバトル曲！
+    // =========================================================================
     playBossBgm(forceRestart = false) {
         if (!forceRestart && this.currentBgm === 'BOSS') return;
         this.currentBgm = 'BOSS';
 
-        // テンポ 168 BPM (超緊迫の高速ボスバトル)
-        const bpm = 168;
-        const totalSteps = 128; // 全8小節ループ (1小節=16ステップ)
+        // テンポ 176 BPM (息もつかせぬ小刻み高速アサルトビート)
+        const bpm = 176;
+        const totalSteps = 256; // 全16小節ループ (1小節=16ステップ)
 
-        // === 1. 容赦ないヘヴィメタル・ドラム (ツーバス連打、スネア、大シンバル、タムロール) ===
-        const dBeatMetal = [
-            5,3,1,3, 2,3,1,3, 1,1,1,1, 2,3,2,4  // 16分ツーバス高速キック連打！
-        ];
-        const dDriveMetal = [
-            1,3,1,3, 2,3,1,3, 1,1,1,1, 2,3,2,4
-        ];
-        const dMetalFill = [
-            1,1,2,2, 6,6,7,7, 8,8,2,2, 2,2,5,5  // 怒涛のタムロール＆シンバル乱打！
-        ];
+        // === 1. 独立マルチレイヤー・ヘヴィパーカッション (同時発音で圧倒的な打撃密度！) ===
+        // (A) 重低音ツーバス＆シンコペーション・キック (1=通常重低音キック, 2=強アクセントキック)
+        const kBarA = [2,1,0,1, 1,0,1,1, 2,1,0,1, 1,1,0,1]; // 小刻みに腹を殴る変則16分キック！
+        const kBarB = [2,1,1,0, 1,1,0,1, 2,1,1,1, 0,1,1,1]; // 怒涛の連打キック
+        const kBarC = [2,0,1,1, 2,0,1,1, 2,1,1,0, 2,1,1,1]; // ポリリズム・ストンプキック
+        const kFill = [2,1,1,1, 2,1,1,1, 2,1,2,1, 2,2,2,2]; // 16分フル連打マシンガンツーバス！
 
-        const drums = [
-            dBeatMetal, dDriveMetal, dDriveMetal, dMetalFill, // 0-3
-            dBeatMetal, dDriveMetal, dDriveMetal, dMetalFill  // 4-7
+        const kickTrack = [
+            kBarA, kBarB, kBarA, kFill,
+            kBarC, kBarB, kBarC, kFill,
+            kBarA, kBarC, kBarB, kFill,
+            kBarC, kBarB, kFill, kFill
         ].flat();
 
-        // === 2. オーケストラ打楽器: ティンパニ (不吉な地鳴り轟音) ===
-        const tBoss1 = [D2,_,_,_, _,_,_,_, Gs1,_,_,_, _,_,_,_];
-        const tBoss2 = [A1,_,_,_, _,_,_,_, F2,_,_,_, _,_,_,_];
-        const tBossRoll = [D2,D2,D2,D2, D2,D2,D2,D2, Gs1,Gs1,A1,A1, D2,_,_,_];
+        // (B) 爆音スネア＆インダストリアル金属パーカッション
+        // 1=爆音スネア, 2=インダストリアル金属アンビル打撃(Low), 3=インダストリアル金属打撃(High), 4=スネア+金属同時強打！
+        const snBarA = [0,0,2,0, 4,0,0,3, 0,2,0,3, 4,0,2,1]; // 裏拍に食い込む金属パーカッション＋爆音スネア
+        const snBarB = [0,3,0,2, 4,0,3,0, 2,0,3,0, 4,1,4,1]; // 小刻みな16分スネア＆アンビル乱打
+        const snBarC = [4,0,2,3, 0,4,0,2, 3,0,4,0, 1,1,4,4]; // 変拍子風ポリリズム強打
+        const snFill = [1,2,1,3, 4,1,2,3, 1,1,4,4, 4,4,4,4]; // 鼓膜と腹を揺らすパーカッション総攻撃フィル！
 
-        const timpani = [
-            tBoss1, tBoss2, tBoss1, tBossRoll,
-            tBoss1, tBoss2, tBoss1, tBossRoll
+        const snarePercTrack = [
+            snBarA, snBarB, snBarA, snFill,
+            snBarC, snBarB, snBarC, snFill,
+            snBarA, snBarC, snBarB, snFill,
+            snBarC, snBarB, snFill, snFill
         ].flat();
 
-        // === 3. 重低音スラッシュメタル・ファズベース (トライトーン・減5度の凶悪リフ) ===
-        const bBoss1 = [D2,D2,D3,D2, F2,F2,F3,F2, Gs2,Gs2,Gs3,Gs2, G2,G2,F2,F2];
-        const bBoss2 = [D2,D2,D3,D2, F2,F2,F3,F2, A2,A2,Gs2,Gs2,   G2,G2,F2,F2];
-        const bBoss3 = [D2,D2,D2,D2, F2,F2,F2,F2, Gs2,Gs2,Gs2,Gs2, A2,A2,A2,A2];
+        // (C) 小刻みタム＆重低音ティンパニ・インターロック (常に低音打楽器がウネりながら刻む！)
+        // 1=HighTom(C4), 2=MidTom(Ab3), 3=LowTom(D3), 4=Timpani(D2), 5=Timpani(Ab1/減5度), 6=Timpani(Eb2/短2度)
+        const tmBarA = [4,0,1,2, 0,5,2,3, 4,0,1,3, 5,6,3,3];
+        const tmBarB = [5,0,2,3, 6,0,1,2, 5,4,2,3, 6,5,4,4];
+        const tmBarC = [4,5,0,6, 4,5,0,6, 1,2,3,4, 5,6,4,5];
+        const tmFill = [1,1,2,2, 3,3,4,4, 5,5,6,6, 4,5,6,4];
+
+        const tomTimpTrack = [
+            tmBarA, tmBarB, tmBarA, tmFill,
+            tmBarC, tmBarB, tmBarC, tmFill,
+            tmBarA, tmBarC, tmBarB, tmFill,
+            tmBarC, tmBarB, tmFill, tmFill
+        ].flat();
+
+        // (D) 16分レーザーハイハット＆大クラッシュシンバル (1=CloseHat, 2=OpenHat, 3=CrashCymbal)
+        const hcBarA = [3,1,2,1, 1,2,1,2, 1,1,2,1, 1,2,1,2];
+        const hcBarB = [1,1,2,1, 1,2,1,2, 3,1,2,1, 2,1,2,2];
+        const hcFill = [3,2,1,2, 3,2,1,2, 3,2,3,2, 3,3,3,3];
+
+        const hatCymTrack = [
+            hcBarA, hcBarB, hcBarA, hcFill,
+            hcBarA, hcBarB, hcBarA, hcFill,
+            hcBarA, hcBarB, hcBarA, hcFill,
+            hcBarA, hcBarB, hcFill, hcFill
+        ].flat();
+
+        // === 2. お腹に響く16分小刻み・不協和音ドライブベース (休符なしで16分音符をマシンガン刻み！) ===
+        // ルート(D)に対して短2度(Eb)・減5度トライトーン(Ab)・長7度(Cs)を小刻みに往復する凶悪ベースライン
+        const bRiffA = [D1,D2,Eb1,Eb2, Ab1,Ab2,D1,Eb1, Ab1,A1,Eb2,D2, Ab1,G1,Fs1,Eb1];
+        const bRiffB = [D1,Eb1,D2,Eb2, Ab1,A1,Ab2,G2,  Fs1,G1,Fs2,F2, E1,Eb1,Ab1,Eb1];
+        const bRiffC = [Eb1,Eb2,E1,E2, A1,A2,Bb1,Bb2,  Ab1,Ab2,D2,Db2, C2,B1,Bb1,Eb1];
+        const bRiffD = [D1,Ab1,Eb1,A1, D2,Ab2,Eb2,A2,  D1,Eb1,E1,F1,   Fs1,G1,Ab1,A1];
+        const bRiffE = [F1,F2,Fs1,Fs2, B1,B2,C2,C3,    Bb1,B1,F2,E2,   Eb2,D2,Ab1,Eb1];
+        const bRiffF = [E1,F1,Bb1,B1,  Eb1,E1,A1,Bb1,  D1,Eb1,Ab1,A1,  Db2,C2,B1,Eb1];
 
         const bass = [
-            bBoss1, bBoss2, bBoss1, bBoss3,
-            bBoss1, bBoss2, bBoss1, bBoss3
+            // 0-3: セクションA (トライトーン＆短2度マシンガン刻み)
+            bRiffA, bRiffB, bRiffA, bRiffD,
+            // 4-7: セクションB (半音上昇・変則オクターブ強襲)
+            bRiffC, bRiffB, bRiffC, bRiffD,
+            // 8-11: セクションC (高圧クロマチック・クライマックス)
+            bRiffE, bRiffF, bRiffE, bRiffD,
+            // 12-15: セクションD (狂乱のポリリズム・ディミニッシュ疾走)
+            bRiffF, bRiffB, bRiffD, bRiffF
         ].flat();
 
-        // === 4. ディストーションギター・パワーコードリフ (ザクザク刻むスラッシュメタル！) ===
-        const gRiff1 = [D3,_,D3,_, F3,_,D3,_, Gs3,_,_,_, G3,_,F3,_];
-        const gRiff2 = [D3,_,D3,_, F3,_,D3,_, A3,_,_,_,  Gs3,_,F3,_];
-        const gRiff3 = [D3,D3,D3,D3, F3,F3,F3,F3, Gs3,Gs3,Gs3,Gs3, A3,A3,A3,A3];
+        // === 3. 強烈な不協和音クラスター・ブラス＆ギター・小刻みスタブ ===
+        // 16分音符で「ジャジャッ！ジャッ！ジャジャッ！」と鋭く切り裂く不協和音クラスター和音
+        // コード1: D + Eb(短2度) + Ab(減5度) + Cs(長7度)
+        // コード2: Eb + E(短2度) + A(減5度) + D(長7度)
+        // コード3: F + Fs(短2度) + B(減5度) + E(長7度)
+        // コード4: Ab + A(短2度) + D(減5度) + G(長7度)
+        const chords = {
+            1: [D3, Ab3, Cs4, Eb4],
+            2: [Eb3, A3, D4, E4],
+            3: [F3, B3, E4, Fs4],
+            4: [Ab3, D4, G4, A4],
+            5: [E3, Bb3, Eb4, F4]
+        };
 
-        const guitarRiff = [
-            gRiff1, gRiff2, gRiff1, gRiff3,
-            gRiff1, gRiff2, gRiff1, gRiff3
+        const stBarA = [1,1,0,2, 0,1,2,0, 4,0,1,2, 0,4,2,1];
+        const stBarB = [2,0,2,1, 0,4,1,2, 0,2,4,0, 1,2,4,2];
+        const stBarC = [3,3,0,4, 0,3,4,0, 5,0,3,4, 0,5,4,3];
+        const stBarD = [1,2,4,1, 2,4,1,2, 3,4,5,3, 4,5,1,4];
+
+        const stabPattern = [
+            stBarA, stBarB, stBarA, stBarD,
+            stBarC, stBarB, stBarC, stBarD,
+            stBarC, stBarD, stBarC, stBarD,
+            stBarA, stBarC, stBarD, stBarD
         ].flat();
 
-        // === 5. 金管ブラス・オーケストラヒット (「ジャン！ジャン！」と炸裂する不協和音) ===
-        const brHitD  = [D4,_,D4,_, _,_,D4,_, D4,_,_,_, D4,_,_,_];
-        const brHitGs = [Gs4,_,Gs4,_, _,_,Gs4,_, Gs4,_,_,_, Gs4,_,_,_];
-        const brHitA  = [A4,_,A4,_, _,_,A4,_, A4,_,_,_, A4,_,_,_];
-
-        const brass1 = [
-            brHitD,  brHitGs, brHitD,  brHitA,
-            brHitD,  brHitGs, brHitD,  brHitA
-        ].flat();
-
-        const brass2 = [
-            brHitGs, brHitD,  brHitGs, brHitD,
-            brHitGs, brHitD,  brHitGs, brHitD
-        ].flat();
-
-        // === 6. 弦楽器ストリングス (緊迫の16分オスティナート) ===
-        const strOst1 = [D4,F4,Gs4,A4, D4,F4,Gs4,A4, D4,F4,Gs4,A4, D4,F4,Gs4,A4];
-        const strOst2 = [Gs4,A4,C5,D5, Gs4,A4,C5,D5, Gs4,A4,C5,D5, Gs4,A4,C5,D5];
+        // === 4. 16分小刻みディミニッシュ＆クロマチック・ストリングス・オスティナート ===
+        const sOstA = [D4,Eb4,Ab4,A4, D4,Eb4,Ab4,A4, Eb4,E4,A4,Bb4, Ab4,G4,Eb4,D4];
+        const sOstB = [Eb4,E4,A4,Bb4, Eb4,E4,A4,Bb4, F4,Fs4,B4,C5,  Bb4,A4,F4,Eb4];
+        const sOstC = [F4,Fs4,B4,C5,  Ab4,A4,D5,Eb5, B4,C5,F5,Fs5,  Eb5,D5,Ab4,A4];
+        const sOstD = [D4,Ab4,Eb4,A4, E4,Bb4,F4,B4,  Fs4,C5,G4,Cs5, Ab4,D5,A4,Eb5];
 
         const strings = [
-            strOst1, strOst2, strOst1, strOst2,
-            strOst1, strOst2, strOst1, strOst2
+            sOstA, sOstB, sOstA, sOstD,
+            sOstB, sOstC, sOstB, sOstD,
+            sOstC, sOstD, sOstC, sOstD,
+            sOstD, sOstB, sOstC, sOstD
         ].flat();
 
-        // === 7. ビッグコア凶悪主旋律 (PSGリード＋金管ブラス＋オクターブギターのトリプルユニゾン！) ===
-        const bossLead = [
-            // 0-3: Aメロ (減5度の不吉なリフ)
-            D5,_,D5,_, F5,_,D5,_, Gs5,_,G5,_, F5,_,D5,_,
-            D5,_,D5,_, F5,_,D5,_, A5,_,Gs5,_, G5,_,F5,_,
-            D5,_,D5,_, F5,_,D5,_, Gs5,_,G5,_, F5,_,D5,_,
-            D5,_,F5,_, Gs5,_,A5,_, D6,_,_,_, _,_,_,_,
+        // === 5. 小刻み・不協和音ボス主旋律 (16分音符で休まず刻みまくる凶悪スタッカート・リード) ===
+        // 従来の長い休符や伸ばし音を廃し、短2度・減5度・減7度を小刻みに跳躍する攻撃的フレーズ！
+        const leadA1 = [D5,Eb5,D5,Ab5, A5,Ab5,Eb5,D5, Ab5,G5,Fs5,F5, Eb5,D5,Ab5,Eb5];
+        const leadA2 = [D5,Eb5,F5,Fs5, Ab5,A5,C6,B5,  Bb5,A5,Ab5,G5, Fs5,F5,E5,Eb5];
+        const leadA3 = [D5,Eb5,D5,Ab5, A5,Ab5,Eb5,D5, B5,Bb5,A5,Ab5, G5,Fs5,F5,Eb5];
+        const leadA4 = [D5,Ab5,Eb5,A5, E5,Bb5,F5,B5,  Fs5,C6,G5,Cs6, D6,Eb6,Ab5,Eb5];
 
-            // 4-7: Bメロ (高音オクターブで襲い来る要塞の脅威)
-            D6,_,_,D6, C6,_,A5,_, Gs5,_,_,Gs5, G5,_,F5,_,
-            D6,_,_,D6, C6,_,A5,_, A5,_,_,A5,   Gs5,_,F5,_,
-            D6,_,_,D6, C6,_,A5,_, Gs5,_,_,Gs5, G5,_,F5,_,
-            D5,_,F5,_, Gs5,_,A5,_, D6,_,_,_,   _,_,_,_
+        const leadB1 = [Eb5,E5,Eb5,A5, Bb5,A5,E5,Eb5, A5,Ab5,G5,Fs5, E5,Eb5,A5,E5];
+        const leadB2 = [F5,Fs5,F5,B5,  C6,B5,Fs5,F5,  B5,Bb5,A5,Ab5,Fs5,F5,B5,Fs5];
+        const leadB3 = [Ab5,A5,Ab5,D6, Eb6,D6,A5,Ab5, D6,Cs6,C6,B5,  Bb5,A5,Ab5,G5];
+        const leadB4 = [Fs5,G5,Ab5,A5, Bb5,B5,C6,Cs6, D6,Cs6,C6,B5,  Bb5,A5,Ab5,Eb5];
+
+        const leadC1 = [D6,Eb6,D6,Ab5, A5,Bb5,A5,Eb5, F5,Fs5,F5,B5,  C6,Cs6,D6,Eb6];
+        const leadC2 = [E6,Eb6,D6,Cs6, C6,B5,Bb5,A5,  Ab5,G5,Fs5,F5, E5,Eb5,D5,Cs5];
+        const leadC3 = [D6,Ab5,Eb6,A5, E6,Bb5,F6,B5,  Fs6,C6,G6,Cs6, Ab6,D6,Eb6,Ab5];
+        const leadC4 = [D6,Eb6,E6,F6,  Fs6,F6,E6,Eb6, D6,Ab5,A5,Eb5, D5,Eb5,Ab5,A5];
+
+        const bossLead = [
+            // 0-3
+            ...leadA1, ...leadA2, ...leadA3, ...leadA4,
+            // 4-7
+            ...leadB1, ...leadB2, ...leadB3, ...leadB4,
+            // 8-11
+            ...leadC1, ...leadC2, ...leadC3, ...leadC4,
+            // 12-15
+            ...leadA4, ...leadB3, ...leadC3, ...leadC4
         ];
 
-        this.startScheduler(bpm, totalSteps, (step, time, stepDur) => {
-            // 1. ドラム & パーカッション (ツーバス, スネア, ハット, 大シンバル, タム)
-            const d = drums[step];
-            if (d === 1) this.triggerKick(time);
-            else if (d === 2) this.triggerSnare(time);
-            else if (d === 3) this.triggerHiHat(time, false);
-            else if (d === 4) this.triggerHiHat(time, true);
-            else if (d === 5) this.triggerCymbal(time);
-            else if (d === 6) this.triggerTom(A3, time, stepDur * 0.95);
-            else if (d === 7) this.triggerTom(F3, time, stepDur * 0.95);
-            else if (d === 8) this.triggerTom(D3, time, stepDur * 0.95);
+        // === 6. 不協和音クラッシュ対旋律 (主旋律に対して減5度トライトーン[-6]＆短2度[-1]/長7度[-11]でぶつかる凶悪ハモリ！) ===
+        const bossClash = bossLead.map((note, idx) => {
+            if (note <= 0) return 0;
+            // 偶数ステップは減5度下(-6: トライトーン)、奇数ステップは長7度下(-11: 半音衝突)または短2度上(+1)で強烈な不協和音を作る！
+            if (idx % 4 === 0) return note - 6;  // トライトーン（増4度/減5度）
+            if (idx % 4 === 1) return note - 11; // 長7度（オクターブ半音衝突）
+            if (idx % 4 === 2) return note - 6;  // トライトーン
+            return note + 1;                     // 短2度クラスター衝突！
+        });
 
-            // 2. オーケストラ打楽器: ティンパニ (重低音轟音)
-            const tp = timpani[step];
-            if (tp > 0) {
-                this.triggerTimpani(tp, time, stepDur * 2.2);
+        this.startScheduler(bpm, totalSteps, (step, time, stepDur) => {
+            // 1. 重低音マルチレイヤー・ドラム＆パーカッション
+            const k = kickTrack[step];
+            if (k === 1) this.triggerKick(time, 0.70);
+            else if (k === 2) this.triggerKick(time, 0.82);
+
+            const sn = snarePercTrack[step];
+            if (sn === 1) {
+                this.triggerSnare(time, 0.56);
+            } else if (sn === 2) {
+                this.triggerIndustrialPerc(time, 0.95, 0.50);
+            } else if (sn === 3) {
+                this.triggerIndustrialPerc(time, 1.38, 0.48);
+            } else if (sn === 4) {
+                this.triggerSnare(time, 0.62);
+                this.triggerIndustrialPerc(time, 1.15, 0.52);
             }
 
-            // 3. ヘヴィ・ファズベース (超重低音)
+            const tm = tomTimpTrack[step];
+            if (tm === 1) this.triggerTom(C4, time, stepDur * 0.90, 0.56);
+            else if (tm === 2) this.triggerTom(Ab3, time, stepDur * 0.90, 0.58);
+            else if (tm === 3) this.triggerTom(D3, time, stepDur * 0.95, 0.62);
+            else if (tm === 4) this.triggerTimpani(D2, time, stepDur * 1.4, 0.64);
+            else if (tm === 5) this.triggerTimpani(Ab1, time, stepDur * 1.4, 0.66);
+            else if (tm === 6) this.triggerTimpani(Eb2, time, stepDur * 1.4, 0.64);
+
+            const hc = hatCymTrack[step];
+            if (hc === 1) this.triggerHiHat(time, false, 1.1);
+            else if (hc === 2) this.triggerHiHat(time, true, 1.15);
+            else if (hc === 3) this.triggerCymbal(time, 0.48);
+
+            // 2. お腹をえぐる16分小刻み重低音ファズ／スラップベース (スタッカートで1音1音ズシンと刻む！)
             const b = bass[step];
             if (b > 0) {
-                this.triggerBass(b, time, stepDur * 1.5, 0.38);
+                this.triggerBass(b, time, stepDur * 0.82, 0.62);
             }
 
-            // 4. ディストーションギター・パワーコードリフ (ザクザク刻む重厚メタル)
-            const gr = guitarRiff[step];
-            if (gr > 0) {
-                this.triggerPowerChord(gr, time, stepDur * 1.5, 0.26);
+            // 3. 不協和音クラスター・小刻みスタブ (短2度＋減5度＋長7度の凶悪コードカッティング)
+            const st = stabPattern[step];
+            if (st > 0 && chords[st]) {
+                this.triggerDissonantCluster(chords[st], time, stepDur * 0.78, 0.24);
+                // 低音ギターでもトライトーン(減5度)パワーコードを同時刻み！
+                const root = chords[st][0];
+                this.triggerGuitar(root, time, stepDur * 0.78, 0.22);
+                this.triggerGuitar(root + 6, time, stepDur * 0.78, 0.20); // +6 = 減5度トライトーン
             }
 
-            // 5. 金管ブラス・オーケストラヒット (ガツンと響く「ジャン！ジャン！」)
-            const br1 = brass1[step];
-            const br2 = brass2[step];
-            if (br1 > 0) this.triggerBrass(br1, time, stepDur * 0.9, 0.22);
-            if (br2 > 0) this.triggerBrass(br2, time, stepDur * 0.9, 0.18);
-
-            // 6. 弦楽器ストリングス (16分緊迫オスティナート刻み)
+            // 4. 16分小刻みストリングス・オスティナート
             const str = strings[step];
             if (str > 0) {
-                this.triggerStrings(str, time, stepDur * 0.95, 0.16);
+                this.triggerStrings(str, time, stepDur * 0.75, 0.16);
+                this.triggerArp(str + 12, time, stepDur * 0.68, 0.13);
             }
 
-            // 7. ビッグコア主旋律 (ハイゲインPSGリード + 重厚金管ブラスのデュアル凶悪猛撃！)
+            // 5. 小刻みスタッカート主旋律 ＋ 不協和音クラッシュ対旋律
             const l = bossLead[step];
+            const c = bossClash[step];
             if (l > 0) {
-                let lLen = 1;
-                for (let k = 1; k < 8; k++) {
-                    if (bossLead[(step + k) % totalSteps] === 0) lLen++;
-                    else break;
-                }
-                const dur = stepDur * lLen * 0.94;
+                // 小刻み感を極限まで際立たせるタイトなゲートタイム (stepDur * 0.74)
+                const dur = stepDur * 0.74;
                 this.triggerLead(l, time, dur, 0.32);
-                this.triggerBrass(l, time, dur, 0.24);
+                this.triggerBrass(l, time, dur, 0.22);
+            }
+            if (c > 0) {
+                const dur = stepDur * 0.72;
+                this.triggerHarmony(c, time, dur, 0.24);
+                this.triggerBrass(c, time, dur, 0.18);
             }
         });
     }
@@ -2309,20 +2726,32 @@ class SoundManager {
         ];
 
         this.startScheduler(bpm, totalSteps, (step, time, stepDur) => {
-            // ドラム
+            // ドラム (お腹に響く高速4つ打ち＆クラッシュ同時キック！)
             const d = drums[step];
-            if (d === 1) this.triggerKick(time);
-            else if (d === 2) this.triggerSnare(time);
-            else if (d === 3) this.triggerHiHat(time, false);
-            else if (d === 4) this.triggerHiHat(time, true);
-            else if (d === 5) this.triggerCymbal(time);
-            else if (d === 6) this.triggerTom(A3, time, stepDur * 0.95);
-            else if (d === 7) this.triggerTom(F3, time, stepDur * 0.95);
-            else if (d === 8) this.triggerTom(D3, time, stepDur * 0.95);
+            if (d === 1) {
+                this.triggerKick(time, 0.72);
+                this.triggerHiHat(time, false, 0.8);
+            } else if (d === 2) {
+                this.triggerSnare(time, 0.54);
+                this.triggerHiHat(time, false, 0.8);
+            } else if (d === 3) {
+                this.triggerHiHat(time, false, 1.0);
+            } else if (d === 4) {
+                this.triggerHiHat(time, true, 1.05);
+            } else if (d === 5) {
+                this.triggerKick(time, 0.76);
+                this.triggerCymbal(time, 0.46);
+            } else if (d === 6) {
+                this.triggerTom(A3, time, stepDur * 0.98, 0.58);
+            } else if (d === 7) {
+                this.triggerTom(F3, time, stepDur * 0.98, 0.58);
+            } else if (d === 8) {
+                this.triggerTom(D3, time, stepDur * 0.98, 0.60);
+            }
 
-            // ベース
+            // 重低音マシンガンベース
             const b = bass[step];
-            if (b > 0) this.triggerBass(b, time, stepDur * 1.35, 0.40);
+            if (b > 0) this.triggerBass(b, time, stepDur * 1.35, 0.56);
 
             // ソワソワするパニックアルペジオ
             const a = arpeggio[step];
@@ -2515,37 +2944,38 @@ class SoundManager {
         ];
 
         this.startScheduler(bpm, totalSteps, (step, time, stepDur) => {
-            // 1. パンチのある16ビート・ドラムセクション
+            // 1. お腹に響くパンチ抜群の16ビート・ドラムセクション
             const d = drums[step];
             if (d === 1) {
-                this.triggerKick(time, 0.50);
+                this.triggerKick(time, 0.70);
+                this.triggerHiHat(time, false, 0.75);
             } else if (d === 2) {
-                this.triggerSnare(time, 0.36);
-                this.triggerHiHat(time, false);
+                this.triggerSnare(time, 0.52);
+                this.triggerHiHat(time, false, 0.85);
             } else if (d === 3) {
-                this.triggerHiHat(time, false);
+                this.triggerHiHat(time, false, 1.0);
             } else if (d === 4) {
-                this.triggerHiHat(time, true);
+                this.triggerHiHat(time, true, 1.05);
             } else if (d === 5) {
-                this.triggerKick(time, 0.52);
-                this.triggerCymbal(time, 0.34);
+                this.triggerKick(time, 0.75);
+                this.triggerCymbal(time, 0.44);
             } else if (d === 6) {
-                this.triggerTom(C4, time, stepDur * 0.92, 0.38);
+                this.triggerTom(C4, time, stepDur * 0.95, 0.56);
             } else if (d === 7) {
-                this.triggerTom(A3, time, stepDur * 0.92, 0.38);
+                this.triggerTom(A3, time, stepDur * 0.95, 0.56);
             } else if (d === 8) {
-                this.triggerTom(E3, time, stepDur * 0.92, 0.40);
+                this.triggerTom(E3, time, stepDur * 0.95, 0.60);
             } else if (d === 9) {
-                this.triggerKick(time, 0.48);
-                this.triggerHiHat(time, true);
+                this.triggerKick(time, 0.68);
+                this.triggerHiHat(time, true, 1.05);
             }
 
-            // 2. 歯切れ良く跳ねるオクターブ・スラップ／シンセベース
+            // 2. お腹に響きつつ歯切れ良く跳ねるオクターブ・スラップ／シンセベース
             const b = bass[step];
             if (b > 0) {
                 let bLen = 1;
                 if (bass[(step + 1) % totalSteps] === 0) bLen = 1.35;
-                this.triggerBass(b, time, stepDur * bLen * 0.82, 0.42);
+                this.triggerBass(b, time, stepDur * bLen * 0.86, 0.58);
             }
 
             // 3. 裏拍カッティング・ブラスコード・スタブ
@@ -2596,23 +3026,23 @@ class SoundManager {
         const bpm = 132;
         const totalSteps = 128; // 8小節ループ
 
-        // 1. ミステリアスなドラム（控えめでスペーシーなビート）
+        // 1. 古代モアイ遺跡の重厚トライバル＆ヘヴィロック・ドラムビート
         const dStg3_A = [
-            1,3,3,3, 2,3,3,3, 1,3,3,3, 2,3,4,3
+            5,3,1,3, 2,3,1,4, 1,1,3,1, 2,3,8,4
         ];
         const dStg3_B = [
-            1,3,3,3, 2,3,1,3, 3,3,1,3, 2,3,3,4
+            1,3,1,4, 2,3,1,3, 1,1,2,3, 6,7,8,5
         ];
         const drums = [
-            dStg3_A, dStg3_A, dStg3_B, dStg3_B,
-            dStg3_A, dStg3_A, dStg3_B, dStg3_B
+            dStg3_A, dStg3_B, dStg3_A, dStg3_B,
+            dStg3_A, dStg3_B, dStg3_A, dStg3_B
         ].flat();
 
-        // 2. 深海のような低いベース（Aマイナー）
-        const bStg3_1 = [A1,_,_,A1, C2,_,E2,_, A1,_,_,A1, G2,_,F2,_];
-        const bStg3_2 = [F1,_,_,F1, A1,_,C2,_, F1,_,_,F1, E2,_,D2,_];
-        const bStg3_3 = [C2,_,_,C2, E2,_,G2,_, C2,_,_,C2, B2,_,A2,_];
-        const bStg3_4 = [E1,_,_,E1, G1,_,B1,_, E2,E2,E2,E2, A2,G2,F2,E2];
+        // 2. お腹の底にズシンと響く重低音オクターブ・うねりベース（Aマイナー）
+        const bStg3_1 = [A1,A1,A2,A1, C2,A1,E2,A1, A1,A1,A2,A1, G2,E2,F2,E2];
+        const bStg3_2 = [F1,F1,F2,F1, A1,F1,C2,F1, F1,F1,F2,F1, E2,C2,D2,C2];
+        const bStg3_3 = [C2,C2,C3,C2, E2,C2,G2,C2, C2,C2,C3,C2, B2,G2,A2,G2];
+        const bStg3_4 = [E1,E1,E2,E1, Gs1,E1,B1,E1, E2,B1,E2,Gs2, A2,G2,F2,E2];
         const bass = [
             bStg3_1, bStg3_2, bStg3_3, bStg3_4,
             bStg3_1, bStg3_2, bStg3_3, bStg3_4
@@ -2645,13 +3075,29 @@ class SoundManager {
 
         this.startScheduler(bpm, totalSteps, (step, time, stepDur) => {
             const d = drums[step];
-            if (d === 1) this.triggerKick(time);
-            else if (d === 2) this.triggerSnare(time);
-            else if (d === 3) this.triggerHiHat(time, false);
-            else if (d === 4) this.triggerHiHat(time, true);
+            if (d === 1) {
+                this.triggerKick(time, 0.70);
+                this.triggerHiHat(time, false, 0.75);
+            } else if (d === 2) {
+                this.triggerSnare(time, 0.52);
+                this.triggerHiHat(time, false, 0.75);
+            } else if (d === 3) {
+                this.triggerHiHat(time, false, 0.95);
+            } else if (d === 4) {
+                this.triggerHiHat(time, true, 1.0);
+            } else if (d === 5) {
+                this.triggerKick(time, 0.74);
+                this.triggerCymbal(time, 0.42);
+            } else if (d === 6) {
+                this.triggerTom(A3, time, stepDur * 0.95, 0.56);
+            } else if (d === 7) {
+                this.triggerTom(F3, time, stepDur * 0.95, 0.56);
+            } else if (d === 8) {
+                this.triggerTom(D3, time, stepDur * 0.95, 0.60);
+            }
 
             const b = bass[step];
-            if (b > 0) this.triggerBass(b, time, stepDur * 1.5, 0.32);
+            if (b > 0) this.triggerBass(b, time, stepDur * 1.4, 0.56);
 
             const a = arpeggio[step];
             if (a > 0) this.triggerArp(a, time, stepDur * 0.8, 0.12);
