@@ -68,27 +68,36 @@
                         🎵 BGM集を開く (SOUND TEST)
                     </button>
 
-                    <!-- iPad・タッチ端末対応：いきなり4面（逆火山／クラゲロボ大巡回）を試せるダイレクト出撃ボタン -->
-                    <div id="title-stage-select" class="arcade-stage-select-row">
-                        <button id="btn-start-stage4" type="button" class="arcade-stage4-direct-btn">
-                            🔥 4面 (逆火山) から開始
+                    <!-- 開発者専用隠しステージセレクト（初期状態は非表示：Komamiロゴ3回タップまたはコナミコマンド等で出現） -->
+                    <div id="title-stage-select" class="arcade-stage-select-row dev-secret-hidden" aria-hidden="true">
+                        <button type="button" class="arcade-stage4-direct-btn btn-st1" data-stage="1" data-mode="STAGE">
+                            🌋 1面 (火山)
                         </button>
-                        <button id="btn-start-stage4-jellyfish" type="button" class="arcade-stage4-direct-btn btn-jellyfish">
-                            👾 4面・クラゲロボ巡回から開始
+                        <button type="button" class="arcade-stage4-direct-btn btn-st2" data-stage="2" data-mode="STAGE">
+                            🗿 2面 (ストーンヘンジ)
+                        </button>
+                        <button type="button" class="arcade-stage4-direct-btn btn-st3" data-stage="3" data-mode="STAGE">
+                            🗿 3面 (モアイ遺跡)
+                        </button>
+                        <button type="button" class="arcade-stage4-direct-btn" data-stage="4" data-mode="STAGE">
+                            🔥 4面 (逆火山)
+                        </button>
+                        <button type="button" class="arcade-stage4-direct-btn btn-jellyfish" data-stage="4" data-mode="JELLYFISH">
+                            👾 4面・クラゲ巡回
                         </button>
                     </div>
                 </div>
 
-                <!-- 下部: コマミロゴ・著作権 & クレジット表示 -->
+                <!-- 下部: コマミロゴ・著作権 & クレジット表示（開発者用シークレットトリガー内蔵） -->
                 <div class="arcade-footer-block">
                     <div class="konami-brand-row">
-                        <span class="konami-wordmark">Komami<span class="konami-reg">&reg;</span></span>
+                        <span id="secret-konami-logo" class="konami-wordmark">Komami<span class="konami-reg">&reg;</span></span>
                     </div>
                     <div class="arcade-bottom-row">
                         <div class="konami-copyright">&copy;&nbsp;KOMAMI&nbsp;&nbsp;2026</div>
-                        <div class="arcade-credit-box">
+                        <div id="secret-credit-box" class="arcade-credit-box">
                             <span class="credit-lbl">CREDIT</span>
-                            <span class="credit-badge">01</span>
+                            <span id="secret-credit-badge" class="credit-badge">01</span>
                         </div>
                     </div>
                 </div>
@@ -173,12 +182,22 @@
 
         <!-- 画面全体（余白を含む全域）をカバーするタッチ操作レイヤー -->
         <div id="touch-layer">
-            <!-- iPad・タッチ操作用：いつでもワンタップで4面・クラゲ巡回・ボス・フル装備を試せる上部ショートカットバー -->
-            <div id="touch-stage-bar" aria-label="ステージ選択ショートカット">
-                <button type="button" class="touch-jump-btn" data-jump="STAGE4">🔥 4面:逆火山</button>
-                <button type="button" class="touch-jump-btn jump-jelly" data-jump="STAGE4_JELLYFISH">👾 4面:クラゲ巡回</button>
-                <button type="button" class="touch-jump-btn jump-boss" data-jump="STAGE4_BOSS">👑 4面:ボス</button>
-                <button type="button" class="touch-jump-btn jump-power" data-jump="FULL_POWER">⚡ フル装備</button>
+            <!-- プレイ中：画面上部中央（HI 0057300付近）を3回タップすると開発者ステージバーを開閉できる透明ホットスポット -->
+            <div id="secret-hud-hotspot" aria-hidden="true"></div>
+
+            <!-- 開発者専用隠しステージワープバー（初期状態は非表示） -->
+            <div id="touch-stage-bar" class="dev-secret-hidden" aria-hidden="true" aria-label="開発者ステージ選択ショートカット">
+                <button type="button" class="touch-jump-btn jump-st1" data-jump="STAGE1">1面</button>
+                <button type="button" class="touch-jump-btn jump-boss" data-jump="STAGE1_BOSS">1面ボス</button>
+                <button type="button" class="touch-jump-btn jump-st2" data-jump="STAGE2">2面</button>
+                <button type="button" class="touch-jump-btn jump-boss" data-jump="STAGE2_BOSS">2面ボス</button>
+                <button type="button" class="touch-jump-btn jump-st3" data-jump="STAGE3">3面</button>
+                <button type="button" class="touch-jump-btn jump-boss" data-jump="STAGE3_BOSS">3面ボス</button>
+                <button type="button" class="touch-jump-btn" data-jump="STAGE4">4面</button>
+                <button type="button" class="touch-jump-btn jump-jelly" data-jump="STAGE4_JELLYFISH">4面クラゲ</button>
+                <button type="button" class="touch-jump-btn jump-boss" data-jump="STAGE4_BOSS">4面ボス</button>
+                <button type="button" class="touch-jump-btn jump-power" data-jump="FULL_POWER">⚡フル装備</button>
+                <button type="button" class="touch-jump-btn jump-close" data-jump="HIDE_DEV">✕</button>
             </div>
 
             <!-- 画面左側（余白〜画面中央）：どこでもスワイプ移動可能 -->

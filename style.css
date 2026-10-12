@@ -709,13 +709,42 @@ html, body {
 }
 
 /* ==========================================
-   iPad・タッチ端末対応：タイトル画面4面ダイレクト開始＆プレイ中クイックワープバー
+   開発者専用シークレット・ステージセレクト＆ワープバー
    ========================================== */
+.dev-secret-hidden {
+    display: none !important;
+}
+
+#secret-konami-logo,
+#secret-credit-box {
+    cursor: pointer;
+    touch-action: manipulation;
+    position: relative;
+    z-index: 40;
+}
+
+#secret-credit-box.secret-stage-active .credit-badge {
+    color: #ffea00;
+    text-shadow: 0 0 10px rgba(255, 234, 0, 0.85);
+}
+
+#secret-hud-hotspot {
+    position: absolute;
+    top: 0;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 180px;
+    height: 44px;
+    z-index: 118;
+    pointer-events: auto;
+    background: transparent;
+}
+
 .arcade-stage-select-row {
     display: flex;
     flex-wrap: wrap;
     justify-content: center;
-    gap: 10px;
+    gap: 8px;
     margin-top: 4px;
     z-index: 35;
     position: relative;
@@ -723,25 +752,46 @@ html, body {
 }
 
 .arcade-stage4-direct-btn {
-    padding: 9px 16px;
+    padding: 8px 13px;
     background: linear-gradient(180deg, #ea580c 0%, #9a3412 100%);
     color: #fff7ed;
     font-family: "Hiragino Kaku Gothic ProN", "Meiryo", sans-serif;
-    font-size: clamp(11px, 2.1vw, 14px);
+    font-size: clamp(11px, 1.9vw, 13px);
     font-weight: 900;
     border: 2px solid #fb923c;
     border-radius: 6px;
-    box-shadow: 0 0 14px rgba(249, 115, 22, 0.7);
+    box-shadow: 0 0 12px rgba(249, 115, 22, 0.65);
     cursor: pointer;
     touch-action: manipulation;
     transition: transform 0.1s ease, box-shadow 0.1s ease;
+}
+
+.arcade-stage4-direct-btn.btn-st1 {
+    background: linear-gradient(180deg, #16a34a 0%, #14532d 100%);
+    border-color: #4ade80;
+    color: #f0fdf4;
+    box-shadow: 0 0 12px rgba(74, 222, 128, 0.6);
+}
+
+.arcade-stage4-direct-btn.btn-st2 {
+    background: linear-gradient(180deg, #ca8a04 0%, #713f12 100%);
+    border-color: #facc15;
+    color: #fefce8;
+    box-shadow: 0 0 12px rgba(250, 204, 21, 0.6);
+}
+
+.arcade-stage4-direct-btn.btn-st3 {
+    background: linear-gradient(180deg, #7c3aed 0%, #4c1d95 100%);
+    border-color: #a78bfa;
+    color: #f5f3ff;
+    box-shadow: 0 0 12px rgba(167, 139, 250, 0.6);
 }
 
 .arcade-stage4-direct-btn.btn-jellyfish {
     background: linear-gradient(180deg, #0284c7 0%, #1e3a8a 100%);
     border-color: #38bdf8;
     color: #e0f2fe;
-    box-shadow: 0 0 14px rgba(56, 189, 248, 0.7);
+    box-shadow: 0 0 12px rgba(56, 189, 248, 0.65);
 }
 
 .arcade-stage4-direct-btn:active {
@@ -754,14 +804,16 @@ html, body {
     right: max(12px, env(safe-area-inset-right));
     display: flex;
     flex-wrap: wrap;
-    gap: 6px;
+    justify-content: flex-end;
+    max-width: min(94vw, 680px);
+    gap: 5px;
     z-index: 120;
     pointer-events: auto;
 }
 
 .touch-jump-btn {
-    padding: 6px 10px;
-    background: rgba(124, 45, 18, 0.82);
+    padding: 5px 9px;
+    background: rgba(124, 45, 18, 0.85);
     color: #ffedd5;
     border: 1.5px solid #fb923c;
     border-radius: 6px;
@@ -774,29 +826,55 @@ html, body {
     transition: transform 0.08s ease, background 0.12s ease;
 }
 
+.touch-jump-btn.jump-st1 {
+    background: rgba(20, 83, 45, 0.85);
+    border-color: #4ade80;
+    color: #dcfce7;
+    box-shadow: 0 0 8px rgba(74, 222, 128, 0.4);
+}
+
+.touch-jump-btn.jump-st2 {
+    background: rgba(113, 63, 18, 0.85);
+    border-color: #facc15;
+    color: #fef9c3;
+    box-shadow: 0 0 8px rgba(250, 204, 21, 0.4);
+}
+
+.touch-jump-btn.jump-st3 {
+    background: rgba(76, 29, 149, 0.85);
+    border-color: #a78bfa;
+    color: #ede9fe;
+    box-shadow: 0 0 8px rgba(167, 139, 250, 0.4);
+}
+
 .touch-jump-btn.jump-jelly {
-    background: rgba(3, 105, 161, 0.82);
+    background: rgba(3, 105, 161, 0.85);
     border-color: #38bdf8;
     color: #e0f2fe;
     box-shadow: 0 0 8px rgba(56, 189, 248, 0.45);
 }
 
 .touch-jump-btn.jump-boss {
-    background: rgba(136, 19, 55, 0.82);
+    background: rgba(136, 19, 55, 0.85);
     border-color: #fb7185;
     color: #ffe4e6;
     box-shadow: 0 0 8px rgba(244, 63, 94, 0.45);
 }
 
 .touch-jump-btn.jump-power {
-    background: rgba(113, 63, 18, 0.85);
+    background: rgba(113, 63, 18, 0.88);
     border-color: #fde047;
     color: #fef08a;
     box-shadow: 0 0 8px rgba(250, 204, 21, 0.45);
 }
 
+.touch-jump-btn.jump-close {
+    background: rgba(30, 41, 59, 0.9);
+    border-color: #94a3b8;
+    color: #e2e8f0;
+    box-shadow: none;
+}
+
 .touch-jump-btn:active {
     transform: scale(0.92);
 }
-
-

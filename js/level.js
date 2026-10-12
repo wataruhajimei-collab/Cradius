@@ -549,6 +549,50 @@ class LevelManager {
         }
     }
 
+    startStage1() {
+        this.stage = 1;
+        this.state = 'WAVES';
+        this.time = 0;
+        this.boss = null;
+        if (this.superVolcano) {
+            this.superVolcano.active = false;
+            this.superVolcano = null;
+        }
+        this.volcanoSpawned = false;
+        this.volcanoSurvivalTimer = 0;
+        this.postVolcanoTimer = 0;
+        this.stageClearTimer = 0;
+        this.floatingIslands = [];
+        this.islandSpawnedCount = 0;
+        this.terrain.active = false;
+        this.terrain.generating = false;
+        this.terrain.topPoints = [];
+        this.terrain.bottomPoints = [];
+        this.terrain.scrollSpeed = 1.5;
+
+        if (typeof stonehengeStage !== 'undefined' && stonehengeStage) {
+            stonehengeStage.active = false;
+        }
+        if (window.stage3) {
+            window.stage3.active = false;
+        }
+        if (window.stage4) {
+            window.stage4.active = false;
+        }
+
+        if (typeof enemies !== 'undefined') enemies.length = 0;
+        if (typeof enemyBullets !== 'undefined') enemyBullets.length = 0;
+
+        if (typeof player !== 'undefined') {
+            if (typeof player.vx !== 'undefined') player.vx = 0;
+            if (typeof player.vy !== 'undefined') player.vy = 0;
+        }
+
+        if (typeof Sound !== 'undefined' && typeof Sound.playAirBgm === 'function') {
+            Sound.playAirBgm();
+        }
+    }
+
     startStage2() {
         this.stage = 2;
         this.state = 'STAGE2';

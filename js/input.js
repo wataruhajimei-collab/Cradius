@@ -6,89 +6,70 @@ class InputManager {
         window.addEventListener('keydown', (e) => {
             this.keys[e.code] = true;
 
-            // テスト用ショートカットキー
-            if (e.code === 'KeyV') {
+            // 開発者用ショートカットキー（1〜4面、Shift+1〜4で各面ボス、Pでフル装備）
+            if (typeof window.bgmModalOpen !== 'undefined' && window.bgmModalOpen) return;
+
+            if (e.code === 'Digit1' || e.code === 'Numpad1') {
+                if (typeof startOrJumpStage === 'function') {
+                    startOrJumpStage(1, e.shiftKey ? 'BOSS' : 'STAGE');
+                }
+            } else if (e.code === 'Digit2' || e.code === 'Numpad2') {
+                if (typeof startOrJumpStage === 'function') {
+                    startOrJumpStage(2, e.shiftKey ? 'BOSS' : 'STAGE');
+                } else if (typeof levelManager !== 'undefined') {
+                    levelManager.startStage2();
+                }
+            } else if (e.code === 'Digit3' || e.code === 'Numpad3') {
+                if (typeof startOrJumpStage === 'function') {
+                    startOrJumpStage(3, e.shiftKey ? 'BOSS' : 'STAGE');
+                } else if (typeof levelManager !== 'undefined') {
+                    levelManager.startStage3();
+                }
+            } else if (e.code === 'Digit4' || e.code === 'Numpad4') {
+                if (typeof startOrJumpStage === 'function') {
+                    startOrJumpStage(4, e.shiftKey ? 'BOSS' : 'STAGE');
+                } else if (typeof levelManager !== 'undefined') {
+                    levelManager.startStage4();
+                }
+            } else if (e.code === 'KeyV') {
                 // 1面 火山サバイバル直前へワープ
-                if (typeof levelManager !== 'undefined' && levelManager.stage === 1) {
-                    levelManager.time = 63800;
-                    if (!levelManager.terrain.active) levelManager.terrain.start();
-                    console.log('Shortcut: Warped to Volcano Survival');
+                if (typeof startOrJumpStage === 'function') {
+                    startOrJumpStage(1, 'VOLCANO');
                 }
             } else if (e.code === 'KeyB') {
-                // 1面 ビッグコアボス戦へワープ
-                if (typeof levelManager !== 'undefined' && levelManager.stage === 1) {
-                    levelManager.state = 'BOSS';
-                    levelManager.terrain.active = false;
-                    if (typeof Sound !== 'undefined') Sound.playBossBgm();
-                    if (typeof Boss !== 'undefined') levelManager.boss = new Boss(levelManager.starfield.width, 200);
-                    console.log('Shortcut: Warped to Stage 1 Boss');
-                }
-            } else if (e.code === 'Digit2') {
-                // 2面（ストーンヘンジ面）へワープ
-                if (typeof levelManager !== 'undefined') {
-                    levelManager.startStage2();
-                    console.log('Shortcut: Warped to Stage 2 Stonehenge');
-                }
-            } else if (e.code === 'Digit3') {
-                // 3面（モアイ面）へワープ
-                if (typeof levelManager !== 'undefined') {
-                    levelManager.startStage3();
-                    console.log('Shortcut: Warped to Stage 3 Moai');
-                }
-            } else if (e.code === 'KeyM') {
-                // 3面ボス ビッグコア戦へワープ
-                if (typeof levelManager !== 'undefined') {
-                    if (levelManager.stage !== 3) {
-                        levelManager.startStage3();
-                    }
-                    const st3 = window.stage3 || (typeof stage3 !== 'undefined' ? stage3 : null);
-                    if (st3) {
-                        st3.state = 'PRE_BOSS';
-                        st3.preBossTimer = 3400; // すぐにボス登場
-                        if (st3.terrain) st3.terrain.wallActive = false;
-                        console.log('Shortcut: Warped to Stage 3 Big Core Boss');
-                    }
+                // 1面 ボス戦へワープ（コナミコマンド入力途中でない時のみ）
+                if (typeof gameStarted !== 'undefined' && gameStarted && typeof startOrJumpStage === 'function') {
+                    startOrJumpStage(1, 'BOSS');
                 }
             } else if (e.code === 'KeyW') {
-                // 2面 宇宙空間・名物ザブ地帯（ザブラッシュ）へワープ
-                if (typeof levelManager !== 'undefined' && levelManager.stage !== 2) {
-                    levelManager.startStage2();
-                }
-                if (typeof stonehengeStage !== 'undefined' && stonehengeStage) {
-                    stonehengeStage.blocks = [];
-                    stonehengeStage.generating = false;
-                    stonehengeStage.state = 'ZAB_RUSH';
-                    stonehengeStage.zabTimer = 0;
-                    stonehengeStage.zabWaveTimer = 0;
-                    console.log('Shortcut: Warped to Stage 2 Zab Rush');
+                // 2面 ザブラッシュへワープ
+                if (typeof startOrJumpStage === 'function') {
+                    startOrJumpStage(2, 'ZAB');
                 }
             } else if (e.code === 'KeyG') {
-                // 2面ボス ビッグコア戦へワープ
-                if (typeof levelManager !== 'undefined' && levelManager.stage !== 2) {
-                    levelManager.startStage2();
+                // 2面 ボス戦へワープ
+                if (typeof startOrJumpStage === 'function') {
+                    startOrJumpStage(2, 'BOSS');
                 }
-                if (typeof stonehengeStage !== 'undefined' && stonehengeStage) {
-                    stonehengeStage.blocks = [];
-                    stonehengeStage.generating = false;
-                    stonehengeStage.state = 'BOSS';
-                    if (typeof Sound !== 'undefined' && typeof Sound.playBossBgm === 'function') Sound.playBossBgm();
-                    const bossClass = (typeof BigCoreBoss !== 'undefined') ? BigCoreBoss : Boss;
-                    stonehengeStage.boss = new bossClass(stonehengeStage.width, stonehengeStage.height / 2);
-                    console.log('Shortcut: Warped to Stage 2 Big Core Boss');
+            } else if (e.code === 'KeyM') {
+                // 3面 ボス戦へワープ
+                if (typeof startOrJumpStage === 'function') {
+                    startOrJumpStage(3, 'BOSS');
+                }
+            } else if (e.code === 'KeyJ') {
+                // 4面 クラゲロボ巡回へワープ
+                if (typeof startOrJumpStage === 'function') {
+                    startOrJumpStage(4, 'JELLYFISH');
+                }
+            } else if (e.code === 'KeyK') {
+                // 4面 ボス戦へワープ
+                if (typeof startOrJumpStage === 'function') {
+                    startOrJumpStage(4, 'BOSS');
                 }
             } else if (e.code === 'KeyP') {
                 // フルパワーアップチート
-                if (typeof player !== 'undefined') {
-                    player.speed = 6;
-                    player.hasMissile = true;
-                    player.weaponType = 'LASER';
-                    player.shieldActive = true;
-                    player.shieldHp = 5;
-                    while (player.options.length < player.maxOptions) {
-                        const delay = (player.options.length + 1) * 15;
-                        player.options.push(new Option(player, delay));
-                    }
-                    console.log('Shortcut: Full Power Activated');
+                if (typeof equipFullPowerForTest === 'function') {
+                    equipFullPowerForTest();
                 }
             }
         });
