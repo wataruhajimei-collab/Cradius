@@ -205,18 +205,22 @@ function init() {
     const bgmTrackBtns = bgmModal ? Array.from(bgmModal.querySelectorAll('.bgm-track-btn')) : [];
 
     // 開発者ステージ選択UI（タイトル画面）の表示・非表示切替
-    const setDevMenuVisible = (visible) => {
-        window.devModeUnlocked = Boolean(visible);
+    const setDevMenuVisible = (visible, playSound = true) => {
+        const show = Boolean(visible);
+        window.devModeUnlocked = show;
         if (titleStageSelect) {
-            titleStageSelect.classList.toggle('dev-secret-hidden', !visible);
-            titleStageSelect.setAttribute('aria-hidden', visible ? 'false' : 'true');
+            titleStageSelect.classList.toggle('dev-secret-hidden', !show);
+            titleStageSelect.style.display = show ? 'flex' : 'none';
+            titleStageSelect.setAttribute('aria-hidden', show ? 'false' : 'true');
         }
-        if (visible && typeof Sound !== 'undefined' && typeof Sound.playPowerUp === 'function') {
+        if (show && playSound && typeof Sound !== 'undefined' && typeof Sound.playPowerUp === 'function') {
             Sound.unlockAudio();
             Sound.playPowerUp();
         }
     };
     window.setDevMenuVisible = setDevMenuVisible;
+    // 初期状態は必ず非表示に固定
+    setDevMenuVisible(false, false);
 
     const isBgmUiEvent = (e) => {
         if (window.bgmModalOpen) return true;
@@ -229,24 +233,38 @@ function init() {
         );
     };
 
-    // タイトル画面の「Komami®」ロゴをタップすると開発者ステージセレクトが出現（1回タップでも3回連打でも確実に開く）
+    // タイトル画面の「Komami®」ロゴを3回タップした時のみ開発者ステージセレクトを開閉
     if (secretKonamiLogo) {
-        let lastLogoEventTime = 0;
-        let lastOpenedTime = 0;
+        let logoTapCount = 0;
+        let lastLogoTapTime = 0;
+        let lastPointerOrTouchTime = 0;
+
         const handleSecretLogoTap = (e) => {
             if (e) {
                 e.preventDefault();
                 e.stopPropagation();
             }
             const now = Date.now();
-            if (now - lastLogoEventTime < 80) return; // pointerdown + click 二重発火防止
-            lastLogoEventTime = now;
 
-            if (!window.devModeUnlocked) {
-                lastOpenedTime = now;
-                setDevMenuVisible(true);
-            } else if (now - lastOpenedTime > 1200) {
-                setDevMenuVisible(false);
+            // pointerdown / touchstart の直後に遅れて発火する合成 click イベントで1タップが2回分カウントされるのを防止
+            if (e && e.type === 'click' && (now - lastPointerOrTouchTime < 450)) {
+                return;
+            }
+            if (e && (e.type === 'pointerdown' || e.type === 'touchstart')) {
+                if (now - lastPointerOrTouchTime < 80) return; // pointerdown + touchstart の同時発火を1回に集約
+                lastPointerOrTouchTime = now;
+            }
+
+            // 前回のタップから2秒以上空いたらカウントをリセット
+            if (now - lastLogoTapTime > 2000) {
+                logoTapCount = 0;
+            }
+            lastLogoTapTime = now;
+            logoTapCount++;
+
+            if (logoTapCount >= 3) {
+                logoTapCount = 0;
+                setDevMenuVisible(!window.devModeUnlocked, true);
             }
         };
         secretKonamiLogo.addEventListener('pointerdown', handleSecretLogoTap);
@@ -617,7 +635,7 @@ function handleCollisions() {
 
                     if (isLaser) {
                         const shotId = bullet.shotId || 0;
-                        // レーザー1回の発射につき5ダメージ（HP15なのでレーザーを3回当てると壊れる）
+                        // レーザー1回の発射につき5ダメージ（従来の3倍のHP45なのでレーザーを9回当てると壊れる）
                         if (shotId > (enemy.lastLaserShotId || 0)) {
                             enemy.lastLaserShotId = shotId;
                             enemy.hp -= 5;

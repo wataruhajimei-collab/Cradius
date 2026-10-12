@@ -227,10 +227,10 @@ class IronMaidenEnemy extends Enemy {
         this.formation = formation;
         this.visible = (delay <= 0);
 
-        this.hp = 15;
-        this.maxHp = 15;
-        this.lastLaserShotId = 0; // レーザー1回の照射につき5ダメージ（レーザー3回当てると破壊）
-        this.hitCooldown = 0; // レーザー接触中に「キーキー」と鳴りながら適度な手応えで破壊できるクールダウン
+        this.hp = 45;
+        this.maxHp = 45;
+        this.lastLaserShotId = 0; // レーザー1回の照射につき5ダメージ（従来の3倍硬いHP45＝レーザー9回照射で破壊）
+        this.hitCooldown = 0; // レーザー接触中に「キーキー」と鳴りながら重厚な手応えで破壊できるクールダウン
         this.flashTimer = 0;
 
         this.phase = 0;
@@ -360,190 +360,343 @@ class IronMaidenEnemy extends Enemy {
         ctx.translate(cx, cy);
 
         const isFlash = (this.flashTimer > 0);
-        const rx = 45; // 傘の横半径 (全幅90px)
+        const rxRim = 46;     // 広げた傘布の最大半径（全幅92px）
+        const rxCollar = 13.5; // 上部ドーム直下の傘の首元半径
+        const yCollar = -23.5;
+        const yRimBase = 2.0;
 
         // =========================================================
-        // 1. 下部メカニカルボディ (重厚な八角形コアハウジング＆サイドスラスターポッド)
+        // 1. 下部回転フィン（背面側）＆ 傘の裏側（内部の陰影と受骨）
         // =========================================================
-        // 左右の重装スタビライザー＆バーニアポッド
-        [-28, 16].forEach((bx, sideIdx) => {
-            const podGrad = ctx.createLinearGradient(bx, 4, bx + 12, 34);
+        const finCount = 6;
+        const fins = [];
+        for (let i = 0; i < finCount; i++) {
+            // 本家同様、下部フィンを右回り（反時計回り）に高速回転
+            const angle = -this.spinAngle * 1.15 + (i * Math.PI * 2) / finCount;
+            fins.push({
+                angle,
+                sin: Math.sin(angle),
+                cos: Math.cos(angle)
+            });
+        }
+
+        const drawFin = (f) => {
+            const xBase = f.sin * 10.5;
+            const xOuter = f.sin * 23.5;
+            const xTip = f.sin * 16.5;
+            const bladeHalfW = 2.6 + Math.abs(f.cos) * 3.8;
+            const yOffset = f.cos * 2.2;
+            const dir = f.sin >= 0 ? 1 : -1;
+
+            const finGrad = ctx.createLinearGradient(xBase - bladeHalfW, 4, xOuter + bladeHalfW, 35);
             if (isFlash) {
-                podGrad.addColorStop(0, '#ffffff');
-                podGrad.addColorStop(1, '#fde047');
+                finGrad.addColorStop(0, '#ffffff');
+                finGrad.addColorStop(1, '#fde047');
+            } else if (this.isRed) {
+                finGrad.addColorStop(0, f.cos >= 0 ? '#fecdd3' : '#9f1239');
+                finGrad.addColorStop(0.55, f.cos >= 0 ? '#e11d48' : '#881337');
+                finGrad.addColorStop(1, '#310413');
             } else {
-                podGrad.addColorStop(0, '#94a3b8');
-                podGrad.addColorStop(0.5, '#475569');
-                podGrad.addColorStop(1, '#0f172a');
+                finGrad.addColorStop(0, f.cos >= 0 ? '#f1f5f9' : '#64748b');
+                finGrad.addColorStop(0.5, f.cos >= 0 ? '#64748b' : '#334155');
+                finGrad.addColorStop(1, '#090d16');
             }
-            ctx.fillStyle = podGrad;
+
+            ctx.fillStyle = finGrad;
             ctx.beginPath();
-            ctx.moveTo(bx, 4);
-            ctx.lineTo(bx + 12, 4);
-            ctx.lineTo(bx + 10, 32);
-            ctx.lineTo(bx + 2, 32);
+            ctx.moveTo(xBase - bladeHalfW * 0.55, 2 + yOffset * 0.4);
+            ctx.lineTo(xBase + bladeHalfW * 0.55, 2 + yOffset * 0.4);
+            ctx.lineTo(xOuter + dir * bladeHalfW * 0.7, 17 + yOffset);
+            ctx.lineTo(xTip + dir * 2.0, 35 + yOffset);
+            ctx.lineTo(xTip - dir * 2.2, 33 + yOffset);
+            ctx.lineTo(xBase - dir * 2.0, 18 + yOffset * 0.6);
             ctx.closePath();
             ctx.fill();
-            ctx.strokeStyle = '#0f172a';
-            ctx.lineWidth = 1.8;
+
+            ctx.strokeStyle = isFlash ? '#ffffff' : '#090d16';
+            ctx.lineWidth = 1.5;
             ctx.stroke();
 
-            // 下向きスラスターノズル
-            ctx.fillStyle = isFlash ? '#ffffff' : '#f97316';
-            ctx.fillRect(bx + 3, 32, 6, 4);
-        });
+            // フィン表面のオレンジ発光スリット（前面側フィンのみ）
+            if (f.cos > -0.15) {
+                ctx.strokeStyle = isFlash ? '#ffffff' : (this.isRed ? '#fde047' : '#f97316');
+                ctx.lineWidth = 1.3;
+                ctx.beginPath();
+                ctx.moveTo((xBase + xOuter) * 0.5, 9 + yOffset * 0.7);
+                ctx.lineTo((xOuter + xTip) * 0.5, 26 + yOffset);
+                ctx.stroke();
+            }
+        };
 
-        // 中央の重装メカニカルボディ本体
-        const bodyGrad = ctx.createLinearGradient(-22, 2, 22, 38);
-        if (isFlash) {
-            bodyGrad.addColorStop(0.0, '#ffffff');
-            bodyGrad.addColorStop(0.6, '#fde047');
-            bodyGrad.addColorStop(1.0, '#ea580c');
-        } else if (this.isRed) {
-            bodyGrad.addColorStop(0.0, '#fda4af');
-            bodyGrad.addColorStop(0.45, '#be123c');
-            bodyGrad.addColorStop(1.0, '#4c0519');
-        } else {
-            bodyGrad.addColorStop(0.0, '#cbd5e1');
-            bodyGrad.addColorStop(0.45, '#475569');
-            bodyGrad.addColorStop(1.0, '#0f172a');
-        }
-        ctx.fillStyle = bodyGrad;
+        // 傘の裏側（開いた傘の内側の暗がり＆ろくろから伸びる受骨）
+        const underGrad = ctx.createLinearGradient(0, -3, 0, 9);
+        underGrad.addColorStop(0, '#020617');
+        underGrad.addColorStop(1, '#1e293b');
+        ctx.fillStyle = underGrad;
         ctx.beginPath();
-        ctx.moveTo(-22, 2);
-        ctx.lineTo(22, 2);
-        ctx.lineTo(18, 30);
-        ctx.lineTo(10, 38);
-        ctx.lineTo(-10, 38);
-        ctx.lineTo(-18, 30);
+        ctx.ellipse(0, 2.5, rxRim - 2, 7.0, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.strokeStyle = '#090d16';
+        ctx.lineWidth = 1.6;
+        ctx.stroke();
+
+        // 傘の内側に見える受骨（中心軸から傘の骨へ伸びる細い金属ストラット）
+        ctx.strokeStyle = isFlash ? '#fde047' : '#475569';
+        ctx.lineWidth = 1.3;
+        for (let s = -3; s <= 3; s++) {
+            if (s === 0) continue;
+            ctx.beginPath();
+            ctx.moveTo(s * 2.5, 7);
+            ctx.lineTo(s * 12.5, 1.5);
+            ctx.stroke();
+        }
+
+        // 背面側の回転フィンを先に描画
+        fins.filter(f => f.cos < 0).sort((a, b) => a.cos - b.cos).forEach(drawFin);
+
+        // =========================================================
+        // 2. 傘の中央軸（ろくろハブ＆下部コアスピンドル）
+        // =========================================================
+        const shaftGrad = ctx.createLinearGradient(-11, 2, 11, 36);
+        if (isFlash) {
+            shaftGrad.addColorStop(0, '#ffffff');
+            shaftGrad.addColorStop(1, '#ea580c');
+        } else if (this.isRed) {
+            shaftGrad.addColorStop(0, '#fda4af');
+            shaftGrad.addColorStop(0.45, '#be123c');
+            shaftGrad.addColorStop(1, '#4c0519');
+        } else {
+            shaftGrad.addColorStop(0, '#e2e8f0');
+            shaftGrad.addColorStop(0.45, '#475569');
+            shaftGrad.addColorStop(1, '#0f172a');
+        }
+        ctx.fillStyle = shaftGrad;
+        ctx.beginPath();
+        ctx.moveTo(-11, 1);
+        ctx.lineTo(11, 1);
+        ctx.lineTo(8.5, 29);
+        ctx.lineTo(0, 38);
+        ctx.lineTo(-8.5, 29);
         ctx.closePath();
         ctx.fill();
         ctx.strokeStyle = '#090d16';
-        ctx.lineWidth = 2.2;
+        ctx.lineWidth = 1.8;
         ctx.stroke();
 
-        // ボディ前面の装甲パネルライン＆リベット
-        ctx.strokeStyle = 'rgba(15, 23, 42, 0.75)';
-        ctx.lineWidth = 1.5;
+        // 中央軸のルーバーリング＆発光スリット
+        for (let ry = 7; ry <= 23; ry += 5) {
+            ctx.fillStyle = '#020617';
+            ctx.fillRect(-7.5, ry, 15, 2.5);
+            ctx.fillStyle = isFlash ? '#ffffff' : '#ff3300';
+            ctx.fillRect(-5, ry + 0.4, 10, 1.7);
+        }
+
+        // 前面側の回転フィンを中央軸の手前に描画
+        fins.filter(f => f.cos >= 0).sort((a, b) => a.cos - b.cos).forEach(drawFin);
+
+        // =========================================================
+        // 3. オリジナル準拠の「傘布を開いた傘型円盤」キャノピー
+        //    （放射状の親骨＋アーチ状に切れ込んだ裾スカラップ＋尖った露先）
+        // =========================================================
+        const panelCount = 5; // 正面180度に見える傘布パネル分割数
+        const step = Math.PI / panelCount;
+        const phase = (((-this.spinAngle * 0.75) % step) + step) % step;
+
+        // 左端(-π/2)と右端(+π/2)を固定しつつ、内部の親骨が滑らかに回転移動する角度配列
+        const ribAngles = [-Math.PI / 2];
+        for (let a = -Math.PI / 2 + phase; a < Math.PI / 2 - 0.02; a += step) {
+            if (a > -Math.PI / 2 + 0.02) {
+                ribAngles.push(a);
+            }
+        }
+        ribAngles.push(Math.PI / 2);
+
+        const getRibGeom = (alpha) => {
+            const u = Math.sin(alpha); // -1.0 (左端) 〜 +1.0 (右端)
+            const depth = Math.cos(alpha); // 0.0 (両端) 〜 1.0 (正面中央)
+            const xTop = u * rxCollar;
+            const yTop = yCollar + depth * 2.2;
+            const xTip = u * rxRim;
+            const yTip = yRimBase + depth * 5.8; // 正面手前の露先ほど下に降りる立体パース
+            // 傘布特有の「外側へ張り出しながら広がる」親骨ベジェ制御点
+            const ctrlX = u * (rxRim * 0.77);
+            const ctrlY = yCollar + (yTip - yCollar) * 0.27;
+            return { alpha, u, depth, xTop, yTop, xTip, yTip, ctrlX, ctrlY };
+        };
+
+        const ribs = ribAngles.map(getRibGeom);
+
+        // 各傘布パネル（隣り合う親骨の間）を描画：裾が上向きアーチ状に切れ込んだ本物の傘シルエット
+        for (let i = 0; i < ribs.length - 1; i++) {
+            const r0 = ribs[i];
+            const r1 = ribs[i + 1];
+            const midAlpha = (r0.alpha + r1.alpha) * 0.5;
+            const midU = Math.sin(midAlpha);
+            const midDepth = Math.cos(midAlpha);
+
+            // 傘布の裾（r0.xTip 〜 r1.xTip）の中央が大きく上向きに湾曲するスカラップアーチ
+            const spanW = Math.abs(r1.xTip - r0.xTip);
+            const archLift = 4.2 + (spanW / rxRim) * 6.5;
+            const archCtrlX = (r0.xTip + r1.xTip) * 0.5;
+            const archCtrlY = (r0.yTip + r1.yTip) * 0.5 - archLift;
+
+            // 光源（左上）に対する各傘布パネルの立体シェーディング
+            const lightFactor = Math.max(0, Math.min(1, 0.58 - midU * 0.45 + midDepth * 0.15));
+            const pGrad = ctx.createLinearGradient(
+                (r0.xTop + r1.xTop) * 0.5,
+                yCollar,
+                archCtrlX,
+                (r0.yTip + r1.yTip) * 0.5
+            );
+
+            if (isFlash) {
+                pGrad.addColorStop(0.0, '#ffffff');
+                pGrad.addColorStop(0.6, '#fde047');
+                pGrad.addColorStop(1.0, '#ea580c');
+            } else if (this.isRed) {
+                if (lightFactor > 0.62) {
+                    pGrad.addColorStop(0.0, '#fff1f2');
+                    pGrad.addColorStop(0.38, '#fda4af');
+                    pGrad.addColorStop(0.82, '#e11d48');
+                    pGrad.addColorStop(1.0, '#881337');
+                } else if (lightFactor > 0.35) {
+                    pGrad.addColorStop(0.0, '#fecdd3');
+                    pGrad.addColorStop(0.42, '#e11d48');
+                    pGrad.addColorStop(0.85, '#9f1239');
+                    pGrad.addColorStop(1.0, '#4c0519');
+                } else {
+                    pGrad.addColorStop(0.0, '#fb7185');
+                    pGrad.addColorStop(0.45, '#9f1239');
+                    pGrad.addColorStop(1.0, '#310413');
+                }
+            } else {
+                if (lightFactor > 0.62) {
+                    pGrad.addColorStop(0.0, '#ffffff');
+                    pGrad.addColorStop(0.35, '#e0f2fe');
+                    pGrad.addColorStop(0.78, '#64748b');
+                    pGrad.addColorStop(1.0, '#1e293b');
+                } else if (lightFactor > 0.35) {
+                    pGrad.addColorStop(0.0, '#e2e8f0');
+                    pGrad.addColorStop(0.40, '#64748b');
+                    pGrad.addColorStop(0.82, '#334155');
+                    pGrad.addColorStop(1.0, '#0f172a');
+                } else {
+                    pGrad.addColorStop(0.0, '#94a3b8');
+                    pGrad.addColorStop(0.45, '#334155');
+                    pGrad.addColorStop(1.0, '#090d16');
+                }
+            }
+
+            ctx.fillStyle = pGrad;
+            ctx.beginPath();
+            ctx.moveTo(r0.xTop, r0.yTop);
+            // 左側の親骨ラインに沿って露先へ
+            ctx.quadraticCurveTo(r0.ctrlX, r0.ctrlY, r0.xTip, r0.yTip);
+            // ★傘布の裾：露先から次の露先へ、上向きに食い込むアーチ状スカラップ！
+            ctx.quadraticCurveTo(archCtrlX, archCtrlY, r1.xTip, r1.yTip);
+            // 右側の親骨ラインに沿って首元へ戻る
+            ctx.quadraticCurveTo(r1.ctrlX, r1.ctrlY, r1.xTop, r1.yTop);
+            ctx.closePath();
+            ctx.fill();
+
+            // 傘布の裾アーチのハイライト縁取り
+            ctx.strokeStyle = isFlash ? '#ffffff' : (this.isRed ? '#fda4af' : '#cbd5e1');
+            ctx.lineWidth = 1.6;
+            ctx.beginPath();
+            ctx.moveTo(r0.xTip, r0.yTip);
+            ctx.quadraticCurveTo(archCtrlX, archCtrlY, r1.xTip, r1.yTip);
+            ctx.stroke();
+        }
+
+        // 各親骨（傘のフレーム）と先端の尖った露先（石突きスパイク）を描画
+        ribs.forEach((r) => {
+            ctx.strokeStyle = isFlash ? '#ffffff' : '#090d16';
+            ctx.lineWidth = 2.2;
+            ctx.beginPath();
+            ctx.moveTo(r.xTop, r.yTop);
+            ctx.quadraticCurveTo(r.ctrlX, r.ctrlY, r.xTip, r.yTip);
+            ctx.stroke();
+
+            // 親骨のメタリックハイライト筋
+            ctx.strokeStyle = isFlash ? '#fde047' : (this.isRed ? '#fecdd3' : '#e2e8f0');
+            ctx.lineWidth = 1.0;
+            ctx.beginPath();
+            ctx.moveTo(r.xTop, r.yTop);
+            ctx.quadraticCurveTo(r.ctrlX, r.ctrlY, r.xTip, r.yTip);
+            ctx.stroke();
+
+            // 傘の骨の先端（露先スパイク）
+            const spikeDirX = r.u * 2.2;
+            const spikeDirY = 3.2;
+            ctx.fillStyle = isFlash ? '#ffffff' : (this.isRed ? '#ffe4e6' : '#f8fafc');
+            ctx.beginPath();
+            ctx.moveTo(r.xTip - 2.0, r.yTip - 0.5);
+            ctx.lineTo(r.xTip + 2.0, r.yTip - 0.5);
+            ctx.lineTo(r.xTip + spikeDirX, r.yTip + spikeDirY);
+            ctx.closePath();
+            ctx.fill();
+            ctx.strokeStyle = '#090d16';
+            ctx.lineWidth = 1.1;
+            ctx.stroke();
+        });
+
+        // =========================================================
+        // 4. 本体上部のドーム＆内部に透けて見える赤熱コア（原作の象徴）
+        // =========================================================
+        // ドーム基部の金属カラー（首輪リング）
+        const collarGrad = ctx.createLinearGradient(-rxCollar - 2, yCollar - 2, rxCollar + 2, yCollar + 3);
+        collarGrad.addColorStop(0, '#1e293b');
+        collarGrad.addColorStop(0.5, '#cbd5e1');
+        collarGrad.addColorStop(1, '#0f172a');
+        ctx.fillStyle = isFlash ? '#ffffff' : collarGrad;
         ctx.beginPath();
-        ctx.moveTo(-14, 6);
-        ctx.lineTo(-10, 34);
-        ctx.moveTo(14, 6);
-        ctx.lineTo(10, 34);
-        ctx.moveTo(-16, 25);
-        ctx.lineTo(16, 25);
+        ctx.ellipse(0, yCollar + 0.5, rxCollar + 1.5, 3.6, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.strokeStyle = '#090d16';
+        ctx.lineWidth = 1.6;
         ctx.stroke();
 
-        // ボディ中央の赤熱リアクタースリット＆回転スキャナーアイ
-        ctx.fillStyle = '#020617';
-        ctx.fillRect(-15, 11, 30, 11);
-        ctx.strokeStyle = '#64748b';
-        ctx.lineWidth = 1.2;
-        ctx.strokeRect(-15, 11, 30, 11);
+        // 上部ドーム外殻（内部コアが透けて見えるダークガラス・カプセルドーム）
+        const topDomeGrad = ctx.createRadialGradient(-4, -33, 2, 0, -28, 15);
+        if (isFlash) {
+            topDomeGrad.addColorStop(0.0, '#ffffff');
+            topDomeGrad.addColorStop(0.7, '#fde047');
+            topDomeGrad.addColorStop(1.0, '#ea580c');
+        } else {
+            topDomeGrad.addColorStop(0.0, 'rgba(148, 163, 184, 0.55)');
+            topDomeGrad.addColorStop(0.6, 'rgba(15, 23, 42, 0.88)');
+            topDomeGrad.addColorStop(1.0, 'rgba(2, 6, 23, 0.96)');
+        }
+        ctx.fillStyle = topDomeGrad;
+        ctx.beginPath();
+        ctx.ellipse(0, yCollar, rxCollar, 14.5, 0, Math.PI, 0, false);
+        ctx.closePath();
+        ctx.fill();
+        ctx.strokeStyle = isFlash ? '#ffffff' : '#64748b';
+        ctx.lineWidth = 2.0;
+        ctx.stroke();
 
-        const coreGlow = 0.7 + Math.sin(this.spinAngle * 2.5) * 0.3;
-        ctx.fillStyle = isFlash ? '#ffffff' : `rgba(255, 50, 15, ${coreGlow})`;
+        // 上部ドーム内部の赤熱エネルギーコア（脈動しながら輝く核）
+        const corePulse = 0.82 + Math.sin(this.spinAngle * 2.4) * 0.18;
+        const coreGrad = ctx.createRadialGradient(-2.5, yCollar - 7.5, 1, 0, yCollar - 6.0, 9.5);
+        coreGrad.addColorStop(0.0, '#ffffff');
+        coreGrad.addColorStop(0.32, '#fde047');
+        coreGrad.addColorStop(0.68, `rgba(255, 38, 0, ${corePulse})`);
+        coreGrad.addColorStop(1.0, 'rgba(127, 29, 29, 0.9)');
+        ctx.fillStyle = coreGrad;
         ctx.shadowColor = '#ff2200';
         ctx.shadowBlur = 10;
-        ctx.fillRect(-12, 13.5, 24, 6);
-
-        const scanX = Math.sin(this.spinAngle * 1.4) * 8;
-        ctx.fillStyle = '#ffffaa';
         ctx.beginPath();
-        ctx.arc(scanX, 16.5, 2.8, 0, Math.PI * 2);
+        ctx.ellipse(0, yCollar - 5.5, 8.8, 6.2, 0, 0, Math.PI * 2);
         ctx.fill();
         ctx.shadowBlur = 0;
 
-        // =========================================================
-        // 2. 傘とボディを繋ぐロータリー・ジョイントリング
-        // =========================================================
-        ctx.fillStyle = '#0f172a';
-        ctx.fillRect(-34, -2, 68, 7);
-        ctx.strokeStyle = '#475569';
-        ctx.lineWidth = 1.5;
-        ctx.strokeRect(-34, -2, 68, 7);
-
-        for (let i = -3; i <= 3; i++) {
-            const ventX = i * 9 + Math.sin(this.spinAngle * 2) * 2;
-            ctx.fillStyle = isFlash ? '#ffffff' : (i % 2 === 0 ? '#38bdf8' : '#f97316');
-            ctx.fillRect(ventX - 2.5, -0.5, 5, 4);
-        }
-
-        // =========================================================
-        // 3. 上部の大型重装甲アンブレラ（傘型ドームキャノピー）
-        // =========================================================
-        const domeGrad = ctx.createRadialGradient(-14, -22, 4, 0, -8, rx);
-        if (isFlash) {
-            domeGrad.addColorStop(0.0, '#ffffff');
-            domeGrad.addColorStop(0.55, '#fde047');
-            domeGrad.addColorStop(1.0, '#ea580c');
-        } else if (this.isRed) {
-            domeGrad.addColorStop(0.0, '#ffffff');
-            domeGrad.addColorStop(0.22, '#fecdd3');
-            domeGrad.addColorStop(0.55, '#e11d48');
-            domeGrad.addColorStop(0.85, '#881337');
-            domeGrad.addColorStop(1.0, '#310413');
-        } else {
-            domeGrad.addColorStop(0.0, '#ffffff');
-            domeGrad.addColorStop(0.22, '#e2e8f0');
-            domeGrad.addColorStop(0.52, '#64748b');
-            domeGrad.addColorStop(0.82, '#1e293b');
-            domeGrad.addColorStop(1.0, '#090d16');
-        }
-
-        ctx.fillStyle = domeGrad;
+        // 上部ドーム表面のガラス光沢ハイライト
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.75)';
+        ctx.lineWidth = 1.6;
         ctx.beginPath();
-        // 大型ドーム傘（半径45px、高さ38pxの重厚な傘型シルエット）
-        ctx.ellipse(0, -2, rx, 36, 0, Math.PI, 0, false);
-        ctx.lineTo(rx, -2);
-        ctx.lineTo(-rx, -2);
-        ctx.closePath();
-        ctx.fill();
-
-        ctx.strokeStyle = isFlash ? '#ffffff' : '#090d16';
-        ctx.lineWidth = 2.5;
+        ctx.ellipse(-2, yCollar - 2, rxCollar * 0.65, 9.5, -0.15, Math.PI * 1.12, Math.PI * 1.68, false);
         ctx.stroke();
-
-        // 傘の表面を分割する装甲リブプレート（回転感を出す立体スリット）
-        ctx.strokeStyle = isFlash ? 'rgba(255,255,255,0.85)' : 'rgba(15, 23, 42, 0.72)';
-        ctx.lineWidth = 2.0;
-        for (let r = -3; r <= 3; r++) {
-            const ribX = Math.sin(this.spinAngle * 0.55 + r * 0.44) * (rx - 4);
-            ctx.beginPath();
-            ctx.moveTo(ribX * 0.15, -37);
-            ctx.quadraticCurveTo(ribX, -18, ribX, -3);
-            ctx.stroke();
-        }
-
-        // 傘の中段にあるメカニカル装甲リング帯＆センサー窓
-        ctx.fillStyle = 'rgba(9, 13, 22, 0.80)';
-        ctx.beginPath();
-        ctx.ellipse(0, -16, 20, 7, 0, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.strokeStyle = isFlash ? '#ffffff' : '#94a3b8';
-        ctx.lineWidth = 1.5;
-        ctx.stroke();
-
-        const topCoreGrad = ctx.createRadialGradient(-3, -18, 1, 0, -16, 13);
-        topCoreGrad.addColorStop(0.0, '#ffffff');
-        topCoreGrad.addColorStop(0.35, '#fde047');
-        topCoreGrad.addColorStop(0.75, '#ff2200');
-        topCoreGrad.addColorStop(1.0, '#7f1d1d');
-        ctx.fillStyle = topCoreGrad;
-        ctx.beginPath();
-        ctx.ellipse(0, -16, 14, 4.8, 0, 0, Math.PI * 2);
-        ctx.fill();
-
-        // 傘の下縁の重厚なフランジリム（傘のツバ装甲）
-        const rimGrad = ctx.createLinearGradient(-rx - 2, -5, rx + 2, 1);
-        rimGrad.addColorStop(0, '#475569');
-        rimGrad.addColorStop(0.5, '#cbd5e1');
-        rimGrad.addColorStop(1, '#1e293b');
-        ctx.fillStyle = isFlash ? '#ffffff' : rimGrad;
-        ctx.fillRect(-rx - 2, -5, (rx + 2) * 2, 6);
-        ctx.strokeStyle = '#090d16';
-        ctx.lineWidth = 1.8;
-        ctx.strokeRect(-rx - 2, -5, (rx + 2) * 2, 6);
 
         ctx.restore();
     }
