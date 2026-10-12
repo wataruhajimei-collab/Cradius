@@ -600,8 +600,9 @@ function handleCollisions() {
             if (bullet.active && enemy.active && checkCollision(bullet, enemy)) {
                 const isIronMaiden = (typeof IronMaidenEnemy !== 'undefined' && enemy instanceof IronMaidenEnemy);
                 if (isIronMaiden) {
+                    const isLaser = (typeof Laser !== 'undefined' && bullet instanceof Laser);
                     // レーザーは消去せず長さと発射ペース（リズム）を完全に維持し、通常弾のみ消去する
-                    if (!(bullet instanceof Laser)) {
+                    if (!isLaser) {
                         bullet.active = false;
                     }
                     // 本家同様の甲高い金属摩擦音「キーキー！」を鳴らす
@@ -612,13 +613,28 @@ function handleCollisions() {
                             Sound.playBossHit();
                         }
                     }
-                    if (enemy.hitCooldown > 0) {
-                        return;
-                    }
-                    enemy.hitCooldown = 3;
-                    enemy.hp--;
-                    if (enemy.hp > 0) {
-                        enemy.flashTimer = 4;
+                    enemy.flashTimer = 4;
+
+                    if (isLaser) {
+                        const shotId = bullet.shotId || 0;
+                        // レーザー1回の発射につき5ダメージ（HP15なのでレーザーを3回当てると壊れる）
+                        if (shotId > (enemy.lastLaserShotId || 0)) {
+                            enemy.lastLaserShotId = shotId;
+                            enemy.hp -= 5;
+                        } else {
+                            return;
+                        }
+                    } else {
+                        if (enemy.hitCooldown > 0) {
+                            return;
+                        }
+                        if (typeof Missile !== 'undefined' && bullet instanceof Missile) {
+                            enemy.hitCooldown = 16;
+                            enemy.hp -= 1;
+                        } else {
+                            enemy.hitCooldown = 6;
+                            enemy.hp -= 2;
+                        }
                     }
                 } else {
                     if (!(bullet instanceof Laser)) {

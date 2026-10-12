@@ -280,10 +280,10 @@ class Player {
         if (typeof Sound !== 'undefined') Sound.playPowerUp();
     }
 
-    fireBulletFromOrigin(originOwner, originX, originY, offsetY) {
+    fireBulletFromOrigin(originOwner, originX, originY, offsetY, shotId = null) {
         if (typeof addPlayerBullet === 'function') {
             if (this.weaponType === 'LASER') {
-                const laser = new Laser(originOwner, offsetY, originX, 20, '#00ffff');
+                const laser = new Laser(originOwner, offsetY, originX, 20, '#00ffff', shotId);
                 addPlayerBullet(laser);
             } else if (this.weaponType === 'DOUBLE') {
                 const b1 = new Bullet(originX, originY, 10, 0);
@@ -315,6 +315,12 @@ class Player {
             }
         }
 
+        let currentShotId = null;
+        if (this.weaponType === 'LASER' && typeof Laser !== 'undefined') {
+            Laser._seq = (Laser._seq || 0) + 1;
+            currentShotId = Laser._seq;
+        }
+
         // 効果音の再生（自機の発射時に1回だけ鳴らす）
         if (typeof Sound !== 'undefined') {
             if (this.weaponType === 'LASER') {
@@ -331,14 +337,14 @@ class Player {
         const bulletX = this.x + this.width;
         const offsetY = this.height / 2 - 2;
         const bulletY = this.y + offsetY;
-        this.fireBulletFromOrigin(this, bulletX, bulletY, offsetY);
+        this.fireBulletFromOrigin(this, bulletX, bulletY, offsetY, currentShotId);
 
         // オプションから発射
         this.options.forEach(opt => {
             const optBulletX = opt.x + opt.width;
             const optOffsetY = opt.height / 2 - 2;
             const optBulletY = opt.y + optOffsetY;
-            this.fireBulletFromOrigin(opt, optBulletX, optBulletY, optOffsetY);
+            this.fireBulletFromOrigin(opt, optBulletX, optBulletY, optOffsetY, currentShotId);
         });
 
         return true;

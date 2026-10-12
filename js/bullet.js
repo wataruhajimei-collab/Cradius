@@ -115,7 +115,7 @@ class Missile {
 }
 
 class Laser {
-    constructor(owner, offsetY, x, speedX, color = '#00ffff') {
+    constructor(owner, offsetY, x, speedX, color = '#00ffff', shotId = null) {
         this.owner = owner;
         this.offsetY = offsetY;
         this.x = x;
@@ -127,6 +127,12 @@ class Laser {
         this.active = true;
         this.framesAlive = 0;
         this.minFrames = 22; // 近くの敵に当たっても発射間隔が乱れないよう一定フレーム維持
+        if (shotId !== null) {
+            this.shotId = shotId;
+        } else {
+            Laser._seq = (Laser._seq || 0) + 1;
+            this.shotId = Laser._seq;
+        }
     }
 
     update(canvasHeight) {

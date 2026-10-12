@@ -227,8 +227,9 @@ class IronMaidenEnemy extends Enemy {
         this.formation = formation;
         this.visible = (delay <= 0);
 
-        this.hp = 6;
-        this.maxHp = 6;
+        this.hp = 15;
+        this.maxHp = 15;
+        this.lastLaserShotId = 0; // レーザー1回の照射につき5ダメージ（レーザー3回当てると破壊）
         this.hitCooldown = 0; // レーザー接触中に「キーキー」と鳴りながら適度な手応えで破壊できるクールダウン
         this.flashTimer = 0;
 
