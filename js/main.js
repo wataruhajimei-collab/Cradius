@@ -99,8 +99,8 @@ function startOrJumpStage(stageNum = 1, mode = 'STAGE', autoEquipPower = null) {
                 st2.state = 'ZAB_RUSH';
                 st2.zabTimer = 0;
                 st2.zabWaveTimer = 0;
-                if (typeof Sound !== 'undefined' && typeof Sound.playStage2Bgm === 'function') {
-                    Sound.playStage2Bgm();
+                if (typeof Sound !== 'undefined' && typeof Sound.playBossBgm === 'function') {
+                    Sound.playBossBgm();
                 }
             } else if (mode === 'BOSS' && st2) {
                 st2.blocks = [];

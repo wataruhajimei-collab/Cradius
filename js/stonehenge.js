@@ -308,12 +308,15 @@ class StonehengeStage {
             // 空中敵の編隊飛行（カプセル供給＆スリル）
             this.updateStonehengeEnemies(dt);
 
-            // 石ブロックが完全に画面左へ抜けたら「ザブ地帯」へ突入！
+            // 石ブロックが完全に画面左へ抜けたら「ザブ地帯」へ突入＆ボスBGM開始！
             if (this.stageTime >= 64000 && this.blocks.length < 5) {
                 this.state = 'ZAB_RUSH';
                 this.blocks = [];
                 this.zabTimer = 0;
                 this.zabWaveTimer = 900;
+                if (typeof Sound !== 'undefined' && typeof Sound.playBossBgm === 'function') {
+                    Sound.playBossBgm();
+                }
             }
 
         } else if (this.state === 'ZAB_RUSH') {

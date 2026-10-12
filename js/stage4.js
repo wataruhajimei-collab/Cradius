@@ -197,7 +197,7 @@ class JumperEnemy extends Enemy {
 // 簡単に壊れない重装甲の大型ボディ（上部ドーム傘＋下部メカニカルボディ）で画面全域を整然と巡回する！
 // ==========================================
 class IronMaidenSquad extends FormationBase {
-    constructor(count = 10, spacing = 42) {
+    constructor(count = 20, spacing = 24) {
         super(count);
         this.enemies = [];
 
@@ -1877,8 +1877,8 @@ class Stage4 {
         this.boss = null;
         this.active = true;
 
-        // 浮遊大陸（3基）の出現タイミング
-        this.islandSpawnTimes = [15000, 24500, 33500];
+        // 浮遊大陸（3基）の出現タイミング（開幕20秒の空中戦後に順次出現）
+        this.islandSpawnTimes = [27000, 36500, 45500];
         this.islandSpawnedCount = 0;
 
         // ボス前：大型クラゲロボット（アイアンメイデン）順次出現＆画面全域巡回ラッシュ管理
@@ -1907,7 +1907,7 @@ class Stage4 {
         this.terrain.start();
     }
 
-    // ★ボス前の大型傘＆ボディメカ巡回場面へ突入（スクロールを止め、右上から整然と1列で出現させて画面を巡回させる）
+    // ★ボス前の大型傘＆ボディメカ巡回場面へ突入（スクロールを止め、右上から整然と1列で2倍の数＝20機出現させて画面を巡回させる）
     _enterPatrolRush() {
         this.active = true;
         this.boss = null;
@@ -1927,16 +1927,17 @@ class Stage4 {
         }
 
         this.state = 'JELLYFISH_RUSH';
-        this.stageTime = 41000;
-        this.jellyfishRushTimer = 25000; // 25秒間の巡回フェーズ
+        this.stageTime = 53000;
+        this.jellyfishRushTimer = 28000; // 28秒間の巡回フェーズ
         this.maidenWaveTimer = 0;
         this.maidenWaveCount = 1;
 
-        // 右上から10機の大型傘＆ボディメカが一定間隔(42フレームおき)で整然と1列で出現し、画面を巡回する！
-        new IronMaidenSquad(10, 42);
+        // 右上から従来の2倍（20機）の大型傘＆ボディメカが一定間隔(24フレームおき)で整然と1列で出現し、画面を巡回する！
+        new IronMaidenSquad(20, 24);
 
-        if (typeof Sound !== 'undefined' && typeof Sound.playStage4Bgm === 'function') {
-            Sound.playStage4Bgm();
+        // 傘の巡回シーンのBGMはボスBGM（Aircraft Carrier）を再生！
+        if (typeof Sound !== 'undefined' && typeof Sound.playBossBgm === 'function') {
+            Sound.playBossBgm();
         }
     }
 
@@ -1951,16 +1952,19 @@ class Stage4 {
         if (this.state === 'STAGE') {
             this.stageTime += dt;
 
-            // 1. 開幕8秒間の空中戦の後、天地逆転した逆火山地形が出現！
-            if (this.stageTime >= 8000 && !this.terrain.wallActive) {
+            // 1. 開幕20秒間の宇宙空中戦の後、天地逆転した逆火山地形が出現＆4面BGM（Free Flyer）開始！
+            if (this.stageTime >= 20000 && !this.terrain.wallActive) {
                 this.terrain.startWalls();
+                if (typeof Sound !== 'undefined' && typeof Sound.playStage4Bgm === 'function') {
+                    Sound.playStage4Bgm();
+                }
             }
 
-            const canSpawnTerrainEnemies = (this.stageTime >= 8500 && this.stageTime < 39500);
+            const canSpawnTerrainEnemies = (this.stageTime >= 20500 && this.stageTime < 51500);
             this.terrain.update(dt, canSpawnTerrainEnemies);
 
-            // 2. 空中編隊の出現（ファン・ガルン・ザブ・ルグラでカプセル補給）
-            if (this.stageTime < 39500) {
+            // 2. 空中編隊の出現（開幕20秒は激しい宇宙空中戦、地形突入後もカプセル補給編隊が出現）
+            if (this.stageTime < 51500) {
                 this.updateFlyingEnemies(dt);
             }
 
@@ -1982,8 +1986,8 @@ class Stage4 {
                 this.islandSpawnedCount++;
             }
 
-            // 4. ★41秒経過で画面スクロールを止め、右上から大型の傘＆ボディメカが整然と出現して巡回する場面へ突入！
-            if (this.stageTime >= 41000) {
+            // 4. ★53秒経過で画面スクロールを止め、右上から大型の傘＆ボディメカが20機整然と出現して巡回する場面へ突入！
+            if (this.stageTime >= 53000) {
                 this._enterPatrolRush();
             }
 
@@ -2051,7 +2055,8 @@ class Stage4 {
 
     updateFlyingEnemies(dt) {
         this.flyingTimer += dt;
-        if (this.flyingTimer < 1050) return;
+        const interval = this.terrain.wallActive ? 1050 : 820;
+        if (this.flyingTimer < interval) return;
         this.flyingTimer = 0;
 
         const roll = Math.random();

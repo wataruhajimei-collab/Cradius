@@ -713,11 +713,11 @@ class LevelManager {
                 console.error('Stage4 initialization error:', err);
             }
         }
-        if (typeof Sound !== 'undefined' && typeof Sound.playStage4Bgm === 'function') {
+        if (typeof Sound !== 'undefined' && typeof Sound.playAirBgm === 'function') {
             try {
-                Sound.playStage4Bgm();
+                Sound.playAirBgm(); // 4面開幕も原作通り宇宙空中戦BGM（Beginning of the History）からスタート！
             } catch (serr) {
-                console.warn('Sound playStage4Bgm error:', serr);
+                console.warn('Sound playAirBgm error:', serr);
             }
         }
     }
