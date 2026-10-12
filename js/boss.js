@@ -662,6 +662,31 @@ function drawOriginalBigCore(ctx, boss) {
     ctx.restore();
 }
 
+// 1985年AC版『グラディウス』準拠：自機のパワーアップ充実度（ランク 0.0〜1.0）を算出
+// オプション数・レーザー/ダブル・ミサイル・シールド・スピード段階が多いほどボスの移動速度・レーザー弾速・連射間隔が強化される
+function getPlayerEquipmentRank() {
+    if (typeof player === 'undefined' || !player) return 0;
+    let score = 0;
+    // オプション数 (0〜4個: 最大8.0pt — 原作で最もランク上昇寄与が大きい要素)
+    const optCount = Array.isArray(player.options) ? player.options.length : 0;
+    score += Math.min(4, optCount) * 2.0;
+    // メインウェポン (LASER: 2.5pt, DOUBLE: 1.8pt)
+    if (player.weaponType === 'LASER') score += 2.5;
+    else if (player.weaponType === 'DOUBLE') score += 1.8;
+    // ミサイル (1.2pt)
+    if (player.hasMissile) score += 1.2;
+    // シールド (1.2pt)
+    if (player.shieldActive) score += 1.2;
+    // スピードアップ段階 (初期3.5から1.5刻み: 最大2.1pt)
+    const speedUps = Math.max(0, Math.min(3, ((player.speed || 3.5) - 3.5) / 1.5));
+    score += speedUps * 0.7;
+
+    return Math.max(0, Math.min(1, score / 14.0));
+}
+if (typeof window !== 'undefined') {
+    window.getPlayerEquipmentRank = getPlayerEquipmentRank;
+}
+
 class Boss {
     constructor(x, y) {
         this.scale = 3; // 98x66ドット×3倍＝294x198px
@@ -707,32 +732,26 @@ class Boss {
         }
         this.isEntering = false;
 
-        // 原作ビッグコア準拠：自機のY座標へ向かって上下に追尾移動し、正面4門からレーザーを斉射
-        const trackSpeed = this.trackSpeed || 1.6;
+        // 原作ビッグコア準拠：自機の装備が充実しているほど上下追尾スピードとレーザー連射・弾速が速くなる！
+        const rank = getPlayerEquipmentRank();
+        const baseTrack = this.trackSpeed || 1.45;
+        const trackSpeed = baseTrack + rank * 1.95 + (this.shields === 0 ? 0.35 : 0);
         const py = (typeof player !== 'undefined' && player) ? (player.y + player.height / 2) : this.baseY;
         const targetY = Math.max(140, Math.min(460, py));
         const dy = targetY - this.y;
         this.y += Math.max(-trackSpeed, Math.min(trackSpeed, dy));
-        this.rotationAngle += 0.04;
+        this.rotationAngle += 0.04 + rank * 0.03;
 
         if (this.shieldHitCooldown > 0) this.shieldHitCooldown--;
         if (this.shieldFlashTimer > 0) this.shieldFlashTimer--;
         if (this.hitFlashTimer > 0) this.hitFlashTimer--;
 
-        if (this.shields > 0) {
-            this.coreOpen = false;
-            this.coreTimer++;
-            if (this.coreTimer > 120) {
-                this.coreTimer = 0;
-                this.shoot();
-            }
-        } else {
-            this.coreOpen = true;
-            this.coreTimer++;
-            if (this.coreTimer > 95) {
-                this.coreTimer = 0;
-                this.shoot();
-            }
+        this.coreOpen = (this.shields <= 0);
+        const fireInterval = Math.max(46, Math.round((this.shields > 0 ? 115 : 92) - rank * 48));
+        this.coreTimer++;
+        if (this.coreTimer > fireInterval) {
+            this.coreTimer = 0;
+            this.shoot();
         }
         
         this.bullets.forEach(b => b.update(600));
@@ -741,9 +760,12 @@ class Boss {
 
     shoot() {
         // 1985年AC版ビッグコアの4門レーザー砲口座標（内側2門は先端x-147/y±28、外側2門は段差肩部x-75/y±70）
+        // 自機の装備ランクが高いほどレーザー弾速も高速化（-5.4 〜 -10.6）
         const cx = this.x;
         const cy = this.y;
-        const laserSpeed = -5.2;
+        const rank = getPlayerEquipmentRank();
+        const laserSpeed = -(5.4 + rank * 4.4 + (this.shields === 0 ? 0.8 : 0));
+        const LaserClass = (typeof BigCoreLaser !== 'undefined') ? BigCoreLaser : Bullet;
         const muzzles = [
             { dx: -75, dy: -70 },
             { dx: -147, dy: -28 },
@@ -751,8 +773,15 @@ class Boss {
             { dx: -75, dy: 70 }
         ];
         muzzles.forEach(m => {
-            this.bullets.push(new Bullet(cx + m.dx, cy + m.dy, laserSpeed, 0, '#88eeff', true));
+            if (LaserClass === BigCoreLaser) {
+                this.bullets.push(new BigCoreLaser(cx + m.dx, cy + m.dy, laserSpeed, 0));
+            } else {
+                this.bullets.push(new Bullet(cx + m.dx, cy + m.dy, laserSpeed, 0, '#38bdf8', true));
+            }
         });
+        if (typeof Sound !== 'undefined' && typeof Sound.playLaser === 'function') {
+            Sound.playLaser();
+        }
     }
 
     hitShield(damage = 1) {

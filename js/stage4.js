@@ -1636,14 +1636,15 @@ class Stage4Boss {
         }
         this.isEntering = false;
 
-        // 原作ビッグコア準拠：自機のY座標へ機敏に追尾し（4面は1面より高速）、正面から4連レーザー
+        // 原作ビッグコア準拠：自機の装備ランクが高いほど機敏に上下追尾し、短い青っぽい太い4連レーザーも高速化する！
+        const rank = (typeof getPlayerEquipmentRank === 'function') ? getPlayerEquipmentRank() : 0;
         const py = (typeof player !== 'undefined' && player) ? (player.y + player.height / 2) : this.baseY;
         const targetY = Math.max(150, Math.min(450, py));
         const dy = targetY - this.y;
-        const trackSpeed = 2.6;
+        const trackSpeed = 2.1 + rank * 2.0 + (this.coreOpen ? 0.4 : 0);
         this.y += Math.max(-trackSpeed, Math.min(trackSpeed, dy));
 
-        this.rotationAngle += 0.05;
+        this.rotationAngle += 0.05 + rank * 0.03;
         this.maidenOrbAngle += 0.06;
 
         if (this.shieldHitCooldown > 0) this.shieldHitCooldown--;
@@ -1652,9 +1653,9 @@ class Stage4Boss {
 
         this.coreOpen = (this.shields <= 0);
 
-        // ビッグコア伝統の4連平行レーザー斉射
+        // ビッグコア伝統の4連平行レーザー斉射（装備ランクに応じて発射間隔も短縮）
         this.laserTimer++;
-        const laserInterval = this.coreOpen ? 72 : 92;
+        const laserInterval = Math.max(42, Math.round((this.coreOpen ? 76 : 96) - rank * 38));
         if (this.laserTimer >= laserInterval) {
             this.laserTimer = 0;
             this.shootTwinLasers();
@@ -1667,8 +1668,10 @@ class Stage4Boss {
     shootTwinLasers() {
         const cx = this.x;
         const cy = this.y;
-        const spd = this.coreOpen ? -6.0 : -5.2;
-        const LaserClass = (typeof EnemyLaser !== 'undefined') ? EnemyLaser : Bullet;
+        const rank = (typeof getPlayerEquipmentRank === 'function') ? getPlayerEquipmentRank() : 0;
+        const spd = -(6.2 + rank * 4.6 + (this.coreOpen ? 0.8 : 0));
+        const LaserClass = (typeof BigCoreLaser !== 'undefined') ? BigCoreLaser :
+                           ((typeof EnemyLaser !== 'undefined') ? EnemyLaser : Bullet);
 
         // 1985年AC版ビッグコアの4門レーザー砲口座標（内側2門は先端x-147/y±28、外側2門は段差肩部x-75/y±70）
         const muzzles = [
@@ -1678,7 +1681,11 @@ class Stage4Boss {
             { dx: -75, dy: 70 }
         ];
         muzzles.forEach(m => {
-            this.bullets.push(new LaserClass(cx + m.dx, cy + m.dy, spd, 0, '#88eeff'));
+            if (LaserClass === BigCoreLaser) {
+                this.bullets.push(new BigCoreLaser(cx + m.dx, cy + m.dy, spd, 0));
+            } else {
+                this.bullets.push(new LaserClass(cx + m.dx, cy + m.dy, spd, 0, '#38bdf8'));
+            }
         });
 
         if (typeof Sound !== 'undefined' && typeof Sound.playLaser === 'function') {

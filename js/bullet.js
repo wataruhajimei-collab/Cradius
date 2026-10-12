@@ -204,6 +204,68 @@ class EnemyLaser extends Bullet {
     }
 }
 
+// 1985年AC版ビッグコア専用：短い青っぽい太いレーザー弾 (BigCoreLaser)
+class BigCoreLaser extends Bullet {
+    constructor(x, y, speedX, speedY = 0) {
+        // 当たり判定は長さ26px × 太さ8pxの短く太い矩形
+        super(x - 13, y - 4, speedX, speedY, '#38bdf8', true);
+        this.width = 26;
+        this.height = 8;
+        this.length = 26;
+        this.thickness = 8;
+    }
+
+    draw(ctx) {
+        ctx.save();
+        const x = Math.round(this.x);
+        const y = Math.round(this.y);
+        const w = this.width;   // 26px (短いレーザー)
+        const h = this.height;  // 8px  (太いレーザー)
+
+        // 青いレーザーの発光グロウ
+        ctx.shadowColor = '#2563eb';
+        ctx.shadowBlur = 8;
+
+        // 1. 外郭ディープブルー〜コバルトブルーの太いカプセル状ボディ
+        const outerGrad = ctx.createLinearGradient(x, y, x, y + h);
+        outerGrad.addColorStop(0.00, '#1d4ed8');
+        outerGrad.addColorStop(0.22, '#3b82f6');
+        outerGrad.addColorStop(0.50, '#60a5fa');
+        outerGrad.addColorStop(0.78, '#3b82f6');
+        outerGrad.addColorStop(1.00, '#1e40af');
+        ctx.fillStyle = outerGrad;
+        ctx.beginPath();
+        if (ctx.roundRect) {
+            ctx.roundRect(x, y, w, h, 3);
+        } else {
+            ctx.rect(x, y, w, h);
+        }
+        ctx.fill();
+
+        // 2. 中間の鮮やかなシアンブルー層
+        ctx.shadowBlur = 0;
+        ctx.fillStyle = '#7dd3fc';
+        ctx.fillRect(x + 2, y + 1.5, w - 4, h - 3);
+
+        // 3. 中心の青白い高輝度コア（太めの3pxコア＋アーケード特有の青色エネルギー節）
+        ctx.fillStyle = '#e0f2fe';
+        ctx.fillRect(x + 3, y + 2.5, w - 6, h - 5);
+
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(x + 4, y + 3, w - 8, 2);
+
+        // アーケード版ビッグコアレーザー特有の青い縦スリット節ディテール
+        ctx.fillStyle = 'rgba(29, 78, 216, 0.55)';
+        for (let sx = x + 6; sx < x + w - 4; sx += 6) {
+            ctx.fillRect(sx, y + 1, 2, h - 2);
+        }
+
+        ctx.restore();
+    }
+}
+
+window.BigCoreLaser = BigCoreLaser;
+
 // 古代イオンリング弾 (RingBullet: モアイが放つ本家グラディウス風の大きな丸いリング光弾)
 class RingBullet extends Bullet {
     constructor(x, y, speedX, speedY, color = '#38bdf8') {
