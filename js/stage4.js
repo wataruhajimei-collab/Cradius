@@ -192,18 +192,19 @@ class JumperEnemy extends Enemy {
 }
 
 // ==========================================
-// 2. クラゲ型重装巡回ロボ：アイアンメイデン (IronMaidenEnemy & IronMaidenSquad)
-// 1985年AC版4面ボス前の象徴：大きな傘型ドームと機械触手を持つ硬いクラゲロボットが
-// 次々と1列に順番に出現し、画面いっぱいに大回りで巡回・包囲する名場面を完全再現！
+// 2. 大型傘＆ボディ重装巡回メカ：アイアンメイデン (IronMaidenEnemy & IronMaidenSquad)
+// 1985年AC版4面ボス前の象徴：スクロールが停止した画面の「右上」からだけ整然と1列で順番に出現し、
+// 簡単に壊れない重装甲の大型ボディ（上部ドーム傘＋下部メカニカルボディ）で画面全域を整然と巡回する！
 // ==========================================
 class IronMaidenSquad extends FormationBase {
-    constructor(pattern = 'GRAND_LOOP_CW', startY = 140, count = 5, spacing = 16) {
+    constructor(count = 10, spacing = 42) {
         super(count);
         this.enemies = [];
 
         for (let i = 0; i < count; i++) {
-            const isRed = (i === count - 1); // 編隊最後尾を赤色（撃破または全滅でカプセル）に
-            const maiden = new IronMaidenEnemy(pattern, startY, i * spacing, this, isRed);
+            // 3機に1機（および最後尾）を赤色カプセルキャリアに設定
+            const isRed = (i % 3 === 2) || (i === count - 1);
+            const maiden = new IronMaidenEnemy(i * spacing, this, isRed);
             this.enemies.push(maiden);
             if (typeof enemies !== 'undefined') {
                 enemies.push(maiden);
@@ -213,27 +214,28 @@ class IronMaidenSquad extends FormationBase {
 }
 
 class IronMaidenEnemy extends Enemy {
-    constructor(pattern = 'GRAND_LOOP_CW', startY = 140, delay = 0, formation = null, isRed = false) {
-        const initX = (pattern === 'LEFT_AMBUSH') ? -54 : 836;
-        super(initX, startY, isRed);
-        // ★動画通りの「大きめなクラゲロボットのようなちょっと硬い敵キャラ」
-        this.width = 56;
-        this.height = 56;
-        this.pattern = pattern; // 'GRAND_LOOP_CW' | 'GRAND_LOOP_CCW' | 'FIGURE_EIGHT' | 'ZIGZAG_BOX' | 'LEFT_AMBUSH' | 'WAVE_SWEEP'
-        this.startY = startY;
+    constructor(delay = 0, formation = null, isRed = false) {
+        // ★必ず画面右上（x=824, y=84）からのみ整然と出現！
+        const initX = 824;
+        const initY = 84;
+        super(initX, initY, isRed);
+
+        // ★さらに大きく、簡単に壊れない重装サブボス級サイズ＆耐久力
+        this.width = 96;
+        this.height = 86;
         this.delay = delay;
         this.formation = formation;
         this.visible = (delay <= 0);
-        this.hp = 5; // ちょっと硬い重装甲（ノーマル連射やレーザーで撃ち込む手応え）
-        this.maxHp = 5;
+
+        this.hp = 24;
+        this.maxHp = 24;
+        this.hitCooldown = 0; // レーザーの毎フレーム多段ヒットで瞬殺されるのを防ぐ重装甲クールダウン
         this.flashTimer = 0;
 
         this.phase = 0;
-        this.phaseTimer = 0;
+        this.lapCount = 0;
         this.spinAngle = 0;
-        this.tentaclePhase = Math.random() * Math.PI * 2;
-        this.vx = (pattern === 'LEFT_AMBUSH') ? 4.2 : -4.2;
-        this.vy = (startY < 300) ? 3.2 : -3.2;
+        this.patrolSpeed = 3.4;
     }
 
     update() {
@@ -245,207 +247,105 @@ class IronMaidenEnemy extends Enemy {
             return;
         }
 
+        if (this.hitCooldown > 0) this.hitCooldown--;
         if (this.flashTimer > 0) this.flashTimer--;
-        this.spinAngle += 0.18;
-        this.tentaclePhase += 0.16;
-        this.phaseTimer++;
+        this.spinAngle += 0.12;
 
+        // 画面外周および内周を整然と巡回する固定ウェイポイント座標
+        const topLaneY = 84;
+        const botLaneY = 428;
+        const leftLaneX = 48;
+        const rightLaneX = 656;
+
+        const innerTopY = 172;
+        const innerBotY = 340;
+        const innerLeftX = 152;
+        const innerRightX = 556;
+
+        const spd = this.patrolSpeed;
         const st4 = window.stage4 || (typeof stage4 !== 'undefined' ? stage4 : null);
-        const terrain = (st4 && st4.terrain && st4.terrain.wallActive) ? st4.terrain : null;
-        const cx = Math.max(20, Math.min(780, this.x + this.width / 2));
-        const minY = terrain ? Math.max(42, terrain.getTopY(cx) + 10) : 48;
-        const maxY = terrain ? Math.min(548 - this.height, terrain.getBottomY(cx) - this.height - 10) : (552 - this.height);
-        const midY = (minY + maxY) * 0.5;
+        const rushEnded = st4 && st4.state !== 'JELLYFISH_RUSH';
 
-        if (this.pattern === 'GRAND_LOOP_CW') {
-            // ★画面外周を時計回りにぐるっと1周半巡回する大迫力ルート（右上→天井沿いに左端→左端を下降→床沿いに右端→右端を上昇→中央横断）
-            if (this.phase === 0) {
-                // 天井付近を左端へ高速巡回
-                this.x -= 4.5;
-                const targetY = minY + 12 + Math.sin(this.phaseTimer * 0.12) * 10;
-                this.y += (targetY - this.y) * 0.22;
-                if (this.x <= 68) {
-                    this.x = 68;
-                    this.phase = 1;
-                }
-            } else if (this.phase === 1) {
-                // 画面左端に沿って床近くまで急降下
-                this.x = 68 + Math.sin(this.phaseTimer * 0.1) * 8;
-                this.y += 4.4;
-                if (this.y >= maxY - 10) {
-                    this.y = maxY - 10;
-                    this.phase = 2;
-                }
-            } else if (this.phase === 2) {
-                // 床付近に沿って画面右端まで横断巡回
-                this.x += 4.6;
-                const targetY = maxY - 12 + Math.sin(this.phaseTimer * 0.12) * 10;
-                this.y += (targetY - this.y) * 0.22;
-                if (this.x >= 690) {
-                    this.x = 690;
-                    this.phase = 3;
-                }
-            } else if (this.phase === 3) {
-                // 画面右端に沿って中段〜上段へ上昇
-                this.x = 690 + Math.cos(this.phaseTimer * 0.1) * 8;
-                this.y -= 4.3;
-                if (this.y <= minY + 36) {
-                    this.phase = 4;
-                    const py = (typeof player !== 'undefined' && player) ? player.y : midY;
-                    this.vy = Math.max(-2.8, Math.min(2.8, (py - this.y) * 0.018));
-                }
-            } else {
-                // 最後に画面中央を大きく波打ちながら左へ横断離脱
-                this.x -= 4.4;
-                this.y += this.vy + Math.sin(this.phaseTimer * 0.09) * 2.2;
-                if (this.y < minY) { this.y = minY; this.vy = Math.abs(this.vy); }
-                if (this.y > maxY) { this.y = maxY; this.vy = -Math.abs(this.vy); }
-            }
-        } else if (this.pattern === 'GRAND_LOOP_CCW') {
-            // ★画面外周を反時計回りに大巡回するルート（右下→床沿いに左端→左端を上昇→天井沿いに右端→右端を下降→中央横断）
-            if (this.phase === 0) {
-                // 床付近を左端へ高速巡回
-                this.x -= 4.5;
-                const targetY = maxY - 12 + Math.sin(this.phaseTimer * 0.12) * 10;
-                this.y += (targetY - this.y) * 0.22;
-                if (this.x <= 68) {
-                    this.x = 68;
-                    this.phase = 1;
-                }
-            } else if (this.phase === 1) {
-                // 画面左端に沿って天井近くまで急上昇
-                this.x = 68 + Math.sin(this.phaseTimer * 0.1) * 8;
-                this.y -= 4.4;
-                if (this.y <= minY + 10) {
-                    this.y = minY + 10;
-                    this.phase = 2;
-                }
-            } else if (this.phase === 2) {
-                // 天井付近に沿って画面右端まで横断巡回
-                this.x += 4.6;
-                const targetY = minY + 12 + Math.sin(this.phaseTimer * 0.12) * 10;
-                this.y += (targetY - this.y) * 0.22;
-                if (this.x >= 690) {
-                    this.x = 690;
-                    this.phase = 3;
-                }
-            } else if (this.phase === 3) {
-                // 画面右端に沿って下降
-                this.x = 690 + Math.cos(this.phaseTimer * 0.1) * 8;
-                this.y += 4.3;
-                if (this.y >= maxY - 36) {
-                    this.phase = 4;
-                    const py = (typeof player !== 'undefined' && player) ? player.y : midY;
-                    this.vy = Math.max(-2.8, Math.min(2.8, (py - this.y) * 0.018));
-                }
-            } else {
-                // 最後に自機高度へ切り込みながら左へ離脱
-                this.x -= 4.4;
-                this.y += this.vy + Math.cos(this.phaseTimer * 0.09) * 2.2;
-                if (this.y < minY) { this.y = minY; this.vy = Math.abs(this.vy); }
-                if (this.y > maxY) { this.y = maxY; this.vy = -Math.abs(this.vy); }
-            }
-        } else if (this.pattern === 'FIGURE_EIGHT') {
-            // ★画面全域を使った巨大8の字（∞）巡回軌道！
-            if (this.phase === 0) {
-                // 右端から画面中央へ進入
-                this.x -= 4.4;
-                this.y += (midY - this.y) * 0.12;
-                if (this.x <= 400) {
-                    this.phase = 1;
-                    this.phaseTimer = 0;
-                }
-            } else if (this.phase === 1) {
-                // リサージュ曲線（巨大8の字）で画面左端〜右端・天井〜床をダイナミックに1周巡回
-                const t = this.phaseTimer * 0.026;
-                const targetX = 400 - Math.sin(t) * 310;
-                const targetY = midY + Math.sin(t * 2) * ((maxY - minY) * 0.45);
-                this.x += (targetX - this.x) * 0.28;
-                this.y += (targetY - this.y) * 0.28;
-                if (this.y < minY) this.y = minY;
-                if (this.y > maxY) this.y = maxY;
-                if (t >= Math.PI * 2.25) {
-                    this.phase = 2;
-                }
-            } else {
-                this.x -= 4.5;
-                this.y += Math.sin(this.phaseTimer * 0.08) * 2.5;
-                if (this.y < minY) this.y = minY;
-                if (this.y > maxY) this.y = maxY;
-            }
-        } else if (this.pattern === 'ZIGZAG_BOX') {
-            // ★画面いっぱいを上下バウンド＆左右往復で埋め尽くすジグザグ巡回！
-            if (this.phase === 0) {
-                this.x += this.vx;
-                this.y += this.vy;
-                if (this.y <= minY) {
-                    this.y = minY;
-                    this.vy = Math.abs(this.vy);
-                } else if (this.y >= maxY) {
-                    this.y = maxY;
-                    this.vy = -Math.abs(this.vy);
-                }
-                if (this.x <= 95) {
-                    this.phase = 1;
-                    this.phaseTimer = 0;
-                    this.vx = 0;
-                    const py = (typeof player !== 'undefined' && player) ? player.y : 300;
-                    this.vy = (py > this.y) ? 3.8 : -3.8;
-                }
-            } else if (this.phase === 1) {
-                this.y += this.vy;
-                if (this.y <= minY) { this.y = minY; this.vy = Math.abs(this.vy); }
-                if (this.y >= maxY) { this.y = maxY; this.vy = -Math.abs(this.vy); }
-                if (this.phaseTimer >= 34) {
-                    this.phase = 2;
-                    this.phaseTimer = 0;
-                    this.vx = 4.2;
-                    this.vy = (this.vy > 0 ? 3.0 : -3.0);
-                }
-            } else if (this.phase === 2) {
-                this.x += this.vx;
-                this.y += this.vy;
-                if (this.y <= minY) { this.y = minY; this.vy = Math.abs(this.vy); }
-                if (this.y >= maxY) { this.y = maxY; this.vy = -Math.abs(this.vy); }
-                if (this.x >= 660 || this.phaseTimer >= 120) {
-                    this.phase = 3;
-                    this.vx = -4.6;
-                    const py = (typeof player !== 'undefined' && player) ? player.y : this.y;
-                    this.vy = Math.max(-2.8, Math.min(2.8, (py - this.y) * 0.03));
-                }
-            } else {
-                this.x += this.vx;
-                this.y += this.vy;
-                if (this.y <= minY) { this.y = minY; this.vy = Math.abs(this.vy); }
-                if (this.y >= maxY) { this.y = maxY; this.vy = -Math.abs(this.vy); }
-            }
-        } else if (this.pattern === 'LEFT_AMBUSH') {
-            // ★画面左端（自機の背後）から順番に出現し、画面右端まで横断してから大波で戻ってくる包囲巡回！
-            if (this.phase === 0) {
-                this.x += 4.5;
-                this.y += Math.sin(this.phaseTimer * 0.09) * 2.8;
-                if (this.y < minY) this.y = minY;
-                if (this.y > maxY) this.y = maxY;
-                if (this.x >= 680) {
-                    this.phase = 1;
-                    this.vx = -4.2;
-                    this.vy = (this.y < 300) ? 3.5 : -3.5;
-                }
-            } else {
-                this.x += this.vx;
-                this.y += this.vy;
-                if (this.y <= minY) { this.y = minY; this.vy = Math.abs(this.vy); }
-                if (this.y >= maxY) { this.y = maxY; this.vy = -Math.abs(this.vy); }
-            }
-        } else {
-            // WAVE_SWEEP: 画面上下いっぱいにうねる大振幅コサイン波で横断
-            this.x -= 3.8;
-            this.y = midY + Math.sin(this.phaseTimer * 0.065) * ((maxY - minY) * 0.46);
-            if (this.y < minY) this.y = minY;
-            if (this.y > maxY) this.y = maxY;
+        // ボス前巡回フェーズ終了時は速やかに左方向へ整然と退場
+        if (rushEnded && this.phase !== 8) {
+            this.phase = 8;
         }
 
-        if (this.x < -110 || this.x > 920) {
+        if (this.phase === 0) {
+            // 0. 右上から出現し、上段レーンを左端へ整然と直進
+            this.y = topLaneY;
+            this.x -= spd;
+            if (this.x <= leftLaneX) {
+                this.x = leftLaneX;
+                this.phase = 1;
+            }
+        } else if (this.phase === 1) {
+            // 1. 左端レーンを上段から下段へ垂直降下
+            this.x = leftLaneX;
+            this.y += spd;
+            if (this.y >= botLaneY) {
+                this.y = botLaneY;
+                this.phase = 2;
+            }
+        } else if (this.phase === 2) {
+            // 2. 下段レーンを左端から右端へ整然と水平移動
+            this.y = botLaneY;
+            this.x += spd;
+            if (this.x >= rightLaneX) {
+                this.x = rightLaneX;
+                this.phase = 3;
+            }
+        } else if (this.phase === 3) {
+            // 3. 右端レーンを下段から中上段へ垂直上昇
+            this.x = rightLaneX;
+            this.y -= spd;
+            if (this.y <= innerTopY) {
+                this.y = innerTopY;
+                this.phase = 4;
+            }
+        } else if (this.phase === 4) {
+            // 4. 内周・中上段レーンを右から左へ水平巡回
+            this.y = innerTopY;
+            this.x -= spd;
+            if (this.x <= innerLeftX) {
+                this.x = innerLeftX;
+                this.phase = 5;
+            }
+        } else if (this.phase === 5) {
+            // 5. 内周・左レーンを中下段へ垂直降下
+            this.x = innerLeftX;
+            this.y += spd;
+            if (this.y >= innerBotY) {
+                this.y = innerBotY;
+                this.phase = 6;
+            }
+        } else if (this.phase === 6) {
+            // 6. 内周・中下段レーンを左から右へ水平巡回
+            this.y = innerBotY;
+            this.x += spd;
+            if (this.x >= innerRightX) {
+                this.x = innerRightX;
+                this.phase = 7;
+            }
+        } else if (this.phase === 7) {
+            // 7. 内周・右レーンから再び上段レーンへ垂直上昇して2周目へ（または退場）
+            this.x = innerRightX;
+            this.y -= spd;
+            if (this.y <= topLaneY) {
+                this.y = topLaneY;
+                this.lapCount++;
+                if (this.lapCount < 2 && !rushEnded) {
+                    this.phase = 0;
+                } else {
+                    this.phase = 8;
+                }
+            }
+        } else {
+            // 8. 巡回完了後、左端へ整然と直進離脱
+            this.x -= spd * 1.35;
+        }
+
+        if (this.x < -140 || this.x > 960) {
             this.active = false;
         }
     }
@@ -458,156 +358,191 @@ class IronMaidenEnemy extends Enemy {
         const cy = this.y + this.height / 2;
         ctx.translate(cx, cy);
 
-        // クラゲの傘が呼吸するように脈動するスケール演出
-        const bellPulse = Math.sin(this.tentaclePhase) * 0.05;
-        ctx.scale(1 + bellPulse, 1 - bellPulse * 0.7);
-
-        const isFlash = (this.flashTimer > 0) || (this.hp < this.maxHp && Math.floor(Date.now() / 55) % 2 === 0);
+        const isFlash = (this.flashTimer > 0);
+        const rx = 45; // 傘の横半径 (全幅90px)
 
         // =========================================================
-        // 1. 下部の機械触手脚（5本の多関節メカテンタクルがクラゲのようにうねる）
+        // 1. 下部メカニカルボディ (重厚な八角形コアハウジング＆サイドスラスターポッド)
         // =========================================================
-        const tentacleOffsets = [-17, -8.5, 0, 8.5, 17];
-        tentacleOffsets.forEach((tx, idx) => {
-            const wave1 = Math.sin(this.tentaclePhase + idx * 0.75) * 6.5;
-            const wave2 = Math.cos(this.tentaclePhase * 1.15 + idx * 0.9) * 8.5;
-            const baseY = 5;
-            const midY = 16;
-            const tipY = 27 + (idx === 2 ? 3 : 0);
-
-            // 触手ケーブル本体
-            ctx.strokeStyle = isFlash ? '#ffffff' : (this.isRed ? '#fda4af' : '#94a3b8');
-            ctx.lineWidth = 3.6;
-            ctx.lineCap = 'round';
+        // 左右の重装スタビライザー＆バーニアポッド
+        [-28, 16].forEach((bx, sideIdx) => {
+            const podGrad = ctx.createLinearGradient(bx, 4, bx + 12, 34);
+            if (isFlash) {
+                podGrad.addColorStop(0, '#ffffff');
+                podGrad.addColorStop(1, '#fde047');
+            } else {
+                podGrad.addColorStop(0, '#94a3b8');
+                podGrad.addColorStop(0.5, '#475569');
+                podGrad.addColorStop(1, '#0f172a');
+            }
+            ctx.fillStyle = podGrad;
             ctx.beginPath();
-            ctx.moveTo(tx, baseY);
-            ctx.quadraticCurveTo(tx + wave1, midY, tx + wave2, tipY);
+            ctx.moveTo(bx, 4);
+            ctx.lineTo(bx + 12, 4);
+            ctx.lineTo(bx + 10, 32);
+            ctx.lineTo(bx + 2, 32);
+            ctx.closePath();
+            ctx.fill();
+            ctx.strokeStyle = '#0f172a';
+            ctx.lineWidth = 1.8;
             ctx.stroke();
 
-            // 触手の中間装甲リング節
-            ctx.fillStyle = isFlash ? '#fde047' : '#334155';
-            ctx.beginPath();
-            ctx.arc(tx + wave1 * 0.55, (baseY + midY) * 0.5 + 2, 2.6, 0, Math.PI * 2);
-            ctx.fill();
-
-            // 触手先端の発光クロー（放電ノード）
-            ctx.fillStyle = isFlash ? '#ffffff' : (this.isRed ? '#ff2255' : '#00f2fe');
-            ctx.shadowColor = this.isRed ? '#ff0044' : '#00ffff';
-            ctx.shadowBlur = 6;
-            ctx.beginPath();
-            ctx.arc(tx + wave2, tipY, 3.2, 0, Math.PI * 2);
-            ctx.fill();
-            ctx.shadowBlur = 0;
+            // 下向きスラスターノズル
+            ctx.fillStyle = isFlash ? '#ffffff' : '#f97316';
+            ctx.fillRect(bx + 3, 32, 6, 4);
         });
 
-        // =========================================================
-        // 2. 傘の下部ロータリータービン・スカート（高速回転する機械リング）
-        // =========================================================
-        ctx.fillStyle = '#0f172a';
+        // 中央の重装メカニカルボディ本体
+        const bodyGrad = ctx.createLinearGradient(-22, 2, 22, 38);
+        if (isFlash) {
+            bodyGrad.addColorStop(0.0, '#ffffff');
+            bodyGrad.addColorStop(0.6, '#fde047');
+            bodyGrad.addColorStop(1.0, '#ea580c');
+        } else if (this.isRed) {
+            bodyGrad.addColorStop(0.0, '#fda4af');
+            bodyGrad.addColorStop(0.45, '#be123c');
+            bodyGrad.addColorStop(1.0, '#4c0519');
+        } else {
+            bodyGrad.addColorStop(0.0, '#cbd5e1');
+            bodyGrad.addColorStop(0.45, '#475569');
+            bodyGrad.addColorStop(1.0, '#0f172a');
+        }
+        ctx.fillStyle = bodyGrad;
         ctx.beginPath();
-        ctx.ellipse(0, 5, 23, 6.5, 0, 0, Math.PI * 2);
+        ctx.moveTo(-22, 2);
+        ctx.lineTo(22, 2);
+        ctx.lineTo(18, 30);
+        ctx.lineTo(10, 38);
+        ctx.lineTo(-10, 38);
+        ctx.lineTo(-18, 30);
+        ctx.closePath();
         ctx.fill();
-        ctx.strokeStyle = isFlash ? '#ffffff' : '#64748b';
-        ctx.lineWidth = 1.6;
+        ctx.strokeStyle = '#090d16';
+        ctx.lineWidth = 2.2;
         ctx.stroke();
 
-        // 回転するタービンスリット発光孔
-        for (let k = -2; k <= 2; k++) {
-            const slotX = k * 7.5 + Math.sin(this.spinAngle * 2) * 2.5;
-            ctx.fillStyle = isFlash ? '#ffffff' : (k % 2 === 0 ? '#ff6600' : '#38bdf8');
-            ctx.fillRect(slotX - 2, 3, 4, 4);
+        // ボディ前面の装甲パネルライン＆リベット
+        ctx.strokeStyle = 'rgba(15, 23, 42, 0.75)';
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.moveTo(-14, 6);
+        ctx.lineTo(-10, 34);
+        ctx.moveTo(14, 6);
+        ctx.lineTo(10, 34);
+        ctx.moveTo(-16, 25);
+        ctx.lineTo(16, 25);
+        ctx.stroke();
+
+        // ボディ中央の赤熱リアクタースリット＆回転スキャナーアイ
+        ctx.fillStyle = '#020617';
+        ctx.fillRect(-15, 11, 30, 11);
+        ctx.strokeStyle = '#64748b';
+        ctx.lineWidth = 1.2;
+        ctx.strokeRect(-15, 11, 30, 11);
+
+        const coreGlow = 0.7 + Math.sin(this.spinAngle * 2.5) * 0.3;
+        ctx.fillStyle = isFlash ? '#ffffff' : `rgba(255, 50, 15, ${coreGlow})`;
+        ctx.shadowColor = '#ff2200';
+        ctx.shadowBlur = 10;
+        ctx.fillRect(-12, 13.5, 24, 6);
+
+        const scanX = Math.sin(this.spinAngle * 1.4) * 8;
+        ctx.fillStyle = '#ffffaa';
+        ctx.beginPath();
+        ctx.arc(scanX, 16.5, 2.8, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.shadowBlur = 0;
+
+        // =========================================================
+        // 2. 傘とボディを繋ぐロータリー・ジョイントリング
+        // =========================================================
+        ctx.fillStyle = '#0f172a';
+        ctx.fillRect(-34, -2, 68, 7);
+        ctx.strokeStyle = '#475569';
+        ctx.lineWidth = 1.5;
+        ctx.strokeRect(-34, -2, 68, 7);
+
+        for (let i = -3; i <= 3; i++) {
+            const ventX = i * 9 + Math.sin(this.spinAngle * 2) * 2;
+            ctx.fillStyle = isFlash ? '#ffffff' : (i % 2 === 0 ? '#38bdf8' : '#f97316');
+            ctx.fillRect(ventX - 2.5, -0.5, 5, 4);
         }
 
         // =========================================================
-        // 3. 大型クラゲ傘ドーム装甲（重厚な半球状メタリック・アンブレラシェル）
+        // 3. 上部の大型重装甲アンブレラ（傘型ドームキャノピー）
         // =========================================================
-        const domeGrad = ctx.createRadialGradient(-8, -14, 3, 0, -4, 27);
+        const domeGrad = ctx.createRadialGradient(-14, -22, 4, 0, -8, rx);
         if (isFlash) {
             domeGrad.addColorStop(0.0, '#ffffff');
             domeGrad.addColorStop(0.55, '#fde047');
             domeGrad.addColorStop(1.0, '#ea580c');
         } else if (this.isRed) {
             domeGrad.addColorStop(0.0, '#ffffff');
-            domeGrad.addColorStop(0.25, '#fecdd3');
-            domeGrad.addColorStop(0.60, '#e11d48');
-            domeGrad.addColorStop(1.0, '#4c0519');
+            domeGrad.addColorStop(0.22, '#fecdd3');
+            domeGrad.addColorStop(0.55, '#e11d48');
+            domeGrad.addColorStop(0.85, '#881337');
+            domeGrad.addColorStop(1.0, '#310413');
         } else {
             domeGrad.addColorStop(0.0, '#ffffff');
-            domeGrad.addColorStop(0.25, '#e0f2fe');
-            domeGrad.addColorStop(0.58, '#38bdf8');
-            domeGrad.addColorStop(0.85, '#1e3a8a');
-            domeGrad.addColorStop(1.0, '#0f172a');
+            domeGrad.addColorStop(0.22, '#e2e8f0');
+            domeGrad.addColorStop(0.52, '#64748b');
+            domeGrad.addColorStop(0.82, '#1e293b');
+            domeGrad.addColorStop(1.0, '#090d16');
         }
 
         ctx.fillStyle = domeGrad;
         ctx.beginPath();
-        // 上部の丸いクラゲ傘ドーム（半径26px）
-        ctx.arc(0, 4, 26, Math.PI, 0, false);
-        // 傘の裾野の波形スカラップ（クラゲ特有の傘の縁の切れ込み造形）
-        ctx.quadraticCurveTo(19, 9, 13, 5);
-        ctx.quadraticCurveTo(6.5, 9, 0, 5);
-        ctx.quadraticCurveTo(-6.5, 9, -13, 5);
-        ctx.quadraticCurveTo(-19, 9, -26, 4);
+        // 大型ドーム傘（半径45px、高さ38pxの重厚な傘型シルエット）
+        ctx.ellipse(0, -2, rx, 36, 0, Math.PI, 0, false);
+        ctx.lineTo(rx, -2);
+        ctx.lineTo(-rx, -2);
         ctx.closePath();
         ctx.fill();
 
-        ctx.strokeStyle = isFlash ? '#ffffff' : '#0f172a';
-        ctx.lineWidth = 2.2;
+        ctx.strokeStyle = isFlash ? '#ffffff' : '#090d16';
+        ctx.lineWidth = 2.5;
         ctx.stroke();
 
-        // 傘の表面を立体的に回転するアーマーリブ（縦縞フレーム）
-        ctx.strokeStyle = isFlash ? 'rgba(255,255,255,0.8)' : 'rgba(15, 23, 42, 0.65)';
-        ctx.lineWidth = 1.8;
-        for (let r = -2; r <= 2; r++) {
-            const ribX = Math.sin(this.spinAngle * 0.7 + r * 0.62) * 21;
+        // 傘の表面を分割する装甲リブプレート（回転感を出す立体スリット）
+        ctx.strokeStyle = isFlash ? 'rgba(255,255,255,0.85)' : 'rgba(15, 23, 42, 0.72)';
+        ctx.lineWidth = 2.0;
+        for (let r = -3; r <= 3; r++) {
+            const ribX = Math.sin(this.spinAngle * 0.55 + r * 0.44) * (rx - 4);
             ctx.beginPath();
-            ctx.moveTo(0, -22);
-            ctx.quadraticCurveTo(ribX, -10, ribX * 0.92, 4);
+            ctx.moveTo(ribX * 0.15, -37);
+            ctx.quadraticCurveTo(ribX, -18, ribX, -3);
             ctx.stroke();
         }
 
-        // 傘の左右に張り出したスタビライザー突起
-        ctx.fillStyle = isFlash ? '#ffffff' : (this.isRed ? '#fb7185' : '#cbd5e1');
-        [-26, 26].forEach(sx => {
-            const sign = sx < 0 ? -1 : 1;
-            ctx.beginPath();
-            ctx.moveTo(sx, -2);
-            ctx.lineTo(sx + sign * 5, 2);
-            ctx.lineTo(sx, 6);
-            ctx.closePath();
-            ctx.fill();
-        });
-
-        // =========================================================
-        // 4. 傘ドーム内部に透けて輝く「灼熱レッドコア（弱点エネルギー核）」
-        // =========================================================
-        ctx.fillStyle = 'rgba(2, 6, 23, 0.82)';
+        // 傘の中段にあるメカニカル装甲リング帯＆センサー窓
+        ctx.fillStyle = 'rgba(9, 13, 22, 0.80)';
         ctx.beginPath();
-        ctx.ellipse(0, -6, 14, 8.5, 0, 0, Math.PI * 2);
+        ctx.ellipse(0, -16, 20, 7, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.strokeStyle = isFlash ? '#ffffff' : '#94a3b8';
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
+
+        const topCoreGrad = ctx.createRadialGradient(-3, -18, 1, 0, -16, 13);
+        topCoreGrad.addColorStop(0.0, '#ffffff');
+        topCoreGrad.addColorStop(0.35, '#fde047');
+        topCoreGrad.addColorStop(0.75, '#ff2200');
+        topCoreGrad.addColorStop(1.0, '#7f1d1d');
+        ctx.fillStyle = topCoreGrad;
+        ctx.beginPath();
+        ctx.ellipse(0, -16, 14, 4.8, 0, 0, Math.PI * 2);
         ctx.fill();
 
-        const coreGlow = 0.75 + Math.sin(this.spinAngle * 2.5) * 0.25;
-        const coreGrad = ctx.createRadialGradient(-2, -8, 1, 0, -6, 11);
-        coreGrad.addColorStop(0.0, '#ffffff');
-        coreGrad.addColorStop(0.35, '#fde047');
-        coreGrad.addColorStop(0.70, '#ff2200');
-        coreGrad.addColorStop(1.0, 'rgba(153, 27, 27, 0)');
-
-        ctx.save();
-        ctx.shadowColor = '#ff2200';
-        ctx.shadowBlur = 14 * coreGlow;
-        ctx.fillStyle = coreGrad;
-        ctx.beginPath();
-        ctx.ellipse(0, -6, 11, 6.8, 0, 0, Math.PI * 2);
-        ctx.fill();
-
-        // コア内部を走る回転光点
-        const eyeX = Math.sin(this.spinAngle * 1.6) * 6.5;
-        ctx.fillStyle = '#ffffff';
-        ctx.beginPath();
-        ctx.arc(eyeX, -6, 2.8, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.restore();
+        // 傘の下縁の重厚なフランジリム（傘のツバ装甲）
+        const rimGrad = ctx.createLinearGradient(-rx - 2, -5, rx + 2, 1);
+        rimGrad.addColorStop(0, '#475569');
+        rimGrad.addColorStop(0.5, '#cbd5e1');
+        rimGrad.addColorStop(1, '#1e293b');
+        ctx.fillStyle = isFlash ? '#ffffff' : rimGrad;
+        ctx.fillRect(-rx - 2, -5, (rx + 2) * 2, 6);
+        ctx.strokeStyle = '#090d16';
+        ctx.lineWidth = 1.8;
+        ctx.strokeRect(-rx - 2, -5, (rx + 2) * 2, 6);
 
         ctx.restore();
     }
@@ -1182,6 +1117,27 @@ class InvertedVolcanoTerrain {
         this.generating = false;
     }
 
+    // ★ボス前の大型傘＆ボディメカ巡回場面：スクロールを完全停止し、右上ゲートと巡回スペースを確保
+    preparePatrolArena() {
+        this.wallActive = true;
+        this.generating = true;
+        this.wallTransition = 1.0;
+        this.scrollSpeed = 0;
+        this.floatingIslands = [];
+
+        for (let i = 0; i < this.topHeights.length; i++) {
+            // 右上（出現口付近）は天井を高く開け、他も大型メカ(96x86)が整然と巡回できるよう高さを揃える
+            if (i >= 19) {
+                this.topHeights[i] = Math.min(this.topHeights[i], 42);
+            } else {
+                this.topHeights[i] = Math.min(this.topHeights[i], 68);
+            }
+        }
+        for (let i = 0; i < this.bottomHeights.length; i++) {
+            this.bottomHeights[i] = Math.max(this.bottomHeights[i], this.height - 68);
+        }
+    }
+
     getTopY(x) {
         if (!this.wallActive) return 0;
         const clampedTransition = Math.max(0, Math.min(1, this.wallTransition));
@@ -1236,14 +1192,16 @@ class InvertedVolcanoTerrain {
     update(dt = 16.6, canSpawnTerrainEnemies = true) {
         if (!this.active) return;
 
-        // 星空スクロール
-        this.stars.forEach(s => {
-            s.x -= s.speed;
-            if (s.x < 0) {
-                s.x = this.width;
-                s.y = Math.random() * this.height;
-            }
-        });
+        // 星空スクロール（スクロール停止場面では背景の星もピタッと止める）
+        if (this.scrollSpeed > 0) {
+            this.stars.forEach(s => {
+                s.x -= s.speed;
+                if (s.x < 0) {
+                    s.x = this.width;
+                    s.y = Math.random() * this.height;
+                }
+            });
+        }
 
         if (!this.wallActive) return;
 
@@ -1995,53 +1953,42 @@ class Stage4 {
         this.terrain.start();
     }
 
-    // ★iPadボタンやショートカットから即座に「ボス前の大型クラゲロボット巡回ラッシュ」を開始するヘルパー
-    startJellyfishRush() {
+    // ★ボス前の大型傘＆ボディメカ巡回場面へ突入（スクロールを止め、右上から整然と1列で出現させて画面を巡回させる）
+    _enterPatrolRush() {
         this.active = true;
         this.boss = null;
         if (!this.terrain.active) {
             this.terrain.start();
         }
-        if (!this.terrain.wallActive) {
-            this.terrain.startWalls();
-            this.terrain.wallTransition = 1.0;
-        }
-        this.terrain.generating = true;
-        this.terrain.scrollSpeed = this.terrain.baseScrollSpeed;
-        this.terrain.floatingIslands = [];
+        this.terrain.preparePatrolArena(); // ★スクロール完全停止 (scrollSpeed = 0) ＆ 巡回スペース確保
         this.islandSpawnedCount = this.islandSpawnTimes.length;
+
+        // 画面上に残っていた通常の雑魚・火山を整理し、大型メカの整然とした巡回に集中させる
+        if (typeof enemies !== 'undefined' && Array.isArray(enemies)) {
+            enemies.forEach(e => {
+                if (!(e instanceof IronMaidenEnemy)) {
+                    e.active = false;
+                }
+            });
+        }
 
         this.state = 'JELLYFISH_RUSH';
         this.stageTime = 41000;
-        this.jellyfishRushTimer = 26000; // 26秒間の大型クラゲロボ連続巡回クライマックス！
-        this.maidenWaveTimer = 2400;     // 直後に第1波が即出現するようセット
-        this.maidenWaveCount = 0;
+        this.jellyfishRushTimer = 25000; // 25秒間の巡回フェーズ
+        this.maidenWaveTimer = 0;
+        this.maidenWaveCount = 1;
+
+        // 右上から10機の大型傘＆ボディメカが一定間隔(42フレームおき)で整然と1列で出現し、画面を巡回する！
+        new IronMaidenSquad(10, 42);
 
         if (typeof Sound !== 'undefined' && typeof Sound.playStage4Bgm === 'function') {
             Sound.playStage4Bgm();
         }
     }
 
-    _spawnNextJellyfishPatrolWave() {
-        this.maidenWaveCount++;
-        // 動画通り：次々と順番に1列で現れて画面外周・8の字・ジグザグ・背後奇襲で画面いっぱいに巡回！
-        const waveConfigs = [
-            { pattern: 'GRAND_LOOP_CW',  startY: 135, count: 5, spacing: 15 },
-            { pattern: 'GRAND_LOOP_CCW', startY: 430, count: 5, spacing: 15 },
-            { pattern: 'FIGURE_EIGHT',   startY: 280, count: 6, spacing: 14 },
-            { pattern: 'ZIGZAG_BOX',     startY: 155, count: 5, spacing: 15 },
-            { pattern: 'LEFT_AMBUSH',    startY: 220, count: 5, spacing: 15 },
-            { pattern: 'GRAND_LOOP_CW',  startY: 140, count: 5, spacing: 14, dual: 'GRAND_LOOP_CCW' },
-            { pattern: 'FIGURE_EIGHT',   startY: 280, count: 6, spacing: 14, dual: 'ZIGZAG_BOX' }
-        ];
-        const cfg = waveConfigs[(this.maidenWaveCount - 1) % waveConfigs.length];
-        new IronMaidenSquad(cfg.pattern, cfg.startY, cfg.count, cfg.spacing);
-
-        // クライマックス後半は上下2列が同時に別ルートで巡回し、画面中がクラゲロボットで埋め尽くされる！
-        if (cfg.dual) {
-            const dualY = (cfg.startY < 260) ? 430 : 140;
-            new IronMaidenSquad(cfg.dual, dualY, 4, 16);
-        }
+    // ★iPadボタンやショートカットから即座に「ボス前の大型傘＆ボディメカ巡回場面」を開始するヘルパー
+    startJellyfishRush() {
+        this._enterPatrolRush();
     }
 
     update(dt) {
@@ -2055,11 +2002,11 @@ class Stage4 {
                 this.terrain.startWalls();
             }
 
-            const canSpawnTerrainEnemies = (this.stageTime >= 8500 && this.stageTime < 40500);
+            const canSpawnTerrainEnemies = (this.stageTime >= 8500 && this.stageTime < 39500);
             this.terrain.update(dt, canSpawnTerrainEnemies);
 
             // 2. 空中編隊の出現（ファン・ガルン・ザブ・ルグラでカプセル補給）
-            if (this.stageTime < 40500) {
+            if (this.stageTime < 39500) {
                 this.updateFlyingEnemies(dt);
             }
 
@@ -2081,29 +2028,28 @@ class Stage4 {
                 this.islandSpawnedCount++;
             }
 
-            // 4. ★41秒経過でボス前のクライマックス「大型クラゲロボット順次出現＆画面全域巡回ラッシュ」へ突入！
-            // （動画の通り、逆火山噴火で停止するのではなく、硬い大型クラゲロボが次々と順番に出てきて画面いっぱいに巡回する）
+            // 4. ★41秒経過で画面スクロールを止め、右上から大型の傘＆ボディメカが整然と出現して巡回する場面へ突入！
             if (this.stageTime >= 41000) {
-                this.state = 'JELLYFISH_RUSH';
-                this.jellyfishRushTimer = 26000; // 26秒間の大型クラゲロボ大巡回地帯
-                this.maidenWaveTimer = 2600;     // 即座に第1波を出撃させる
-                this.maidenWaveCount = 0;
+                this._enterPatrolRush();
             }
 
         } else if (this.state === 'JELLYFISH_RUSH') {
-            // 逆火山地形をスクロールさせ続けながら、大型クラゲロボット編隊を次々と順番に送り出す！
+            // ★この場面はスクロールを止める (scrollSpeed = 0)
+            this.terrain.scrollSpeed = 0;
             this.terrain.update(dt, false);
             this.jellyfishRushTimer -= dt;
-            this.maidenWaveTimer += dt;
 
-            // 約2.6秒ごとに次のクラゲロボット巡回小隊（5〜6機ずつ順番に出現）を投入！
-            if (this.maidenWaveTimer >= 2600 && this.jellyfishRushTimer > 2800) {
-                this.maidenWaveTimer = 0;
-                this._spawnNextJellyfishPatrolWave();
+            let activeMaidenCount = 0;
+            if (typeof enemies !== 'undefined' && Array.isArray(enemies)) {
+                for (let i = 0; i < enemies.length; i++) {
+                    if (enemies[i].active && enemies[i] instanceof IronMaidenEnemy) {
+                        activeMaidenCount++;
+                    }
+                }
             }
 
-            // クラゲロボット大巡回地帯を突破したら地形生成を終了してボス戦へ！
-            if (this.jellyfishRushTimer <= 0) {
+            // 巡回メカがすべて退場／撃破されるか、制限時間が経過したらスクロールを再開してボス戦へ！
+            if (this.jellyfishRushTimer <= 0 || (this.jellyfishRushTimer < 22000 && activeMaidenCount === 0)) {
                 this.jellyfishRushTimer = 0;
                 this.terrain.scrollSpeed = 4.2;
                 this.terrain.stopGenerating();
@@ -2206,12 +2152,12 @@ class Stage4 {
             ctx.fillStyle = `rgba(255, 235, 120, ${alpha})`;
             ctx.shadowColor = '#ff8800';
             ctx.shadowBlur = 8;
-            ctx.fillText('BEWARE OF JUMPERS, CEILING VOLCANOES & JELLYFISH MECHS!', this.width / 2, this.height / 2 + 10);
+            ctx.fillText('BEWARE OF JUMPERS, CEILING VOLCANOES & IRON MAIDENS!', this.width / 2, this.height / 2 + 10);
 
             ctx.restore();
         }
 
-        // 2. ボス前：大型クラゲロボット（アイアンメイデン）大巡回ラッシュHUD表示
+        // 2. ボス前：大型傘＆ボディ重装メカ（アイアンメイデン）整然巡回HUD表示
         if (this.state === 'JELLYFISH_RUSH') {
             ctx.save();
             const remainSec = Math.max(0, (this.jellyfishRushTimer / 1000)).toFixed(1);
@@ -2228,13 +2174,13 @@ class Stage4 {
             ctx.fillStyle = '#38bdf8';
             ctx.shadowColor = '#0284c7';
             ctx.shadowBlur = 10;
-            ctx.fillText('WARNING: ARMORED JELLYFISH MECH PATROL SWARM!', this.width / 2, 34);
+            ctx.fillText('WARNING: HEAVY ARMORED MECH PATROL IN PROGRESS!', this.width / 2, 34);
 
             ctx.font = 'bold 16px "Courier New", monospace';
             ctx.fillStyle = '#fde047';
             ctx.shadowColor = '#ea580c';
             ctx.shadowBlur = 8;
-            ctx.fillText(`PATROL WAVE #${Math.max(1, this.maidenWaveCount)} - BOSS IN : ${remainSec}s`, this.width / 2, 55);
+            ctx.fillText(`SCROLL LOCKED - BOSS IN : ${remainSec}s`, this.width / 2, 55);
 
             ctx.restore();
         } else if (this.state === 'POST_RUSH' || this.state === 'POST_VOLCANO') {
@@ -2244,7 +2190,7 @@ class Stage4 {
             ctx.fillStyle = '#00ffff';
             ctx.shadowColor = '#0088ff';
             ctx.shadowBlur = 10;
-            ctx.fillText('PATROL SWARM CLEARED - MAGMA BIG CORE APPROACHING!', this.width / 2, 48);
+            ctx.fillText('PATROL UNIT CLEARED - MAGMA BIG CORE APPROACHING!', this.width / 2, 48);
             ctx.restore();
         }
 

@@ -780,13 +780,24 @@ function handleCollisions() {
             if (typeof WarpSphereEnemy !== 'undefined' && enemy instanceof WarpSphereEnemy && enemy.state === 'WARPING') return;
 
             if (bullet.active && enemy.active && checkCollision(bullet, enemy)) {
-                if (!(bullet instanceof Laser)) {
+                const isIronMaiden = (typeof IronMaidenEnemy !== 'undefined' && enemy instanceof IronMaidenEnemy);
+                if (isIronMaiden) {
+                    // 大型傘＆ボディ重装メカはレーザーも貫通せず弾き止め、クールダウン中はダメージを受けない重装甲仕様
                     bullet.active = false;
-                }
-                enemy.hp--;
-                if (typeof IronMaidenEnemy !== 'undefined' && enemy instanceof IronMaidenEnemy && enemy.hp > 0) {
-                    enemy.flashTimer = 6;
-                    if (typeof Sound !== 'undefined' && typeof Sound.playBossHit === 'function') Sound.playBossHit();
+                    if (enemy.hitCooldown > 0) {
+                        return;
+                    }
+                    enemy.hitCooldown = 5;
+                    enemy.hp--;
+                    if (enemy.hp > 0) {
+                        enemy.flashTimer = 5;
+                        if (typeof Sound !== 'undefined' && typeof Sound.playBossHit === 'function') Sound.playBossHit();
+                    }
+                } else {
+                    if (!(bullet instanceof Laser)) {
+                        bullet.active = false;
+                    }
+                    enemy.hp--;
                 }
                 if (enemy.hp <= 0) {
                     enemy.active = false;
@@ -828,6 +839,17 @@ function handleCollisions() {
         if (typeof InvertedSuperVolcano !== 'undefined' && enemy instanceof InvertedSuperVolcano) return;
 
         if (enemy.active && checkCollision(player, enemy)) {
+            if (typeof IronMaidenEnemy !== 'undefined' && enemy instanceof IronMaidenEnemy) {
+                // 大型重装メカは自機シールド体当たりでも簡単には壊れない
+                if (enemy.hitCooldown <= 0) {
+                    enemy.hitCooldown = 14;
+                    enemy.flashTimer = 6;
+                    if (typeof player.onHit === 'function') {
+                        player.onHit(enemy.x);
+                    }
+                }
+                return;
+            }
             if (player.shieldActive) {
                 if (enemy.x > player.x) {
                     player.shieldHp--;
