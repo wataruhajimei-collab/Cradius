@@ -2184,239 +2184,206 @@ class SoundManager {
     }
 
     // =========================================================================
-    // ボス戦BGM: 『AIRCRAFT CARRIER : DISSONANT FORTRESS ASSAULT』
-    // 176 BPM！強烈な不協和音（減5度トライトーン・短2度・減7度クラスター）と
-    // 腹の底をえぐる爆音パーカッション群＆16分小刻み重低音スラップ／ファズベースが
-    // 容赦なく刻み続ける、息もつかせぬ超緊迫・小刻みボスバトル曲！
+    // ボス戦＆1面火山噴火BGM: 『AIRCRAFT CARRIER (1985 ARCADE GRADIUS BOSS BGM)』
+    // 1985年本家アーケード版『グラディウス』ボス戦BGM「Aircraft Carrier」（東野美紀 作曲）を
+    // 実機基板（Konami 005289 波形メモリ2ch + AY-3-8910 PSG 3ch + パーカッション）の
+    // 楽譜データ（GRADI-AC.MUS / 134 BPM / 13ステップ半音階上昇イントロ＋64ステップ無限ループ）
+    // から1音1音・全5チャンネル対位法まで完全採譜！
     // =========================================================================
-    playBossBgm(forceRestart = false) {
-        if (!forceRestart && this.currentBgm === 'BOSS') return;
-        this.currentBgm = 'BOSS';
+    _startAircraftCarrierBgm(bgmTag) {
+        this.currentBgm = bgmTag;
 
-        // テンポ 176 BPM (息もつかせぬ小刻み高速アサルトビート)
-        const bpm = 176;
-        const totalSteps = 256; // 全16小節ループ (1小節=16ステップ)
+        // 実機オリジナルテンポ: t134 (134 BPM)
+        const bpm = 134;
+        // イントロ13ステップ (16分音符×13個の半音階上昇 c d- d e- e f g- g a- a b- b > c)
+        // ＋ 本編ループ4小節 (64ステップ) ＝ 全77ステップ (loopStartStep = 13)
+        const loopStartStep = 13;
+        const totalSteps = 77;
 
-        // === 1. 独立マルチレイヤー・ヘヴィパーカッション (同時発音で圧倒的な打撃密度！) ===
-        // (A) 重低音ツーバス＆シンコペーション・キック (1=通常重低音キック, 2=強アクセントキック)
-        const kBarA = [2,1,0,1, 1,0,1,1, 2,1,0,1, 1,1,0,1]; // 小刻みに腹を殴る変則16分キック！
-        const kBarB = [2,1,1,0, 1,1,0,1, 2,1,1,1, 0,1,1,1]; // 怒涛の連打キック
-        const kBarC = [2,0,1,1, 2,0,1,1, 2,1,1,0, 2,1,1,1]; // ポリリズム・ストンプキック
-        const kFill = [2,1,1,1, 2,1,1,1, 2,1,2,1, 2,2,2,2]; // 16分フル連打マシンガンツーバス！
-
-        const kickTrack = [
-            kBarA, kBarB, kBarA, kFill,
-            kBarC, kBarB, kBarC, kFill,
-            kBarA, kBarC, kBarB, kFill,
-            kBarC, kBarB, kFill, kFill
-        ].flat();
-
-        // (B) 爆音スネア＆インダストリアル金属パーカッション
-        // 1=爆音スネア, 2=インダストリアル金属アンビル打撃(Low), 3=インダストリアル金属打撃(High), 4=スネア+金属同時強打！
-        const snBarA = [0,0,2,0, 4,0,0,3, 0,2,0,3, 4,0,2,1]; // 裏拍に食い込む金属パーカッション＋爆音スネア
-        const snBarB = [0,3,0,2, 4,0,3,0, 2,0,3,0, 4,1,4,1]; // 小刻みな16分スネア＆アンビル乱打
-        const snBarC = [4,0,2,3, 0,4,0,2, 3,0,4,0, 1,1,4,4]; // 変拍子風ポリリズム強打
-        const snFill = [1,2,1,3, 4,1,2,3, 1,1,4,4, 4,4,4,4]; // 鼓膜と腹を揺らすパーカッション総攻撃フィル！
-
-        const snarePercTrack = [
-            snBarA, snBarB, snBarA, snFill,
-            snBarC, snBarB, snBarC, snFill,
-            snBarA, snBarC, snBarB, snFill,
-            snBarC, snBarB, snFill, snFill
-        ].flat();
-
-        // (C) 小刻みタム＆重低音ティンパニ・インターロック (常に低音打楽器がウネりながら刻む！)
-        // 1=HighTom(C4), 2=MidTom(Ab3), 3=LowTom(D3), 4=Timpani(D2), 5=Timpani(Ab1/減5度), 6=Timpani(Eb2/短2度)
-        const tmBarA = [4,0,1,2, 0,5,2,3, 4,0,1,3, 5,6,3,3];
-        const tmBarB = [5,0,2,3, 6,0,1,2, 5,4,2,3, 6,5,4,4];
-        const tmBarC = [4,5,0,6, 4,5,0,6, 1,2,3,4, 5,6,4,5];
-        const tmFill = [1,1,2,2, 3,3,4,4, 5,5,6,6, 4,5,6,4];
-
-        const tomTimpTrack = [
-            tmBarA, tmBarB, tmBarA, tmFill,
-            tmBarC, tmBarB, tmBarC, tmFill,
-            tmBarA, tmBarC, tmBarB, tmFill,
-            tmBarC, tmBarB, tmFill, tmFill
-        ].flat();
-
-        // (D) 16分レーザーハイハット＆大クラッシュシンバル (1=CloseHat, 2=OpenHat, 3=CrashCymbal)
-        const hcBarA = [3,1,2,1, 1,2,1,2, 1,1,2,1, 1,2,1,2];
-        const hcBarB = [1,1,2,1, 1,2,1,2, 3,1,2,1, 2,1,2,2];
-        const hcFill = [3,2,1,2, 3,2,1,2, 3,2,3,2, 3,3,3,3];
-
-        const hatCymTrack = [
-            hcBarA, hcBarB, hcBarA, hcFill,
-            hcBarA, hcBarB, hcBarA, hcFill,
-            hcBarA, hcBarB, hcBarA, hcFill,
-            hcBarA, hcBarB, hcFill, hcFill
-        ].flat();
-
-        // === 2. お腹に響く16分小刻み・不協和音ドライブベース (休符なしで16分音符をマシンガン刻み！) ===
-        // ルート(D)に対して短2度(Eb)・減5度トライトーン(Ab)・長7度(Cs)を小刻みに往復する凶悪ベースライン
-        const bRiffA = [D1,D2,Eb1,Eb2, Ab1,Ab2,D1,Eb1, Ab1,A1,Eb2,D2, Ab1,G1,Fs1,Eb1];
-        const bRiffB = [D1,Eb1,D2,Eb2, Ab1,A1,Ab2,G2,  Fs1,G1,Fs2,F2, E1,Eb1,Ab1,Eb1];
-        const bRiffC = [Eb1,Eb2,E1,E2, A1,A2,Bb1,Bb2,  Ab1,Ab2,D2,Db2, C2,B1,Bb1,Eb1];
-        const bRiffD = [D1,Ab1,Eb1,A1, D2,Ab2,Eb2,A2,  D1,Eb1,E1,F1,   Fs1,G1,Ab1,A1];
-        const bRiffE = [F1,F2,Fs1,Fs2, B1,B2,C2,C3,    Bb1,B1,F2,E2,   Eb2,D2,Ab1,Eb1];
-        const bRiffF = [E1,F1,Bb1,B1,  Eb1,E1,A1,Bb1,  D1,Eb1,Ab1,A1,  Db2,C2,B1,Eb1];
-
-        const bass = [
-            // 0-3: セクションA (トライトーン＆短2度マシンガン刻み)
-            bRiffA, bRiffB, bRiffA, bRiffD,
-            // 4-7: セクションB (半音上昇・変則オクターブ強襲)
-            bRiffC, bRiffB, bRiffC, bRiffD,
-            // 8-11: セクションC (高圧クロマチック・クライマックス)
-            bRiffE, bRiffF, bRiffE, bRiffD,
-            // 12-15: セクションD (狂乱のポリリズム・ディミニッシュ疾走)
-            bRiffF, bRiffB, bRiffD, bRiffF
-        ].flat();
-
-        // === 3. 強烈な不協和音クラスター・ブラス＆ギター・小刻みスタブ ===
-        // 16分音符で「ジャジャッ！ジャッ！ジャジャッ！」と鋭く切り裂く不協和音クラスター和音
-        // コード1: D + Eb(短2度) + Ab(減5度) + Cs(長7度)
-        // コード2: Eb + E(短2度) + A(減5度) + D(長7度)
-        // コード3: F + Fs(短2度) + B(減5度) + E(長7度)
-        // コード4: Ab + A(短2度) + D(減5度) + G(長7度)
-        const chords = {
-            1: [D3, Ab3, Cs4, Eb4],
-            2: [Eb3, A3, D4, E4],
-            3: [F3, B3, E4, Fs4],
-            4: [Ab3, D4, G4, A4],
-            5: [E3, Bb3, Eb4, F4]
-        };
-
-        const stBarA = [1,1,0,2, 0,1,2,0, 4,0,1,2, 0,4,2,1];
-        const stBarB = [2,0,2,1, 0,4,1,2, 0,2,4,0, 1,2,4,2];
-        const stBarC = [3,3,0,4, 0,3,4,0, 5,0,3,4, 0,5,4,3];
-        const stBarD = [1,2,4,1, 2,4,1,2, 3,4,5,3, 4,5,1,4];
-
-        const stabPattern = [
-            stBarA, stBarB, stBarA, stBarD,
-            stBarC, stBarB, stBarC, stBarD,
-            stBarC, stBarD, stBarC, stBarD,
-            stBarA, stBarC, stBarD, stBarD
-        ].flat();
-
-        // === 4. 16分小刻みディミニッシュ＆クロマチック・ストリングス・オスティナート ===
-        const sOstA = [D4,Eb4,Ab4,A4, D4,Eb4,Ab4,A4, Eb4,E4,A4,Bb4, Ab4,G4,Eb4,D4];
-        const sOstB = [Eb4,E4,A4,Bb4, Eb4,E4,A4,Bb4, F4,Fs4,B4,C5,  Bb4,A4,F4,Eb4];
-        const sOstC = [F4,Fs4,B4,C5,  Ab4,A4,D5,Eb5, B4,C5,F5,Fs5,  Eb5,D5,Ab4,A4];
-        const sOstD = [D4,Ab4,Eb4,A4, E4,Bb4,F4,B4,  Fs4,C5,G4,Cs5, Ab4,D5,A4,Eb5];
-
-        const strings = [
-            sOstA, sOstB, sOstA, sOstD,
-            sOstB, sOstC, sOstB, sOstD,
-            sOstC, sOstD, sOstC, sOstD,
-            sOstD, sOstB, sOstC, sOstD
-        ].flat();
-
-        // === 5. 小刻み・不協和音ボス主旋律 (16分音符で休まず刻みまくる凶悪スタッカート・リード) ===
-        // 従来の長い休符や伸ばし音を廃し、短2度・減5度・減7度を小刻みに跳躍する攻撃的フレーズ！
-        const leadA1 = [D5,Eb5,D5,Ab5, A5,Ab5,Eb5,D5, Ab5,G5,Fs5,F5, Eb5,D5,Ab5,Eb5];
-        const leadA2 = [D5,Eb5,F5,Fs5, Ab5,A5,C6,B5,  Bb5,A5,Ab5,G5, Fs5,F5,E5,Eb5];
-        const leadA3 = [D5,Eb5,D5,Ab5, A5,Ab5,Eb5,D5, B5,Bb5,A5,Ab5, G5,Fs5,F5,Eb5];
-        const leadA4 = [D5,Ab5,Eb5,A5, E5,Bb5,F5,B5,  Fs5,C6,G5,Cs6, D6,Eb6,Ab5,Eb5];
-
-        const leadB1 = [Eb5,E5,Eb5,A5, Bb5,A5,E5,Eb5, A5,Ab5,G5,Fs5, E5,Eb5,A5,E5];
-        const leadB2 = [F5,Fs5,F5,B5,  C6,B5,Fs5,F5,  B5,Bb5,A5,Ab5,Fs5,F5,B5,Fs5];
-        const leadB3 = [Ab5,A5,Ab5,D6, Eb6,D6,A5,Ab5, D6,Cs6,C6,B5,  Bb5,A5,Ab5,G5];
-        const leadB4 = [Fs5,G5,Ab5,A5, Bb5,B5,C6,Cs6, D6,Cs6,C6,B5,  Bb5,A5,Ab5,Eb5];
-
-        const leadC1 = [D6,Eb6,D6,Ab5, A5,Bb5,A5,Eb5, F5,Fs5,F5,B5,  C6,Cs6,D6,Eb6];
-        const leadC2 = [E6,Eb6,D6,Cs6, C6,B5,Bb5,A5,  Ab5,G5,Fs5,F5, E5,Eb5,D5,Cs5];
-        const leadC3 = [D6,Ab5,Eb6,A5, E6,Bb5,F6,B5,  Fs6,C6,G6,Cs6, Ab6,D6,Eb6,Ab5];
-        const leadC4 = [D6,Eb6,E6,F6,  Fs6,F6,E6,Eb6, D6,Ab5,A5,Eb5, D5,Eb5,Ab5,A5];
-
-        const bossLead = [
-            // 0-3
-            ...leadA1, ...leadA2, ...leadA3, ...leadA4,
-            // 4-7
-            ...leadB1, ...leadB2, ...leadB3, ...leadB4,
-            // 8-11
-            ...leadC1, ...leadC2, ...leadC3, ...leadC4,
-            // 12-15
-            ...leadA4, ...leadB3, ...leadC3, ...leadC4
+        // --- イントロ (Steps 0..12, 13ステップ): 全5チャンネル3オクターブ・ユニゾン半音階上昇 ---
+        const introO4 = [
+            [C4,1], [Db4,1], [D4,1], [Eb4,1], [E4,1], [F4,1],
+            [Gb4,1], [G4,1], [Ab4,1], [A4,1], [Bb4,1], [B4,1], [C5,1]
+        ];
+        const introO3 = [
+            [C3,1], [Db3,1], [D3,1], [Eb3,1], [E3,1], [F3,1],
+            [Gb3,1], [G3,1], [Ab3,1], [A3,1], [Bb3,1], [B3,1], [C4,1]
+        ];
+        const introO2 = [
+            [C2,1], [Db2,1], [D2,1], [Eb2,1], [E2,1], [F2,1],
+            [Gb2,1], [G2,1], [Ab2,1], [A2,1], [Bb2,1], [B2,1], [C3,1]
         ];
 
-        // === 6. 不協和音クラッシュ対旋律 (主旋律に対して減5度トライトーン[-6]＆短2度[-1]/長7度[-11]でぶつかる凶悪ハモリ！) ===
-        const bossClash = bossLead.map((note, idx) => {
-            if (note <= 0) return 0;
-            // 偶数ステップは減5度下(-6: トライトーン)、奇数ステップは長7度下(-11: 半音衝突)または短2度上(+1)で強烈な不協和音を作る！
-            if (idx % 4 === 0) return note - 6;  // トライトーン（増4度/減5度）
-            if (idx % 4 === 1) return note - 11; // 長7度（オクターブ半音衝突）
-            if (idx % 4 === 2) return note - 6;  // トライトーン
-            return note + 1;                     // 短2度クラスター衝突！
-        });
+        // --- ループ部 (Steps 13..76, 4小節 = 64ステップ) の基本モチーフ ---
+        // f>fcd<g>fcd<a>fcd<g>fcd (16ステップ: F-F-C-D / G-F-C-D / A-F-C-D / G-F-C-D)
+        const ostinatoF_o4 = [
+            [F4,1], [F5,1], [C5,1], [D5,1],
+            [G4,1], [F5,1], [C5,1], [D5,1],
+            [A4,1], [F5,1], [C5,1], [D5,1],
+            [G4,1], [F5,1], [C5,1], [D5,1]
+        ];
+        const ostinatoF_o3 = [
+            [F3,1], [F4,1], [C4,1], [D4,1],
+            [G3,1], [F4,1], [C4,1], [D4,1],
+            [A3,1], [F4,1], [C4,1], [D4,1],
+            [G3,1], [F4,1], [C4,1], [D4,1]
+        ];
+
+        // aagaaagaaagaaaga (16ステップ: ループ3小節目の高音反復モチーフ)
+        const highA_o5 = [
+            [A5,1], [A5,1], [G5,1], [A5,1],
+            [A5,1], [A5,1], [G5,1], [A5,1],
+            [A5,1], [A5,1], [G5,1], [A5,1],
+            [A5,1], [A5,1], [G5,1], [A5,1]
+        ];
+        const highA_o4 = [
+            [A4,1], [A4,1], [G4,1], [A4,1],
+            [A4,1], [A4,1], [G4,1], [A4,1],
+            [A4,1], [A4,1], [G4,1], [A4,1],
+            [A4,1], [A4,1], [G4,1], [A4,1]
+        ];
+
+        // >cc<b->ccc<b->ccc<b->ccc<b->c (16ステップ: ループ4小節目の最高音クライマックス)
+        const highC_o6 = [
+            [C6,1], [C6,1], [Bb5,1], [C6,1],
+            [C6,1], [C6,1], [Bb5,1], [C6,1],
+            [C6,1], [C6,1], [Bb5,1], [C6,1],
+            [C6,1], [C6,1], [Bb5,1], [C6,1]
+        ];
+
+        // シンコペーション・パルス (n16 n8 n16 = 4ステップ) ヘルパー
+        const syncPulse = (n) => [[n,1], [n,2], _, [n,1]];
+        const syncBar = (n1, n2, n3, n4) => [
+            ...syncPulse(n1), ...syncPulse(n2), ...syncPulse(n3), ...syncPulse(n4)
+        ];
+
+        // 1. Ch4 (Konami 005289 Lead 1: 主旋律)
+        const ch4Track = [
+            ...introO4,
+            ...ostinatoF_o4,
+            ...ostinatoF_o4,
+            ...highA_o5,
+            ...highC_o6
+        ];
+
+        // 2. Ch5 (Konami 005289 Lead 2: ループ後半も f>fcd<g>fcd<a>fcd<g>fcd を維持する対位法パート)
+        const ch5Track = [
+            ...introO4,
+            ...ostinatoF_o4,
+            ...ostinatoF_o4,
+            ...ostinatoF_o4,
+            ...ostinatoF_o4
+        ];
+
+        // 3. Ch7 (AY-3-8910 PSG Sub-Octave: 1オクターブ下の厚いパルス＆4小節目C5シンコペーション)
+        const ch7Track = [
+            ...introO3,
+            ...ostinatoF_o3,
+            ...ostinatoF_o3,
+            ...highA_o4,
+            ...syncBar(C5, C5, C5, C5)
+        ];
+
+        // 4. Ch8 (AY-3-8910 PSG Syncopated Mid-Bass / Counter-Riff: F3 -> C3 -> C3/F4/A4 上昇リフ)
+        const ch8Track = [
+            ...introO3,
+            ...syncBar(F3, F3, F3, F3),
+            ...syncBar(C3, C3, C3, C3),
+            ...syncBar(C3, C3, F4, A4),
+            ...syncBar(C3, F4, A4, A4)
+        ];
+
+        // 5. Ch6 (Konami 005289 Pedal Bass: F2 シンコペーション・ペダルベース)
+        const ch6Track = [
+            ...introO2,
+            ...syncBar(F2, F2, F2, F2),
+            ...syncBar(F2, F2, F2, F2),
+            ...syncBar(F2, F2, F2, F2),
+            ...syncBar(F2, F2, F2, F2)
+        ];
 
         this.startScheduler(bpm, totalSteps, (step, time, stepDur) => {
-            // 1. 重低音マルチレイヤー・ドラム＆パーカッション
-            const k = kickTrack[step];
-            if (k === 1) this.triggerKick(time, 0.70);
-            else if (k === 2) this.triggerKick(time, 0.82);
+            // イントロ (step < 13) は実機エンベロープ (@e2 -> @e0) に合わせてクレッシェンド
+            const isIntro = step < loopStartStep;
+            const gainMult = isIntro ? (0.38 + (step / 12) * 0.62) : 1.0;
 
-            const sn = snarePercTrack[step];
-            if (sn === 1) {
-                this.triggerSnare(time, 0.56);
-            } else if (sn === 2) {
-                this.triggerIndustrialPerc(time, 0.95, 0.50);
-            } else if (sn === 3) {
-                this.triggerIndustrialPerc(time, 1.38, 0.48);
-            } else if (sn === 4) {
-                this.triggerSnare(time, 0.62);
-                this.triggerIndustrialPerc(time, 1.15, 0.52);
+            // 1. Ch4: 主旋律リード
+            const c4 = ch4Track[step];
+            if (Array.isArray(c4)) {
+                const [note, len] = c4;
+                const dur = stepDur * len * 0.86;
+                this.triggerLead(note, time, dur, 0.34 * gainMult);
+                this.triggerBrass(note, time, dur, 0.20 * gainMult);
             }
 
-            const tm = tomTimpTrack[step];
-            if (tm === 1) this.triggerTom(C4, time, stepDur * 0.90, 0.56);
-            else if (tm === 2) this.triggerTom(Ab3, time, stepDur * 0.90, 0.58);
-            else if (tm === 3) this.triggerTom(D3, time, stepDur * 0.95, 0.62);
-            else if (tm === 4) this.triggerTimpani(D2, time, stepDur * 1.4, 0.64);
-            else if (tm === 5) this.triggerTimpani(Ab1, time, stepDur * 1.4, 0.66);
-            else if (tm === 6) this.triggerTimpani(Eb2, time, stepDur * 1.4, 0.64);
-
-            const hc = hatCymTrack[step];
-            if (hc === 1) this.triggerHiHat(time, false, 1.1);
-            else if (hc === 2) this.triggerHiHat(time, true, 1.15);
-            else if (hc === 3) this.triggerCymbal(time, 0.48);
-
-            // 2. お腹をえぐる16分小刻み重低音ファズ／スラップベース (スタッカートで1音1音ズシンと刻む！)
-            const b = bass[step];
-            if (b > 0) {
-                this.triggerBass(b, time, stepDur * 0.82, 0.62);
+            // 2. Ch5: 第2波形メモリ (ループ後半のステップ45〜76では対位法オスティナートとして独立)
+            const c5 = ch5Track[step];
+            if (Array.isArray(c5)) {
+                const [note, len] = c5;
+                const dur = stepDur * len * 0.86;
+                const isCounterpart = step >= 45;
+                this.triggerHarmony(note, time, dur, (isCounterpart ? 0.28 : 0.18) * gainMult);
+                this.triggerArp(note, time, dur * 0.90, (isCounterpart ? 0.20 : 0.14) * gainMult);
             }
 
-            // 3. 不協和音クラスター・小刻みスタブ (短2度＋減5度＋長7度の凶悪コードカッティング)
-            const st = stabPattern[step];
-            if (st > 0 && chords[st]) {
-                this.triggerDissonantCluster(chords[st], time, stepDur * 0.78, 0.24);
-                // 低音ギターでもトライトーン(減5度)パワーコードを同時刻み！
-                const root = chords[st][0];
-                this.triggerGuitar(root, time, stepDur * 0.78, 0.22);
-                this.triggerGuitar(root + 6, time, stepDur * 0.78, 0.20); // +6 = 減5度トライトーン
+            // 3. Ch7: PSG 1オクターブ下パルス＆C5シンコペーション
+            const c7 = ch7Track[step];
+            if (Array.isArray(c7)) {
+                const [note, len] = c7;
+                const dur = stepDur * len * 0.88;
+                this.triggerStrings(note, time, dur, 0.18 * gainMult);
+                this.triggerArp(note, time, dur * 0.88, 0.16 * gainMult);
             }
 
-            // 4. 16分小刻みストリングス・オスティナート
-            const str = strings[step];
-            if (str > 0) {
-                this.triggerStrings(str, time, stepDur * 0.75, 0.16);
-                this.triggerArp(str + 12, time, stepDur * 0.68, 0.13);
+            // 4. Ch8: PSG シンコペーション中音リフ (F3 / C3 / F4 / A4)
+            const c8 = ch8Track[step];
+            if (Array.isArray(c8)) {
+                const [note, len] = c8;
+                const dur = stepDur * len * 0.88;
+                this.triggerHarmony(note, time, dur, 0.24 * gainMult);
+                this.triggerBass(note, time, dur, 0.34 * gainMult);
             }
 
-            // 5. 小刻みスタッカート主旋律 ＋ 不協和音クラッシュ対旋律
-            const l = bossLead[step];
-            const c = bossClash[step];
-            if (l > 0) {
-                // 小刻み感を極限まで際立たせるタイトなゲートタイム (stepDur * 0.74)
-                const dur = stepDur * 0.74;
-                this.triggerLead(l, time, dur, 0.32);
-                this.triggerBrass(l, time, dur, 0.22);
+            // 5. Ch6: 波形メモリ重低音ペダルベース (F2 ff8f)
+            const c6 = ch6Track[step];
+            if (Array.isArray(c6)) {
+                const [note, len] = c6;
+                const dur = stepDur * len * 0.90;
+                this.triggerBass(note, time, dur, 0.58 * gainMult);
             }
-            if (c > 0) {
-                const dur = stepDur * 0.72;
-                this.triggerHarmony(c, time, dur, 0.24);
-                this.triggerBrass(c, time, dur, 0.18);
+
+            // 6. 実機パーカッション (イントロ13ステップ休符、ループ部で c8cc8cc8cc8cc8cc & c4c4c4c8c8)
+            if (!isIntro) {
+                const loopStep = step - loopStartStep;
+                const barStep = loopStep % 16;
+                const beatStep = loopStep % 4;
+
+                if (beatStep === 0) {
+                    this.triggerKick(time, 0.62);
+                    this.triggerHiHat(time, false, 0.85);
+                    if (barStep === 12) {
+                        this.triggerSnare(time, 0.44);
+                    }
+                } else if (beatStep === 2) {
+                    this.triggerHiHat(time, true, 0.90);
+                    if (barStep === 14) {
+                        this.triggerSnare(time, 0.46);
+                    }
+                } else if (beatStep === 3) {
+                    this.triggerHiHat(time, false, 0.80);
+                }
             }
-        });
+        }, loopStartStep);
+    }
+
+    playBossBgm(forceRestart = false) {
+        // 1面火山噴火(VOLCANO_SURVIVAL)からボス戦(BOSS)へ移行する際は、
+        // 原作同様に「Aircraft Carrier」を途切れさせずシームレスに継続再生する
+        if (!forceRestart && (this.currentBgm === 'BOSS' || this.currentBgm === 'VOLCANO_SURVIVAL')) {
+            this.currentBgm = 'BOSS';
+            return;
+        }
+        this._startAircraftCarrierBgm('BOSS');
     }
 
     // 警告音・クリアジングルは演出の引き締めのため完全カット
@@ -2424,129 +2391,15 @@ class SoundManager {
     playClearJingle() {}
 
     // =========================================================================
-    // 1面 火山大噴火サバイバルBGM: 『VOLCANO INFERNO : SURVIVAL COUNTDOWN』
-    // 170 BPM！脈拍が跳ね上がる超アップテンポ・激しいソワソワ感と緊迫のパニック新曲！
+    // 1面 火山噴火BGM: 原作（FC/MSX/AC版グラディウス）に準拠し、
+    // 1面終盤の火山噴火イベント突入から名曲『AIRCRAFT CARRIER』を演奏開始！
     // =========================================================================
     playVolcanoSurvivalBgm(forceRestart = false) {
-        if (!forceRestart && this.currentBgm === 'VOLCANO_SURVIVAL') return;
-        this.currentBgm = 'VOLCANO_SURVIVAL';
-
-        const bpm = 170;
-        const totalSteps = 128; // 全8小節ループ
-
-        // 1. 激しいドラムビート (高速4つ打ちキック + 裏拍オープンハット + 連打スネア)
-        const dSurv1 = [
-            1,3,1,4, 1,2,1,3, 1,3,1,4, 1,2,2,4
-        ];
-        const dSurv2 = [
-            1,3,1,4, 1,2,1,3, 1,3,1,4, 2,2,2,2 // スネア4連打！
-        ];
-        const dSurvRoll = [
-            1,1,2,2, 6,6,7,7, 8,8,2,2, 5,2,5,2 // 怒涛のクラッシュ乱打！
-        ];
-
-        const drums = [
-            dSurv1, dSurv2, dSurv1, dSurvRoll,
-            dSurv1, dSurv2, dSurv1, dSurvRoll
-        ].flat();
-
-        // 2. 高速マシンガン・パニックベース (焦燥感あふれる半音上昇・急降下スリルリフ)
-        const bSurv1 = [D2,D2,D3,D2, Eb2,Eb2,Eb3,Eb2, E2,E2,E3,E2, F2,F2,F3,F2];
-        const bSurv2 = [Fs2,Fs2,Fs3,Fs2, G2,G2,G3,G2, Ab2,Ab2,Ab3,Ab2, A2,A2,A3,A2];
-        const bSurv3 = [D2,D2,F2,F2, Ab2,Ab2,B2,B2, D3,D3,B2,B2, Ab2,Ab2,F2,F2];
-        const bSurv4 = [D2,D2,D2,D2, Eb2,Eb2,Eb2,Eb2, E2,E2,E2,E2, F2,F2,F2,F2];
-
-        const bass = [
-            bSurv1, bSurv2, bSurv3, bSurv4,
-            bSurv1, bSurv2, bSurv3, bSurv4
-        ].flat();
-
-        // 3. ソワソワする緊迫のディミニッシュ・パニックアルペジオ (16分音符クリスタルパルス)
-        const aSurv1 = [D4,F4,Ab4,B4, D5,B4,Ab4,F4, D4,F4,Ab4,B4, D5,B4,Ab4,F4];
-        const aSurv2 = [Eb4,Fs4,A4,C5, Eb5,C5,A4,Fs4, Eb4,Fs4,A4,C5, Eb5,C5,A4,Fs4];
-        const aSurv3 = [E4,G4,Bb4,Cs5, E5,Cs5,Bb4,G4, E4,G4,Bb4,Cs5, E5,Cs5,Bb4,G4];
-        const aSurv4 = [F4,Ab4,B4,D5, F5,D5,B4,Ab4, F4,Ab4,B4,D5, F5,D5,B4,Ab4];
-
-        const arpeggio = [
-            aSurv1, aSurv2, aSurv3, aSurv4,
-            aSurv1, aSurv2, aSurv3, aSurv4
-        ].flat();
-
-        // 4. 緊迫ストリングス・オスティナート (息詰まるパニック刻み)
-        const sSurv1 = [D4,D4,D4,D4, Eb4,Eb4,Eb4,Eb4, E4,E4,E4,E4, F4,F4,F4,F4];
-        const sSurv2 = [Fs4,Fs4,Fs4,Fs4, G4,G4,G4,G4, Ab4,Ab4,Ab4,Ab4, A4,A4,A4,A4];
-        const sSurv3 = [Ab4,Ab4,Ab4,Ab4, B4,B4,B4,B4, D5,D5,D5,D5, B4,B4,B4,B4];
-        const sSurv4 = [D5,D5,Eb5,Eb5, E5,E5,F5,F5, Fs5,Fs5,G5,G5, Ab5,Ab5,A5,A5];
-
-        const strings = [
-            sSurv1, sSurv2, sSurv3, sSurv4,
-            sSurv1, sSurv2, sSurv3, sSurv4
-        ].flat();
-
-        // 5. 緊急事態サイレン主旋律 (PSGリード + ブラスによる超緊迫パニックメロディ！)
-        const lead = [
-            // 0-3: 警報サイレン・激動のサバイバルリフ
-            D5,_,D5,_, Ab5,_,_,_, G5,_,F5,_, D5,_,_,_,
-            Eb5,_,Eb5,_, A5,_,_,_, Ab5,_,Fs5,_, Eb5,_,_,_,
-            E5,_,E5,_, Bb5,_,_,_, A5,_,G5,_, E5,_,_,_,
-            F5,_,F5,_, B5,_,_,_, D6,_,B5,_, Ab5,_,F5,_,
-
-            // 4-7: クライマックス・死線脱出の咆哮
-            D6,_,_,D6, C6,_,A5,_, Ab5,_,_,Ab5, G5,_,F5,_,
-            D6,_,_,D6, Eb6,_,D6,_, C6,_,_,C6, B5,_,A5,_,
-            D6,_,_,D6, F6,_,D6,_, B5,_,_,B5, Ab5,_,F5,_,
-            D5,_,F5,_, Ab5,_,B5,_, D6,_,_,_, _,_,_,_
-        ];
-
-        this.startScheduler(bpm, totalSteps, (step, time, stepDur) => {
-            // ドラム (お腹に響く高速4つ打ち＆クラッシュ同時キック！)
-            const d = drums[step];
-            if (d === 1) {
-                this.triggerKick(time, 0.72);
-                this.triggerHiHat(time, false, 0.8);
-            } else if (d === 2) {
-                this.triggerSnare(time, 0.54);
-                this.triggerHiHat(time, false, 0.8);
-            } else if (d === 3) {
-                this.triggerHiHat(time, false, 1.0);
-            } else if (d === 4) {
-                this.triggerHiHat(time, true, 1.05);
-            } else if (d === 5) {
-                this.triggerKick(time, 0.76);
-                this.triggerCymbal(time, 0.46);
-            } else if (d === 6) {
-                this.triggerTom(A3, time, stepDur * 0.98, 0.58);
-            } else if (d === 7) {
-                this.triggerTom(F3, time, stepDur * 0.98, 0.58);
-            } else if (d === 8) {
-                this.triggerTom(D3, time, stepDur * 0.98, 0.60);
-            }
-
-            // 重低音マシンガンベース
-            const b = bass[step];
-            if (b > 0) this.triggerBass(b, time, stepDur * 1.35, 0.56);
-
-            // ソワソワするパニックアルペジオ
-            const a = arpeggio[step];
-            if (a > 0) this.triggerArp(a, time, stepDur * 0.85, 0.18);
-
-            // 緊迫ストリングス
-            const str = strings[step];
-            if (str > 0) this.triggerStrings(str, time, stepDur * 0.9, 0.16);
-
-            // 主旋律リード
-            const l = lead[step];
-            if (l > 0) {
-                let lLen = 1;
-                for (let k = 1; k < 6; k++) {
-                    if (lead[(step + k) % totalSteps] === 0) lLen++;
-                    else break;
-                }
-                const dur = stepDur * lLen * 0.92;
-                this.triggerLead(l, time, dur, 0.35);
-                this.triggerBrass(l, time, dur, 0.22);
-            }
-        });
+        if (!forceRestart && (this.currentBgm === 'VOLCANO_SURVIVAL' || this.currentBgm === 'BOSS')) {
+            this.currentBgm = 'VOLCANO_SURVIVAL';
+            return;
+        }
+        this._startAircraftCarrierBgm('VOLCANO_SURVIVAL');
     }
 
     // =========================================================================

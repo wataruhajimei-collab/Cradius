@@ -400,10 +400,10 @@ function init() {
                 label = '♪ 再生中: 02. CHALLENGER 1985 (1面メインBGM)';
             } else if (trackId === 'VOLCANO') {
                 Sound.playVolcanoSurvivalBgm(true);
-                label = '♪ 再生中: 03. VOLCANO INFERNO (1面・大噴火サバイバル)';
+                label = '♪ 再生中: 03. AIRCRAFT CARRIER (1面・火山噴火)';
             } else if (trackId === 'STAGE2') {
                 Sound.playStage2Bgm(true);
-                label = '♪ 再生中: 04. MAXIMUM SPEED (2面・ストーンヘンジ)';
+                label = '♪ 再生中: 04. BEAT BACK (2面・ストーンヘンジ)';
             } else if (trackId === 'STAGE3') {
                 Sound.playStage3Bgm(true);
                 label = '♪ 再生中: 05. BLANK MASK (3面・モアイ遺跡)';
