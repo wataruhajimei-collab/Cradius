@@ -509,6 +509,77 @@ class SoundManager {
         this.autoClean(osc, 0.04, gain);
     }
 
+    // 重装甲メカ（4面巡回傘アイアンメイデン等）へのレーザー・ショット着弾音:
+    // 1985年アーケード版グラディウス特有の甲高い金属摩擦音「キーキー！ / キィィ・キィィ！」を忠実再現
+    playMetalHit() {
+        if (!this.initialized || this.isMuted || !this.ctx) return;
+        const nowMs = Date.now();
+        // レーザー連続接触時に「キー・キー・キー・キー！」と歯切れ良く連続発音するための最適間隔（52ms）
+        if (this._lastMetalHitTime && (nowMs - this._lastMetalHitTime < 52)) {
+            return;
+        }
+        this._lastMetalHitTime = nowMs;
+
+        const now = this.ctx.currentTime;
+        const totalDur = 0.088;
+
+        // 金属的な高域共鳴を作るピーキングフィルタ（2900Hz付近を鋭く強調）
+        const resonance = this.ctx.createBiquadFilter();
+        resonance.type = 'peaking';
+        resonance.frequency.setValueAtTime(2950, now);
+        resonance.Q.setValueAtTime(3.8, now);
+        resonance.gain.setValueAtTime(6.0, now);
+
+        // 主音: 12.5%パルス波（または矩形波）による2山ピッチスイープ「キィー・キィ！」
+        const osc1 = this.ctx.createOscillator();
+        if (this.pulseWave125) {
+            osc1.setPeriodicWave(this.pulseWave125);
+        } else {
+            osc1.type = 'square';
+        }
+        // 1山目「キィー」(0.000s〜0.042s) -> 2山目「キィ！」(0.044s〜0.088s)
+        osc1.frequency.setValueAtTime(2380, now);
+        osc1.frequency.linearRampToValueAtTime(3520, now + 0.018);
+        osc1.frequency.linearRampToValueAtTime(2620, now + 0.042);
+        osc1.frequency.setValueAtTime(2520, now + 0.044);
+        osc1.frequency.linearRampToValueAtTime(3680, now + 0.064);
+        osc1.frequency.linearRampToValueAtTime(2740, now + totalDur);
+
+        // 副音: 非整数倍音（約1.38倍）の矩形波を重ねてアーケードPSG特有の硬質な金属光沢感を生成
+        const osc2 = this.ctx.createOscillator();
+        osc2.type = 'square';
+        osc2.frequency.setValueAtTime(3290, now);
+        osc2.frequency.linearRampToValueAtTime(4820, now + 0.018);
+        osc2.frequency.linearRampToValueAtTime(3610, now + 0.042);
+        osc2.frequency.setValueAtTime(3480, now + 0.044);
+        osc2.frequency.linearRampToValueAtTime(5040, now + 0.064);
+        osc2.frequency.linearRampToValueAtTime(3780, now + totalDur);
+
+        const gain1 = this.ctx.createGain();
+        gain1.gain.setValueAtTime(0.42, now);
+        gain1.gain.linearRampToValueAtTime(0.12, now + 0.041);
+        gain1.gain.setValueAtTime(0.44, now + 0.044);
+        gain1.gain.exponentialRampToValueAtTime(0.01, now + totalDur);
+
+        const gain2 = this.ctx.createGain();
+        gain2.gain.setValueAtTime(0.24, now);
+        gain2.gain.linearRampToValueAtTime(0.07, now + 0.041);
+        gain2.gain.setValueAtTime(0.26, now + 0.044);
+        gain2.gain.exponentialRampToValueAtTime(0.008, now + totalDur);
+
+        osc1.connect(gain1);
+        osc2.connect(gain2);
+        gain1.connect(resonance);
+        gain2.connect(resonance);
+        resonance.connect(this.seGain);
+
+        osc1.start(now);
+        osc1.stop(now + totalDur);
+        osc2.start(now);
+        osc2.stop(now + totalDur);
+        this.autoClean(osc1, totalDur, osc2, gain1, gain2, resonance);
+    }
+
     // ボス大爆発音: グラディウス風 超ド級・重低音連続爆発（ズドドドド…ドッカーン！）
     playBossExplode() {
         if (!this.initialized || this.isMuted) return;

@@ -144,12 +144,6 @@ function startOrJumpStage4(mode = 'STAGE') {
 function startGame() {
     if (gameStarted || window.bgmModalOpen) return;
 
-    // タイトル画面の「CREDIT」隠しコマンドで2〜4面が選択されている場合はその面から直接開始！
-    if (window.secretSelectedStage && window.secretSelectedStage > 1) {
-        startOrJumpStage(window.secretSelectedStage, 'STAGE', true);
-        return;
-    }
-
     gameStarted = true;
 
     // Web Audioを確実にアンロック＆即座に「タララララン！」グラディウス開始音を再生！
@@ -196,17 +190,12 @@ function init() {
     window.startOrJumpStage4 = startOrJumpStage4;
     window.equipFullPowerForTest = equipFullPowerForTest;
 
-    // スタート画面 & BGM集モーダル & 開発者専用隠しステージセレクトのバインド
+    // スタート画面 & BGM集モーダル & Komamiロゴタップによる開発者ステージセレクトのバインド
     const startScreen = document.getElementById('start-screen');
     const btnStart = document.getElementById('btn-start');
     const titleStageSelect = document.getElementById('title-stage-select');
     const titleStageBtns = titleStageSelect ? Array.from(titleStageSelect.querySelectorAll('button[data-stage]')) : [];
-    const touchStageBar = document.getElementById('touch-stage-bar');
-    const touchJumpBtns = touchStageBar ? Array.from(touchStageBar.querySelectorAll('.touch-jump-btn')) : [];
     const secretKonamiLogo = document.getElementById('secret-konami-logo');
-    const secretCreditBox = document.getElementById('secret-credit-box');
-    const secretCreditBadge = document.getElementById('secret-credit-badge');
-    const secretHudHotspot = document.getElementById('secret-hud-hotspot');
     const btnBgmCollection = document.getElementById('btn-bgm-collection');
     const bgmModal = document.getElementById('bgm-modal');
     const btnBgmClose = document.getElementById('btn-bgm-close');
@@ -215,16 +204,12 @@ function init() {
     const bgmNowPlaying = document.getElementById('bgm-now-playing');
     const bgmTrackBtns = bgmModal ? Array.from(bgmModal.querySelectorAll('.bgm-track-btn')) : [];
 
-    // 開発者ステージ選択UIの表示・非表示切替
+    // 開発者ステージ選択UI（タイトル画面）の表示・非表示切替
     const setDevMenuVisible = (visible) => {
         window.devModeUnlocked = Boolean(visible);
         if (titleStageSelect) {
             titleStageSelect.classList.toggle('dev-secret-hidden', !visible);
             titleStageSelect.setAttribute('aria-hidden', visible ? 'false' : 'true');
-        }
-        if (touchStageBar) {
-            touchStageBar.classList.toggle('dev-secret-hidden', !visible);
-            touchStageBar.setAttribute('aria-hidden', visible ? 'false' : 'true');
         }
         if (visible && typeof Sound !== 'undefined' && typeof Sound.playPowerUp === 'function') {
             Sound.unlockAudio();
@@ -233,24 +218,6 @@ function init() {
     };
     window.setDevMenuVisible = setDevMenuVisible;
 
-    // URLパラメータ (?dev=1 または ?stage=1..4) による開発者ショートカット
-    try {
-        const params = new URLSearchParams(window.location.search);
-        if (params.get('dev') === '1') {
-            setDevMenuVisible(true);
-        }
-        const urlStage = parseInt(params.get('stage'), 10);
-        if (urlStage >= 1 && urlStage <= 4) {
-            window.secretSelectedStage = urlStage;
-            if (secretCreditBadge) {
-                secretCreditBadge.textContent = `0${urlStage}`;
-            }
-            if (secretCreditBox) {
-                secretCreditBox.classList.toggle('secret-stage-active', urlStage > 1);
-            }
-        }
-    } catch (_) {}
-
     const isBgmUiEvent = (e) => {
         if (window.bgmModalOpen) return true;
         if (!e || !e.target || typeof e.target.closest !== 'function') return false;
@@ -258,95 +225,33 @@ function init() {
             e.target.closest('#btn-bgm-collection') ||
             e.target.closest('#bgm-modal') ||
             e.target.closest('#title-stage-select') ||
-            e.target.closest('#touch-stage-bar') ||
-            e.target.closest('#secret-konami-logo') ||
-            e.target.closest('#secret-credit-box') ||
-            e.target.closest('#secret-hud-hotspot')
+            e.target.closest('#secret-konami-logo')
         );
     };
 
-    // 仕掛け1: タイトル画面右下の「CREDIT 01」をタップするごとに開始ステージが 01(1面) -> 02(2面) -> 03(3面) -> 04(4面) と切り替わる！
-    if (secretCreditBox && secretCreditBadge) {
-        let lastCreditTapTime = 0;
-        const handleSecretCreditTap = (e) => {
-            if (e) {
-                e.preventDefault();
-                e.stopPropagation();
-            }
-            const now = Date.now();
-            if (now - lastCreditTapTime < 80) return; // pointerdown + click 二重発火防止
-            lastCreditTapTime = now;
-
-            window.secretSelectedStage = (window.secretSelectedStage % 4) + 1;
-            secretCreditBadge.textContent = `0${window.secretSelectedStage}`;
-            secretCreditBox.classList.toggle('secret-stage-active', window.secretSelectedStage > 1);
-
-            if (typeof Sound !== 'undefined' && typeof Sound.playPowerUp === 'function') {
-                Sound.unlockAudio();
-                Sound.playPowerUp();
-            }
-        };
-        secretCreditBox.addEventListener('pointerdown', handleSecretCreditTap);
-        secretCreditBox.addEventListener('touchstart', handleSecretCreditTap, { passive: false });
-        secretCreditBox.addEventListener('click', handleSecretCreditTap);
-    }
-
-    // 仕掛け2: タイトル画面の「Komami®」ロゴを3回タップすると全ステージ＆ボス選択パネルが出現！
+    // タイトル画面の「Komami®」ロゴをタップすると開発者ステージセレクトが出現（1回タップでも3回連打でも確実に開く）
     if (secretKonamiLogo) {
-        let logoTapCount = 0;
-        let lastLogoTapTime = 0;
         let lastLogoEventTime = 0;
+        let lastOpenedTime = 0;
         const handleSecretLogoTap = (e) => {
             if (e) {
                 e.preventDefault();
                 e.stopPropagation();
             }
             const now = Date.now();
-            if (now - lastLogoEventTime < 80) return; // 二重発火防止
+            if (now - lastLogoEventTime < 80) return; // pointerdown + click 二重発火防止
             lastLogoEventTime = now;
 
-            if (now - lastLogoTapTime > 1800) {
-                logoTapCount = 0;
-            }
-            lastLogoTapTime = now;
-            logoTapCount++;
-            if (logoTapCount >= 3) {
-                logoTapCount = 0;
-                setDevMenuVisible(!window.devModeUnlocked);
+            if (!window.devModeUnlocked) {
+                lastOpenedTime = now;
+                setDevMenuVisible(true);
+            } else if (now - lastOpenedTime > 1200) {
+                setDevMenuVisible(false);
             }
         };
         secretKonamiLogo.addEventListener('pointerdown', handleSecretLogoTap);
         secretKonamiLogo.addEventListener('touchstart', handleSecretLogoTap, { passive: false });
         secretKonamiLogo.addEventListener('click', handleSecretLogoTap);
-    }
-
-    // 仕掛け3: プレイ中、画面上部中央（HI 0057300付近）を3回タップすると開発者ワープバーを開閉！
-    if (secretHudHotspot) {
-        let hudTapCount = 0;
-        let lastHudTapTime = 0;
-        let lastHudEventTime = 0;
-        const handleSecretHudTap = (e) => {
-            if (e) {
-                e.preventDefault();
-                e.stopPropagation();
-            }
-            const now = Date.now();
-            if (now - lastHudEventTime < 80) return;
-            lastHudEventTime = now;
-
-            if (now - lastHudTapTime > 1800) {
-                hudTapCount = 0;
-            }
-            lastHudTapTime = now;
-            hudTapCount++;
-            if (hudTapCount >= 3) {
-                hudTapCount = 0;
-                setDevMenuVisible(!window.devModeUnlocked);
-            }
-        };
-        secretHudHotspot.addEventListener('pointerdown', handleSecretHudTap);
-        secretHudHotspot.addEventListener('touchstart', handleSecretHudTap, { passive: false });
-        secretHudHotspot.addEventListener('click', handleSecretHudTap);
     }
 
     // タイトル画面の隠しステージセレクトボタン（1面〜4面）
@@ -367,47 +272,6 @@ function init() {
         btn.addEventListener('pointerdown', handleStageSelectBtn);
         btn.addEventListener('touchstart', handleStageSelectBtn, { passive: false });
         btn.addEventListener('click', handleStageSelectBtn);
-    });
-
-    // プレイ中（画面右上）の開発者クイックワープバー
-    touchJumpBtns.forEach(btn => {
-        let lastJumpTap = 0;
-        const handleQuickJump = (e) => {
-            if (e) {
-                e.preventDefault();
-                e.stopPropagation();
-            }
-            const now = Date.now();
-            if (now - lastJumpTap < 80) return;
-            lastJumpTap = now;
-            const jumpType = btn.getAttribute('data-jump');
-            if (jumpType === 'STAGE1') {
-                startOrJumpStage(1, 'STAGE');
-            } else if (jumpType === 'STAGE1_BOSS') {
-                startOrJumpStage(1, 'BOSS');
-            } else if (jumpType === 'STAGE2') {
-                startOrJumpStage(2, 'STAGE');
-            } else if (jumpType === 'STAGE2_BOSS') {
-                startOrJumpStage(2, 'BOSS');
-            } else if (jumpType === 'STAGE3') {
-                startOrJumpStage(3, 'STAGE');
-            } else if (jumpType === 'STAGE3_BOSS') {
-                startOrJumpStage(3, 'BOSS');
-            } else if (jumpType === 'STAGE4') {
-                startOrJumpStage(4, 'STAGE');
-            } else if (jumpType === 'STAGE4_JELLYFISH') {
-                startOrJumpStage(4, 'JELLYFISH');
-            } else if (jumpType === 'STAGE4_BOSS') {
-                startOrJumpStage(4, 'BOSS');
-            } else if (jumpType === 'FULL_POWER') {
-                equipFullPowerForTest();
-            } else if (jumpType === 'HIDE_DEV') {
-                setDevMenuVisible(false);
-            }
-        };
-        btn.addEventListener('pointerdown', handleQuickJump);
-        btn.addEventListener('touchstart', handleQuickJump, { passive: false });
-        btn.addEventListener('click', handleQuickJump);
     });
 
     const clearTrackSelection = () => {
@@ -539,31 +403,9 @@ function init() {
         btn.addEventListener('click', handlePlayTrack);
     });
 
-    // コナミコマンド (↑↑↓↓←→←→BA) による開発者ステージセレクト解放＆フル装備
-    const konamiSequence = [
-        'ArrowUp', 'ArrowUp', 'ArrowDown', 'ArrowDown',
-        'ArrowLeft', 'ArrowRight', 'ArrowLeft', 'ArrowRight',
-        'KeyB', 'KeyA'
-    ];
-    let konamiIndex = 0;
-
     window.addEventListener('keydown', (e) => {
         if (window.bgmModalOpen && e.code === 'Escape') {
             closeBgmModal(e);
-            return;
-        }
-        if (window.bgmModalOpen) return;
-
-        // コナミコマンド判定
-        if (e.code === konamiSequence[konamiIndex]) {
-            konamiIndex++;
-            if (konamiIndex === konamiSequence.length) {
-                konamiIndex = 0;
-                setDevMenuVisible(!window.devModeUnlocked);
-                equipFullPowerForTest();
-            }
-        } else {
-            konamiIndex = (e.code === konamiSequence[0]) ? 1 : 0;
         }
     });
 
@@ -591,30 +433,6 @@ function init() {
     const globalTrigger = (e) => {
         if (isBgmUiEvent(e)) return;
         if (!gameStarted) {
-            if (e && e.type === 'keydown') {
-                // タイトル画面で 1〜4 キー（Shift同時押しでその面のボス）を押した場合は指定面から直接スタート！
-                const stageKeyMap = {
-                    Digit1: 1, Numpad1: 1,
-                    Digit2: 2, Numpad2: 2,
-                    Digit3: 3, Numpad3: 3,
-                    Digit4: 4, Numpad4: 4
-                };
-                if (stageKeyMap[e.code]) {
-                    startOrJumpStage(stageKeyMap[e.code], e.shiftKey ? 'BOSS' : 'STAGE');
-                    return;
-                }
-                // 修飾キーやコナミコマンド入力用キー、ファンクションキー単体ではタイトル画面を閉じない
-                const ignoreStartKeys = new Set([
-                    'ShiftLeft', 'ShiftRight', 'ControlLeft', 'ControlRight',
-                    'AltLeft', 'AltRight', 'MetaLeft', 'MetaRight', 'Tab',
-                    'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight',
-                    'KeyB', 'KeyA', 'KeyP', 'KeyV', 'KeyG', 'KeyM', 'KeyW', 'KeyJ', 'KeyK',
-                    'F1', 'F2', 'F3', 'F4', 'F5', 'F6', 'F7', 'F8', 'F9', 'F10', 'F11', 'F12'
-                ]);
-                if (ignoreStartKeys.has(e.code)) {
-                    return;
-                }
-            }
             startGame();
         } else {
             if (typeof Sound !== 'undefined') {
@@ -782,16 +600,25 @@ function handleCollisions() {
             if (bullet.active && enemy.active && checkCollision(bullet, enemy)) {
                 const isIronMaiden = (typeof IronMaidenEnemy !== 'undefined' && enemy instanceof IronMaidenEnemy);
                 if (isIronMaiden) {
-                    // 大型傘＆ボディ重装メカはレーザーも貫通せず弾き止め、クールダウン中はダメージを受けない重装甲仕様
-                    bullet.active = false;
+                    // レーザーは消去せず長さと発射ペース（リズム）を完全に維持し、通常弾のみ消去する
+                    if (!(bullet instanceof Laser)) {
+                        bullet.active = false;
+                    }
+                    // 本家同様の甲高い金属摩擦音「キーキー！」を鳴らす
+                    if (typeof Sound !== 'undefined') {
+                        if (typeof Sound.playMetalHit === 'function') {
+                            Sound.playMetalHit();
+                        } else if (typeof Sound.playBossHit === 'function') {
+                            Sound.playBossHit();
+                        }
+                    }
                     if (enemy.hitCooldown > 0) {
                         return;
                     }
-                    enemy.hitCooldown = 5;
+                    enemy.hitCooldown = 3;
                     enemy.hp--;
                     if (enemy.hp > 0) {
-                        enemy.flashTimer = 5;
-                        if (typeof Sound !== 'undefined' && typeof Sound.playBossHit === 'function') Sound.playBossHit();
+                        enemy.flashTimer = 4;
                     }
                 } else {
                     if (!(bullet instanceof Laser)) {

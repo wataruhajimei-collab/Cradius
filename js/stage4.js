@@ -227,9 +227,9 @@ class IronMaidenEnemy extends Enemy {
         this.formation = formation;
         this.visible = (delay <= 0);
 
-        this.hp = 24;
-        this.maxHp = 24;
-        this.hitCooldown = 0; // レーザーの毎フレーム多段ヒットで瞬殺されるのを防ぐ重装甲クールダウン
+        this.hp = 6;
+        this.maxHp = 6;
+        this.hitCooldown = 0; // レーザー接触中に「キーキー」と鳴りながら適度な手応えで破壊できるクールダウン
         this.flashTimer = 0;
 
         this.phase = 0;
