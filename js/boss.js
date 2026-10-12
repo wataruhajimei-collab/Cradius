@@ -113,44 +113,372 @@ const BIG_CORE_SPRITE_ROWS = [
 
 let _bigCoreHullCanvas = null;
 
+function _parseHexRgb(hex) {
+    if (!hex) return [0, 0, 0];
+    const v = parseInt(hex.slice(1), 16);
+    return [(v >> 16) & 255, (v >> 8) & 255, v & 255];
+}
+
+const BIG_CORE_RGB_PALETTE = {};
+for (const k in BIG_CORE_PALETTE) {
+    if (BIG_CORE_PALETTE[k]) {
+        BIG_CORE_RGB_PALETTE[k] = _parseHexRgb(BIG_CORE_PALETTE[k]);
+    }
+}
+
 function getBigCoreHullCanvas() {
     if (_bigCoreHullCanvas) return _bigCoreHullCanvas;
     const w = 98;
     const h = 66;
+    const HD = 6; // 6倍スーパーサンプリング (588x396px) でドット絵の正確なシルエットを保ったまま高精細HD化
+    const cw = w * HD;
+    const ch = h * HD;
+
     const c = document.createElement('canvas');
-    c.width = w;
-    c.height = h;
+    c.width = cw;
+    c.height = ch;
     const g = c.getContext('2d');
+
+    // 1. セルごとのマテリアル分類とベースRGB配列を構築
+    // Group 0: 透過('.'), Group 1: 黒溝/装甲継目('0'および動的描画キャビティ), Group 2: シルバー/スレート装甲, Group 3: ゴールド/アンバーフレーム
+    const groupGrid = new Uint8Array(w * h);
+    const charGrid = new Array(w * h);
+    const rgbGrid = new Float32Array(w * h * 3);
+
+    const goldChars = new Set(['4', '6', '9', 'B']);
 
     for (let y = 0; y < h; y++) {
         const row = BIG_CORE_SPRITE_ROWS[y];
         for (let x = 0; x < w; x++) {
-            const ch = row[x];
-            if (ch === '.') continue;
-            // コア通路の4枚遮蔽板＋ストッパー領域(x=10..29, y=29..36)と中央コア内部(x=41..52, y=27..38)は動的描画するため黒下地にする
-            if (y >= 29 && y <= 36 && x >= 10 && x <= 29) {
-                g.fillStyle = '#000000';
-                g.fillRect(x, y, 1, 1);
-                continue;
+            const idx = y * w + x;
+            let chCell = row[x];
+            // コア通路の4枚遮蔽板＋ストッパー領域(x=10..29, y=29..36)と中央コア内部(x=41..52, y=27..38)は動的HD描画するため黒下地にする
+            if ((y >= 29 && y <= 36 && x >= 10 && x <= 29) ||
+                (y >= 27 && y <= 38 && x >= 41 && x <= 52)) {
+                chCell = '0';
             }
-            if (y >= 27 && y <= 38 && x >= 41 && x <= 52) {
-                g.fillStyle = '#000000';
-                g.fillRect(x, y, 1, 1);
-                continue;
-            }
-            const col = BIG_CORE_PALETTE[ch];
-            if (col) {
-                g.fillStyle = col;
-                g.fillRect(x, y, 1, 1);
+            charGrid[idx] = chCell;
+
+            if (chCell === '.') {
+                groupGrid[idx] = 0;
+            } else if (chCell === '0') {
+                groupGrid[idx] = 1;
+                rgbGrid[idx * 3] = 10;
+                rgbGrid[idx * 3 + 1] = 15;
+                rgbGrid[idx * 3 + 2] = 20;
+            } else if (goldChars.has(chCell)) {
+                groupGrid[idx] = 3;
+                const rgb = BIG_CORE_RGB_PALETTE[chCell] || [181, 140, 0];
+                rgbGrid[idx * 3] = rgb[0];
+                rgbGrid[idx * 3 + 1] = rgb[1];
+                rgbGrid[idx * 3 + 2] = rgb[2];
+            } else {
+                groupGrid[idx] = 2;
+                const rgb = BIG_CORE_RGB_PALETTE[chCell] || [140, 148, 140];
+                rgbGrid[idx * 3] = rgb[0];
+                rgbGrid[idx * 3 + 1] = rgb[1];
+                rgbGrid[idx * 3 + 2] = rgb[2];
             }
         }
     }
+
+    const getGroup = (x, y) => {
+        if (x < 0 || x >= w || y < 0 || y >= h) return 0;
+        return groupGrid[y * w + x];
+    };
+    const getChar = (x, y) => {
+        if (x < 0 || x >= w || y < 0 || y >= h) return '.';
+        return charGrid[y * w + x];
+    };
+
+    // 2. 同一マテリアルパネル内で滑らかな3D金属グラデーションを得るため、境界('0'や異素材)を跨がないガウシアン平滑化フィールドを計算
+    const smoothRgb = new Float32Array(w * h * 3);
+    for (let y = 0; y < h; y++) {
+        for (let x = 0; x < w; x++) {
+            const idx = y * w + x;
+            const grp = groupGrid[idx];
+            if (grp < 2) {
+                smoothRgb[idx * 3] = rgbGrid[idx * 3];
+                smoothRgb[idx * 3 + 1] = rgbGrid[idx * 3 + 1];
+                smoothRgb[idx * 3 + 2] = rgbGrid[idx * 3 + 2];
+                continue;
+            }
+            let rSum = 0, gSum = 0, bSum = 0, wSum = 0;
+            for (let dy = -2; dy <= 2; dy++) {
+                const ny = y + dy;
+                if (ny < 0 || ny >= h) continue;
+                for (let dx = -2; dx <= 2; dx++) {
+                    const nx = x + dx;
+                    if (nx < 0 || nx >= w) continue;
+                    const nIdx = ny * w + nx;
+                    if (groupGrid[nIdx] !== grp) continue;
+                    const dist2 = dx * dx + dy * dy;
+                    const weight = Math.exp(-dist2 * 0.42);
+                    rSum += rgbGrid[nIdx * 3] * weight;
+                    gSum += rgbGrid[nIdx * 3 + 1] * weight;
+                    bSum += rgbGrid[nIdx * 3 + 2] * weight;
+                    wSum += weight;
+                }
+            }
+            // オリジナルの階調ディテールと滑らかな3D曲面シェーディングをブレンド
+            const sr = rSum / wSum;
+            const sg = gSum / wSum;
+            const sb = bSum / wSum;
+            smoothRgb[idx * 3] = rgbGrid[idx * 3] * 0.38 + sr * 0.62;
+            smoothRgb[idx * 3 + 1] = rgbGrid[idx * 3 + 1] * 0.38 + sg * 0.62;
+            smoothRgb[idx * 3 + 2] = rgbGrid[idx * 3 + 2] * 0.38 + sb * 0.62;
+        }
+    }
+
+    // 同一マテリアルグループ内でバイリニア補間サンプリングを行うヘルパー
+    const sampleMaterialRgb = (gx, gy, targetGrp, fallbackX, fallbackY) => {
+        const x0 = Math.floor(gx - 0.5);
+        const y0 = Math.floor(gy - 0.5);
+        const tx = (gx - 0.5) - x0;
+        const ty = (gy - 0.5) - y0;
+
+        let rAcc = 0, gAcc = 0, bAcc = 0, wAcc = 0;
+        for (let j = 0; j <= 1; j++) {
+            const sy = Math.max(0, Math.min(h - 1, y0 + j));
+            const wy = j === 0 ? (1 - ty) : ty;
+            for (let i = 0; i <= 1; i++) {
+                const sx = Math.max(0, Math.min(w - 1, x0 + i));
+                const wx = i === 0 ? (1 - tx) : tx;
+                const sIdx = sy * w + sx;
+                if (groupGrid[sIdx] === targetGrp) {
+                    const wt = wx * wy;
+                    rAcc += smoothRgb[sIdx * 3] * wt;
+                    gAcc += smoothRgb[sIdx * 3 + 1] * wt;
+                    bAcc += smoothRgb[sIdx * 3 + 2] * wt;
+                    wAcc += wt;
+                }
+            }
+        }
+        if (wAcc > 0.001) {
+            return [rAcc / wAcc, gAcc / wAcc, bAcc / wAcc];
+        }
+        const fIdx = Math.max(0, Math.min(h - 1, fallbackY)) * w + Math.max(0, Math.min(w - 1, fallbackX));
+        return [smoothRgb[fIdx * 3], smoothRgb[fIdx * 3 + 1], smoothRgb[fIdx * 3 + 2]];
+    };
+
+    // 3. 588x396 (HD=6) サブピクセル合成（xBR/Scale3x風の斜めエッジ補間＋金属ヘアライン＆パネルベベル立体化）
+    const imgData = g.createImageData(cw, ch);
+    const data = imgData.data;
+
+    for (let py = 0; py < ch; py++) {
+        const gy = (py + 0.5) / HD;
+        const cy = Math.min(h - 1, Math.floor(gy));
+        const fy = gy - cy;
+
+        // 船体全体のゆるやかな立体円筒ライティング（上下対称の曲面光沢）
+        const normY = (gy - 33.0) / 33.0;
+        const hullCurveLight = Math.cos(normY * Math.PI * 0.75) * 9.0 - 2.0;
+        // 微細な水平ブラッシュドメタル（ヘアライン金属質感）
+        const hairline = Math.sin(py * 1.5708) * 2.8 + Math.cos(py * 0.65) * 1.8;
+
+        for (let px = 0; px < cw; px++) {
+            const gx = (px + 0.5) / HD;
+            const cx = Math.min(w - 1, Math.floor(gx));
+            const fx = gx - cx;
+
+            let grp = getGroup(cx, cy);
+            let sampleCx = cx;
+            let sampleCy = cy;
+
+            const gUp = getGroup(cx, cy - 1);
+            const gDn = getGroup(cx, cy + 1);
+            const gLf = getGroup(cx - 1, cy);
+            const gRt = getGroup(cx + 1, cy);
+
+            // 斜めエッジのC1連続xBR補間（1:1 / 2:1 / 1:2 スロープを自動判定してドット階段を完全な直線・滑らかエッジに変換）
+            const checkCorner = (u, v, sx, sy, gH, gV) => {
+                if (gV !== gH || gV === grp) return false;
+                // 1ドット幅の細い斜めラインを切断しないための保護条件
+                if (grp !== 0 && getGroup(cx + sx, cy + sy) === grp) return false;
+                const is2to1H = (getGroup(cx - sx, cy + sy) === gV);
+                const is1to2V = (getGroup(cx + sx, cy - sy) === gV);
+                const kU = is2to1H ? 0.5 : 1.0;
+                const kV = is1to2V ? 0.5 : 1.0;
+                return (u * kU + v * kV) < 0.52;
+            };
+
+            if (checkCorner(fx, fy, -1, -1, gLf, gUp)) {
+                grp = gUp;
+                sampleCx = cx - 1;
+                sampleCy = cy - 1;
+            } else if (checkCorner(1 - fx, fy, 1, -1, gRt, gUp)) {
+                grp = gUp;
+                sampleCx = cx + 1;
+                sampleCy = cy - 1;
+            } else if (checkCorner(fx, 1 - fy, -1, 1, gLf, gDn)) {
+                grp = gDn;
+                sampleCx = cx - 1;
+                sampleCy = cy + 1;
+            } else if (checkCorner(1 - fx, 1 - fy, 1, 1, gRt, gDn)) {
+                grp = gDn;
+                sampleCx = cx + 1;
+                sampleCy = cy + 1;
+            }
+
+            if (grp === 0) continue; // 透過背景
+
+            const pOffset = (py * cw + px) * 4;
+
+            // Group 1: 黒アウトライン・装甲パネル溝・コア通路内部
+            if (grp === 1) {
+                const isCavity = (cy >= 29 && cy <= 36 && cx >= 10 && cx <= 29) ||
+                                 (cy >= 27 && cy <= 38 && cx >= 41 && cx <= 52);
+                if (isCavity) {
+                    // コア通路・格納部の重厚なダークガンメタル内壁
+                    const railWave = Math.sin(px * 0.35) * 3;
+                    data[pOffset] = Math.max(4, Math.min(28, 12 + railWave));
+                    data[pOffset + 1] = Math.max(6, Math.min(34, 16 + railWave));
+                    data[pOffset + 2] = Math.max(10, Math.min(42, 22 + railWave));
+                    data[pOffset + 3] = 255;
+                } else {
+                    // 装甲パネルの継ぎ目（溝の中心は深く、装甲との境界は微細なガンメタルベベル）
+                    const nearArmor = (gUp >= 2 || gDn >= 2 || gLf >= 2 || gRt >= 2);
+                    const grooveBase = nearArmor ? 20 : 10;
+                    data[pOffset] = grooveBase;
+                    data[pOffset + 1] = grooveBase + 4;
+                    data[pOffset + 2] = grooveBase + 7;
+                    data[pOffset + 3] = 255;
+                }
+                continue;
+            }
+
+            // Group 2 (シルバー/スレート装甲) または Group 3 (ゴールドフレーム) の連続バイリニア色取得
+            let [r, gr, b] = sampleMaterialRgb(gx, gy, grp, sampleCx, sampleCy);
+
+            // パネル境界ベベル立体感（上・左が黒溝'0'ならハイライトエッジ、下・右が黒溝'0'ならシャドウエッジ）
+            let bevel = 0;
+            if (gUp !== grp && fy < 0.34) bevel += (0.34 - fy) * 82;
+            if (gLf !== grp && fx < 0.34) bevel += (0.34 - fx) * 68;
+            if (gDn !== grp && fy > 0.66) bevel -= (fy - 0.66) * 65;
+            if (gRt !== grp && fx > 0.66) bevel -= (fx - 0.66) * 52;
+
+            if (grp === 2) {
+                // シルバー＆スレート装甲のクールな金属光沢・青백スペキュラ補正
+                const lum = (r * 0.299 + gr * 0.587 + b * 0.114) / 255;
+                const spec = Math.pow(Math.max(0, lum), 2.2) * 26;
+                const delta = hullCurveLight + hairline + bevel + spec;
+                r = Math.max(24, Math.min(248, r + delta * 0.92));
+                gr = Math.max(30, Math.min(252, gr + delta * 0.98));
+                b = Math.max(32, Math.min(255, b + delta * 1.08 + 5));
+            } else if (grp === 3) {
+                // ゴールド＆シャンパン合金フレームのリッチな金属反射＋精密リブ質感
+                const lum = (r * 0.299 + gr * 0.587 + b * 0.114) / 255;
+                const rib = Math.sin(px * 0.95) * 5.5 + Math.sin(py * 1.5708) * 3.5;
+                const spec = Math.pow(Math.max(0, lum), 1.8) * 32;
+                const delta = hullCurveLight * 0.8 + rib + bevel * 1.15 + spec;
+                r = Math.max(55, Math.min(255, r + delta * 1.12 + 8));
+                gr = Math.max(38, Math.min(248, gr + delta * 0.96 + 3));
+                b = Math.max(12, Math.min(230, b + delta * 0.68));
+            }
+
+            data[pOffset] = Math.round(r);
+            data[pOffset + 1] = Math.round(gr);
+            data[pOffset + 2] = Math.round(b);
+            data[pOffset + 3] = 255;
+        }
+    }
+
+    g.putImageData(imgData, 0, 0);
+
+    // 4. 高精細ベクターディテール（シルエットを1ドットも崩さずに内部へ精密メカディテールを重ねる）
+    g.save();
+    g.globalCompositeOperation = 'source-atop';
+
+    // (a) 船体全体の立体メタリック光沢グラデーション（上下ウイングの金属ハイライトと中央の重厚感）
+    const sheenGrad = g.createLinearGradient(0, 0, 0, ch);
+    sheenGrad.addColorStop(0.00, 'rgba(180, 210, 230, 0.08)');
+    sheenGrad.addColorStop(0.18, 'rgba(255, 255, 255, 0.14)');
+    sheenGrad.addColorStop(0.36, 'rgba(15, 25, 35, 0.10)');
+    sheenGrad.addColorStop(0.50, 'rgba(220, 240, 255, 0.10)');
+    sheenGrad.addColorStop(0.64, 'rgba(15, 25, 35, 0.10)');
+    sheenGrad.addColorStop(0.82, 'rgba(255, 255, 255, 0.14)');
+    sheenGrad.addColorStop(1.00, 'rgba(180, 210, 230, 0.08)');
+    g.fillStyle = sheenGrad;
+    g.fillRect(0, 0, cw, ch);
+
+    // (b) 中央ゴールド冷却コンジット（x=38..50, y=15..25 & y=40..50）の精密フィン溝ディテール
+    g.fillStyle = 'rgba(25, 14, 0, 0.28)';
+    for (let gx = 39; gx <= 49; gx += 2) {
+        g.fillRect(gx * HD + 1, 15 * HD, 2, 10 * HD);
+        g.fillRect(gx * HD + 1, 41 * HD, 2, 10 * HD);
+    }
+    g.fillStyle = 'rgba(255, 244, 190, 0.25)';
+    for (let gx = 39; gx <= 49; gx += 2) {
+        g.fillRect(gx * HD + 3, 15 * HD, 1.5, 10 * HD);
+        g.fillRect(gx * HD + 3, 41 * HD, 1.5, 10 * HD);
+    }
+
+    // (c) 上下装甲プレートの精密マイクロリベット（上下対称配置）
+    const rivetCoords = [
+        [34, 14], [34, 18], [34, 22],
+        [24, 18], [24, 22], [15, 21],
+        [56, 12], [62, 12], [68, 12],
+        [56, 21], [62, 21], [68, 21],
+        [73, 16], [73, 22], [79, 24],
+        [63, 28], [69, 28], [83, 28]
+    ];
+    for (const [rx, ry] of rivetCoords) {
+        for (const yPos of [ry, 65 - ry]) {
+            const px = (rx + 0.5) * HD;
+            const py = (yPos + 0.5) * HD;
+            g.fillStyle = 'rgba(15, 22, 28, 0.65)';
+            g.beginPath();
+            g.arc(px + 0.8, py + 0.8, 2.1, 0, Math.PI * 2);
+            g.fill();
+            g.fillStyle = 'rgba(235, 245, 255, 0.72)';
+            g.beginPath();
+            g.arc(px - 0.5, py - 0.5, 1.6, 0, Math.PI * 2);
+            g.fill();
+        }
+    }
+
+    // (d) 4門のレーザー砲口（外側肩部 x=24, y=9.5/56.5 ＆ 内側先端 x=1, y=23.5/42.5）のHD砲身レンズ発光
+    const muzzlePorts = [
+        { x: 24.5, y: 10.0 },
+        { x: 1.2,  y: 23.5 },
+        { x: 1.2,  y: 42.5 },
+        { x: 24.5, y: 56.0 }
+    ];
+    for (const mp of muzzlePorts) {
+        const mx = mp.x * HD;
+        const my = mp.y * HD;
+        const mGrad = g.createRadialGradient(mx, my, 1, mx, my, 9);
+        mGrad.addColorStop(0, 'rgba(200, 250, 255, 0.85)');
+        mGrad.addColorStop(0.5, 'rgba(60, 180, 240, 0.40)');
+        mGrad.addColorStop(1, 'rgba(0, 80, 160, 0)');
+        g.fillStyle = mGrad;
+        g.beginPath();
+        g.arc(mx, my, 9, 0, Math.PI * 2);
+        g.fill();
+    }
+
+    // (e) コア通路の上下ガイドレールと奥行き陰影 (x=9..40, y=28..37)
+    const corrX = 9 * HD;
+    const corrY = 28.5 * HD;
+    const corrW = 32 * HD;
+    const corrH = 9 * HD;
+    const corrGrad = g.createLinearGradient(0, corrY, 0, corrY + corrH);
+    corrGrad.addColorStop(0.0, 'rgba(0, 0, 0, 0.75)');
+    corrGrad.addColorStop(0.18, 'rgba(70, 90, 105, 0.28)');
+    corrGrad.addColorStop(0.50, 'rgba(5, 10, 18, 0.65)');
+    corrGrad.addColorStop(0.82, 'rgba(70, 90, 105, 0.28)');
+    corrGrad.addColorStop(1.0, 'rgba(0, 0, 0, 0.75)');
+    g.fillStyle = corrGrad;
+    g.fillRect(corrX, corrY, corrW, corrH);
+
+    g.restore();
+
     _bigCoreHullCanvas = c;
     return c;
 }
 
 function drawOriginalBigCore(ctx, boss) {
-    const S = 3; // 98x66ドットを3倍スケール(294x198px)でドット絵パーフェクト描画
+    const S = 3; // 画面上の表示サイズは従来どおり 98x66 * 3 = 294x198px（当たり判定・シルエット完全維持）
     const w = 98;
     const h = 66;
     const ox = Math.round(boss.x - (w * S) / 2); // boss.x - 147
@@ -158,80 +486,176 @@ function drawOriginalBigCore(ctx, boss) {
 
     ctx.save();
     const prevSmooth = ctx.imageSmoothingEnabled;
-    ctx.imageSmoothingEnabled = false;
+    ctx.imageSmoothingEnabled = true;
+    if ('imageSmoothingQuality' in ctx) {
+        ctx.imageSmoothingQuality = 'high';
+    }
 
-    // 1. ベース船体ハル（98x66 AC版ドット絵）を描画
+    // 1. 6倍スーパーサンプリング済みの高精細HD船体ハルを描画
     const hullCanvas = getBigCoreHullCanvas();
     ctx.drawImage(hullCanvas, ox, oy, w * S, h * S);
 
-    // 2. コア通路内の4枚遮蔽板（シャッター）＋奥のストッパーを残存枚数に応じてドット描画
+    // 2. コア通路内の4枚遮蔽板（シャッター）＋奥のストッパーを高精細3Dメタリック描画
     const shields = Math.max(0, Math.min(4, boss.shields || 0));
     if (shields > 0) {
         const firstBarIdx = 4 - shields; // 前(左)から順に破壊される
         for (let i = firstBarIdx; i < 4; i++) {
-            const bx = 10 + i * 4;
+            const bx = ox + (10 + i * 4) * S;
+            const by = oy + 29 * S;
+            const bw = 2 * S; // 6px
+            const bh = 8 * S; // 24px
             const isFrontBar = (i === firstBarIdx);
             const isFlashing = isFrontBar && (boss.shieldFlashTimer > 0);
-            for (let y = 29; y <= 36; y++) {
-                const row = BIG_CORE_SPRITE_ROWS[y];
-                for (let dx = 0; dx < 2; dx++) {
-                    const ch = row[bx + dx];
-                    if (ch === '.' || ch === '0') continue;
-                    if (isFlashing) {
-                        ctx.fillStyle = dx === 0 ? '#FFFFFF' : '#FFE7A5';
-                    } else {
-                        ctx.fillStyle = BIG_CORE_PALETTE[ch];
-                    }
-                    ctx.fillRect(ox + (bx + dx) * S, oy + y * S, S, S);
-                }
+
+            // シャッター装甲プレートの立体円筒グラデーション
+            const sGrad = ctx.createLinearGradient(bx, by, bx, by + bh);
+            if (isFlashing) {
+                sGrad.addColorStop(0.0, '#ffffff');
+                sGrad.addColorStop(0.5, '#fff6cc');
+                sGrad.addColorStop(1.0, '#ffd266');
+            } else {
+                sGrad.addColorStop(0.00, '#6e4700');
+                sGrad.addColorStop(0.18, '#c69e4b');
+                sGrad.addColorStop(0.45, '#f2dfba');
+                sGrad.addColorStop(0.55, '#ffffff');
+                sGrad.addColorStop(0.75, '#c6ad7b');
+                sGrad.addColorStop(1.00, '#593800');
             }
+            ctx.fillStyle = sGrad;
+            ctx.fillRect(bx, by, bw, bh);
+
+            // 前面（左側）のエッジハイライトと背面シャドウ
+            ctx.fillStyle = isFlashing ? '#ffffff' : 'rgba(255, 250, 225, 0.85)';
+            ctx.fillRect(bx, by, 1.5, bh);
+            ctx.fillStyle = 'rgba(25, 12, 0, 0.7)';
+            ctx.fillRect(bx + bw - 1.2, by, 1.2, bh);
+
+            // 上下の油圧ロック金具
+            ctx.fillStyle = '#4a3208';
+            ctx.fillRect(bx - 0.5, by, bw + 1, 2.5);
+            ctx.fillRect(bx - 0.5, by + bh - 2.5, bw + 1, 2.5);
         }
+
         // 4枚目のすぐ後ろにある金色の丸型シャッターストッパー (x=25..29, y=30..35)
-        for (let y = 30; y <= 35; y++) {
-            const row = BIG_CORE_SPRITE_ROWS[y];
-            for (let x = 25; x <= 29; x++) {
-                const ch = row[x];
-                if (ch === '.' || ch === '0') continue;
-                ctx.fillStyle = BIG_CORE_PALETTE[ch];
-                ctx.fillRect(ox + x * S, oy + y * S, S, S);
-            }
-        }
+        const stX = ox + 25 * S;
+        const stY = oy + 30 * S;
+        const stW = 5 * S; // 15px
+        const stH = 6 * S; // 18px
+        const stCx = stX + stW * 0.5;
+        const stCy = stY + stH * 0.5;
+
+        const stGrad = ctx.createRadialGradient(stCx - 2, stCy - 3, 1, stCx, stCy, stH * 0.55);
+        stGrad.addColorStop(0.0, '#fff5d6');
+        stGrad.addColorStop(0.35, '#d6b46e');
+        stGrad.addColorStop(0.72, '#9c6b08');
+        stGrad.addColorStop(1.0, '#3b2400');
+        ctx.fillStyle = stGrad;
+        ctx.beginPath();
+        ctx.roundRect ? ctx.roundRect(stX, stY, stW, stH, 4) : ctx.rect(stX, stY, stW, stH);
+        ctx.fill();
+        ctx.strokeStyle = 'rgba(255, 235, 180, 0.6)';
+        ctx.lineWidth = 1;
+        ctx.stroke();
     }
 
-    // 3. 中央の12x12ドット・ブルーコア（ダメージ蓄積・撃破寸前で赤熱化、被弾時フラッシュ）
+    // 3. 中央の12x12領域（36x36px）・高精細クリスタルプラズマ・ブルーコア
     const isFlash = (boss.hitFlashTimer > 0);
     const isCritical = (boss.hp <= 2) || boss.isDying;
-    for (let y = 27; y <= 38; y++) {
-        const row = BIG_CORE_SPRITE_ROWS[y];
-        for (let x = 41; x <= 52; x++) {
-            const ch = row[x];
-            if (ch === '.' || ch === '0') continue;
-            if (isFlash) {
-                ctx.fillStyle = (ch === 'D' || ch === 'H') ? '#A5CEFF' : '#FFFFFF';
-            } else if (isCritical && BIG_CORE_CORE_RED_MAP[ch]) {
-                ctx.fillStyle = BIG_CORE_CORE_RED_MAP[ch];
-            } else {
-                ctx.fillStyle = BIG_CORE_PALETTE[ch];
-            }
-            ctx.fillRect(ox + x * S, oy + y * S, S, S);
-        }
-    }
-
-    // コアの微細な発光オーラ（ドット絵のディテールを潰さない透過加算グロウ）
     const coreCenterX = ox + 47 * S;
     const coreCenterY = oy + 33 * S;
-    const pulse = 0.22 + Math.sin(Date.now() * 0.008) * 0.08;
-    const auraGrad = ctx.createRadialGradient(coreCenterX, coreCenterY, 4, coreCenterX, coreCenterY, 26);
+    const outerR = 6.2 * S; // 18.6px (外周リングベゼル)
+    const coreR = 5.0 * S;  // 15.0px (コア球体)
+    const now = Date.now();
+    const pulse = 0.5 + Math.sin(now * 0.008) * 0.5;
+
+    // (a) 外周の重厚なダーククローム装甲ベゼルリング (原作の'C','K'リング領域に完全一致)
+    const bezelGrad = ctx.createLinearGradient(coreCenterX - outerR, coreCenterY - outerR, coreCenterX + outerR, coreCenterY + outerR);
+    bezelGrad.addColorStop(0.0, '#a8b2b8');
+    bezelGrad.addColorStop(0.35, '#5a646a');
+    bezelGrad.addColorStop(0.70, '#262d32');
+    bezelGrad.addColorStop(1.0, '#101518');
+    ctx.fillStyle = bezelGrad;
+    ctx.beginPath();
+    ctx.arc(coreCenterX, coreCenterY, outerR, 0, Math.PI * 2);
+    ctx.fill();
+
+    // ベゼル内周の暗い溝リング
+    ctx.fillStyle = '#05080c';
+    ctx.beginPath();
+    ctx.arc(coreCenterX, coreCenterY, coreR + 1.4, 0, Math.PI * 2);
+    ctx.fill();
+
+    // (b) 3D球体プラズマ・エネルギーコア本体
+    const sphereGrad = ctx.createRadialGradient(
+        coreCenterX - coreR * 0.28,
+        coreCenterY - coreR * 0.28,
+        coreR * 0.06,
+        coreCenterX,
+        coreCenterY,
+        coreR
+    );
+    if (isFlash) {
+        sphereGrad.addColorStop(0.00, '#ffffff');
+        sphereGrad.addColorStop(0.45, '#e0f7ff');
+        sphereGrad.addColorStop(0.80, '#78c8ff');
+        sphereGrad.addColorStop(1.00, '#1a5fb4');
+    } else if (isCritical) {
+        sphereGrad.addColorStop(0.00, '#ffffff');
+        sphereGrad.addColorStop(0.22, '#ffe599');
+        sphereGrad.addColorStop(0.50, '#ff7722');
+        sphereGrad.addColorStop(0.78, '#c62800');
+        sphereGrad.addColorStop(0.94, '#5a0800');
+        sphereGrad.addColorStop(1.00, '#220000');
+    } else {
+        sphereGrad.addColorStop(0.00, '#ffffff');
+        sphereGrad.addColorStop(0.20, '#d4ecff');
+        sphereGrad.addColorStop(0.46, '#62b6ff');
+        sphereGrad.addColorStop(0.72, '#1e6ec8');
+        sphereGrad.addColorStop(0.92, '#062670');
+        sphereGrad.addColorStop(1.00, '#020c30');
+    }
+    ctx.fillStyle = sphereGrad;
+    ctx.beginPath();
+    ctx.arc(coreCenterX, coreCenterY, coreR, 0, Math.PI * 2);
+    ctx.fill();
+
+    // (c) コア内部のクリスタルエネルギー・リング脈動
+    ctx.strokeStyle = isCritical
+        ? `rgba(255, 220, 140, ${0.35 + pulse * 0.25})`
+        : `rgba(180, 235, 255, ${0.35 + pulse * 0.25})`;
+    ctx.lineWidth = 1.3;
+    ctx.beginPath();
+    ctx.arc(coreCenterX, coreCenterY, coreR * (0.58 + pulse * 0.08), 0, Math.PI * 2);
+    ctx.stroke();
+
+    // (d) 曲面ガラスレンズのハイグロス反射ハイライト（左上メイン光沢＋右下バウンス光）
+    ctx.save();
+    ctx.translate(coreCenterX - coreR * 0.34, coreCenterY - coreR * 0.34);
+    ctx.rotate(-Math.PI / 4);
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.78)';
+    ctx.beginPath();
+    ctx.ellipse(0, 0, coreR * 0.32, coreR * 0.16, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+
+    ctx.fillStyle = isCritical ? 'rgba(255, 160, 90, 0.28)' : 'rgba(140, 220, 255, 0.30)';
+    ctx.beginPath();
+    ctx.arc(coreCenterX + coreR * 0.32, coreCenterY + coreR * 0.32, coreR * 0.22, 0, Math.PI * 2);
+    ctx.fill();
+
+    // (e) コアの透過発光オーラ
+    const auraAlpha = 0.20 + pulse * 0.10;
+    const auraGrad = ctx.createRadialGradient(coreCenterX, coreCenterY, 4, coreCenterX, coreCenterY, 28);
     if (isCritical) {
-        auraGrad.addColorStop(0, `rgba(255, 180, 80, ${pulse})`);
+        auraGrad.addColorStop(0, `rgba(255, 180, 80, ${auraAlpha})`);
         auraGrad.addColorStop(1, 'rgba(255, 40, 0, 0)');
     } else {
-        auraGrad.addColorStop(0, `rgba(140, 220, 255, ${pulse})`);
+        auraGrad.addColorStop(0, `rgba(140, 220, 255, ${auraAlpha})`);
         auraGrad.addColorStop(1, 'rgba(0, 100, 255, 0)');
     }
     ctx.fillStyle = auraGrad;
     ctx.beginPath();
-    ctx.arc(coreCenterX, coreCenterY, 26, 0, Math.PI * 2);
+    ctx.arc(coreCenterX, coreCenterY, 28, 0, Math.PI * 2);
     ctx.fill();
 
     ctx.imageSmoothingEnabled = prevSmooth;
