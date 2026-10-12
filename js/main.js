@@ -950,7 +950,8 @@ function triggerBossDefeatExplosion(boss) {
                 const sparkColor = isStage2 ? '#e6ccb2' : (isStage4 ? '#ff5500' : '#ffaa00');
                 createExplosion(explosionX, explosionY, sparkColor);
             }
-            if (i % 3 === 0 && typeof spawnBossDismembermentWave === 'function') {
+            const shouldSpawnWave = isStage3 ? (i === 9 || i === 18) : (i % 3 === 0);
+            if (shouldSpawnWave && typeof spawnBossDismembermentWave === 'function') {
                 spawnBossDismembermentWave(boss, false);
             }
         }, i * 45);

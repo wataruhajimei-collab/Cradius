@@ -1855,24 +1855,6 @@ class Stage4Boss {
             drawOriginalBigCore(ctx, this);
         }
 
-        // 撃破時の断末魔シャウト演出
-        if (this.isDying || this.isScreaming) {
-            ctx.save();
-            const sx = cx + (Math.random() - 0.5) * 16;
-            const sy = Math.max(60, cy - 115) + (Math.random() - 0.5) * 16;
-            ctx.font = '900 44px "Impact", "Arial Black", sans-serif';
-            ctx.textAlign = 'center';
-            ctx.shadowColor = '#ff2200';
-            ctx.shadowBlur = 22;
-            ctx.strokeStyle = '#ffffff';
-            ctx.lineWidth = 6;
-            const txt = this.screamText || 'ウワーーーー！';
-            ctx.strokeText(txt, sx, sy);
-            ctx.fillStyle = '#ff3300';
-            ctx.fillText(txt, sx, sy);
-            ctx.restore();
-        }
-
         ctx.restore();
 
         this.bullets.forEach(b => b.draw(ctx));

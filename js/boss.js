@@ -461,24 +461,6 @@ class Boss {
         // 1985年AC版『グラディウス』ビッグコア完全再現描画（船体＋動的4枚遮蔽板＋ブルーコア）
         drawOriginalBigCore(ctx, this);
 
-        // 撃破時の断末魔シャウト演出
-        if (this.isDying || this.isScreaming) {
-            ctx.save();
-            const sx = this.x + (Math.random() - 0.5) * 16;
-            const sy = Math.max(60, this.y - 115) + (Math.random() - 0.5) * 16;
-            ctx.font = '900 42px "Impact", "Arial Black", sans-serif';
-            ctx.textAlign = 'center';
-            ctx.shadowColor = '#ff0000';
-            ctx.shadowBlur = 22;
-            ctx.strokeStyle = '#ffffff';
-            ctx.lineWidth = 6;
-            const txt = this.screamText || 'ウワーーーー！';
-            ctx.strokeText(txt, sx, sy);
-            ctx.fillStyle = '#ff2200';
-            ctx.fillText(txt, sx, sy);
-            ctx.restore();
-        }
-
         ctx.restore();
         
         this.bullets.forEach(b => b.draw(ctx));
@@ -1178,24 +1160,6 @@ class GolemBoss {
         // --- 6. 旋回する浮遊モノリス結界石とルーン稲妻 ---
         this._drawOrbitingMonoliths(ctx, bx + 62, by + bh / 2);
 
-        // 撃破時の大声断末魔シャウト演出（「ウワーーーー！」）
-        if (this.isDying || this.isScreaming) {
-            ctx.save();
-            const sx = bx + bw / 2 + (Math.random() - 0.5) * 16;
-            const sy = Math.max(60, by - 24) + (Math.random() - 0.5) * 16;
-            ctx.font = '900 42px "Impact", "Arial Black", sans-serif';
-            ctx.textAlign = 'center';
-            ctx.shadowColor = '#ff0000';
-            ctx.shadowBlur = 22;
-            ctx.strokeStyle = '#ffffff';
-            ctx.lineWidth = 6;
-            const txt = this.screamText || 'ウワーーーー！';
-            ctx.strokeText(txt, sx, sy);
-            ctx.fillStyle = '#ff2200';
-            ctx.fillText(txt, sx, sy);
-            ctx.restore();
-        }
-
         ctx.restore();
 
         // 弾の描画
@@ -1859,24 +1823,6 @@ class BigCoreBoss {
 
         // --- 5. 前面4つの生体臓器カプセル・シールドコア ---
         this._drawShieldCores(ctx, cy);
-
-        // 撃破時の大声断末魔シャウト演出（「ウワーーーー！」）
-        if (this.isDying || this.isScreaming) {
-            ctx.save();
-            const sx = cx + (Math.random() - 0.5) * 18;
-            const sy = Math.max(65, cy - 115) + (Math.random() - 0.5) * 18;
-            ctx.font = '900 46px "Impact", "Arial Black", sans-serif';
-            ctx.textAlign = 'center';
-            ctx.shadowColor = '#ff0044';
-            ctx.shadowBlur = 24;
-            ctx.strokeStyle = '#ffffff';
-            ctx.lineWidth = 6;
-            const txt = this.screamText || 'ウワーーーー！';
-            ctx.strokeText(txt, sx, sy);
-            ctx.fillStyle = '#ff1144';
-            ctx.fillText(txt, sx, sy);
-            ctx.restore();
-        }
 
         ctx.restore();
 

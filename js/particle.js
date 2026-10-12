@@ -244,31 +244,13 @@ class BossDebris {
             }
         }
 
-        // 内臓から垂れ下がるドロドロの粘液・血の糸の伸長と滴り
+        // 内臓から垂れ下がるドロドロの粘液・血の糸（子パーティクルを無限増殖させず、太い粘液糸の伸縮で表現）
         if (this.dripStrings.length > 0) {
             for (let i = 0; i < this.dripStrings.length; i++) {
                 const ds = this.dripStrings[i];
                 ds.len += ds.growSpeed;
                 if (ds.len >= ds.maxLen) {
-                    // 伸び切った粘液の先端からボタッと重い血塊がちぎれて落ちる
-                    if (typeof particles !== 'undefined' && particles.length < 880) {
-                        particles.push(new BossDebris(
-                            this.x + ds.ox,
-                            this.y + ds.oy + ds.len,
-                            'BLOOD_SPLATTER',
-                            {
-                                stage: 3,
-                                vx: this.vx * 0.35 + (Math.random() - 0.5) * 0.8,
-                                vy: Math.max(0.5, this.vy * 0.4) + 1.2,
-                                gravity: 0.085,
-                                drag: 0.965,
-                                size: 6.5 + Math.random() * 5.0,
-                                decay: 0.014,
-                                color: '#b91c1c'
-                            }
-                        ));
-                    }
-                    ds.len = 6 + Math.random() * 6;
+                    ds.len = 10 + Math.random() * 8;
                 }
             }
         }
@@ -309,20 +291,20 @@ class BossDebris {
             const dx = other.x - this.x;
             const dy = other.y - this.y;
             const dist = Math.hypot(dx, dy);
-            const maxWebDist = 115;
-            if (dist > 12 && dist < maxWebDist) {
+            const maxWebDist = 175;
+            if (dist > 14 && dist < maxWebDist) {
                 const ratio = 1 - dist / maxWebDist;
                 const midX = (this.x + other.x) * 0.5;
                 // 重力で中央がドロッと垂れ下がるカテナリー曲線
-                const sag = (1 - ratio) * 26 + Math.sin(this.age * 0.15 + dist * 0.05) * 5;
+                const sag = (1 - ratio) * 34 + Math.sin(this.age * 0.15 + dist * 0.05) * 6;
                 const midY = (this.y + other.y) * 0.5 + sag;
 
                 ctx.save();
-                ctx.globalAlpha = Math.min(this.life, other.life) * ratio * 0.85;
+                ctx.globalAlpha = Math.min(this.life, other.life) * ratio * 0.88;
 
                 // 外側の太い粘着血膜
                 ctx.strokeStyle = '#9f1239';
-                ctx.lineWidth = Math.max(1.2, ratio * 6.5);
+                ctx.lineWidth = Math.max(2.0, ratio * 9.5);
                 ctx.lineCap = 'round';
                 ctx.beginPath();
                 ctx.moveTo(this.x, this.y);
@@ -330,11 +312,11 @@ class BossDebris {
                 ctx.stroke();
 
                 // 内側の濡れた光沢粘液ライン
-                ctx.strokeStyle = 'rgba(253, 164, 175, 0.75)';
-                ctx.lineWidth = Math.max(0.6, ratio * 2.0);
+                ctx.strokeStyle = 'rgba(253, 164, 175, 0.78)';
+                ctx.lineWidth = Math.max(1.0, ratio * 3.0);
                 ctx.beginPath();
                 ctx.moveTo(this.x, this.y - 1);
-                ctx.quadraticCurveTo(midX, midY - 1.5, other.x, other.y - 1);
+                ctx.quadraticCurveTo(midX, midY - 2.0, other.x, other.y - 1);
                 ctx.stroke();
 
                 // 粘液の糸の途中に絡みつくドロッとした血の玉
@@ -342,12 +324,12 @@ class BossDebris {
                 const bx = 0.25 * this.x + 0.5 * midX + 0.25 * other.x;
                 const by = 0.25 * this.y + 0.5 * midY + 0.25 * other.y;
                 ctx.beginPath();
-                ctx.arc(bx, by, Math.max(2, ratio * 4.5), 0, Math.PI * 2);
+                ctx.arc(bx, by, Math.max(3, ratio * 6.5), 0, Math.PI * 2);
                 ctx.fill();
 
                 ctx.restore();
                 connected++;
-                if (connected >= 3) break;
+                if (connected >= 2) break;
             }
         }
     }
@@ -361,28 +343,28 @@ class BossDebris {
             const ds = this.dripStrings[i];
             const sx = this.x + ds.ox;
             const sy = this.y + ds.oy;
-            const sway = Math.sin(this.age * 0.14 + ds.phase) * 4 - this.vx * 1.8;
+            const sway = Math.sin(this.age * 0.14 + ds.phase) * 5 - this.vx * 1.8;
             const ex = sx + sway;
-            const ey = sy + ds.len;
+            const ey = sy + ds.len * 1.25;
 
             // 粘着質の太い血の糸
             ctx.strokeStyle = '#99001b';
-            ctx.lineWidth = ds.thickness;
+            ctx.lineWidth = ds.thickness * 1.35;
             ctx.lineCap = 'round';
             ctx.beginPath();
             ctx.moveTo(sx, sy);
-            ctx.quadraticCurveTo(sx + sway * 0.4, sy + ds.len * 0.55, ex, ey);
+            ctx.quadraticCurveTo(sx + sway * 0.4, sy + ds.len * 0.65, ex, ey);
             ctx.stroke();
 
-            // 先端に溜まるぷっくりした粘液血滴（ティアドロップ型）
-            const dropR = ds.thickness * 1.45;
-            const dGrad = ctx.createRadialGradient(ex - dropR * 0.3, ey - dropR * 0.3, 0.5, ex, ey, dropR);
-            dGrad.addColorStop(0, '#fda4af');
-            dGrad.addColorStop(0.35, '#e11d48');
-            dGrad.addColorStop(1, '#4c0519');
-            ctx.fillStyle = dGrad;
+            // 先端に溜まるぷっくりした粘液血滴
+            const dropR = ds.thickness * 1.85;
+            ctx.fillStyle = '#b91c1c';
             ctx.beginPath();
             ctx.arc(ex, ey, dropR, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.fillStyle = '#fda4af';
+            ctx.beginPath();
+            ctx.arc(ex - dropR * 0.28, ey - dropR * 0.28, dropR * 0.35, 0, Math.PI * 2);
             ctx.fill();
         }
         ctx.restore();
@@ -1206,112 +1188,116 @@ function spawnBossDismembermentWave(boss, isFinalBlast = false) {
     } else if (isStage3) {
         // ====================================================
         // STAGE 3 BOSS: 神経を引きずった巨大目玉が飛び出し、
-        // ベトベトでドロドロした粘着質な内臓・血液塊が糸を引きながら溢れ出るスプラッター演出！
+        // 大ぶりで粘着質な内臓・血液塊が太い糸を引きながら溢れ出る演出（数厳選＆高フレームレート維持）
         // ====================================================
         if (isFinalBlast && typeof boss._getBioMechaTentacles === 'function') {
             const tents = boss._getBioMechaTentacles();
             tents.forEach(t => {
                 t.nodes.forEach((n, idx) => {
+                    // 画面負荷を抑えるため3節ごと＋先端のみ大ぶりな肉塊・関節として飛散
+                    if (idx % 3 !== 0 && idx !== t.nodes.length - 1) return;
                     const kind = t.isBio ? 'BIO_TENTACLE_CHUNK' : ((idx === t.nodes.length - 1) ? 'TENTACLE_CLAW' : 'TENTACLE_JOINT');
                     particles.push(new BossDebris(n.x, n.y, kind, {
                         stage: 3,
-                        speed: 2.2 + Math.random() * 3.8,
-                        drag: 0.975,
+                        speed: 2.0 + Math.random() * 3.2,
+                        drag: 0.972,
                         gravity: t.isBio ? 0.075 : 0.045,
-                        size: Math.max(12, 20 - idx * 0.8),
+                        size: Math.max(18, 28 - idx * 0.7),
                         subColor: t.isBio ? '#ff0055' : '#00ffee',
-                        decay: 0.0042
+                        decay: 0.0055
                     }));
                 });
             });
 
-            // 中央の巨大生体眼球コアが太い視神経コードを長く引きずりながら前方へボロッと飛び出す！
-            particles.push(new BossDebris(cx - 10, cy, 'EYEBALL_CHUNK', {
-                stage: 3,
-                vx: -3.4 - Math.random() * 1.4,
-                vy: -2.2 + (Math.random() - 0.5) * 1.5,
-                drag: 0.985,
-                gravity: 0.055,
-                size: 27,
-                rot: Math.PI,
-                vAngle: -0.025,
-                decay: 0.0032
-            }));
-        }
-
-        // 1. モアイ巨石顎アーマー＆機械部品の飛散
-        const armorCount = Math.round(4 * mult);
-        for (let i = 0; i < armorCount; i++) {
-            const ox = (Math.random() - 0.5) * 150;
-            const oy = (Math.random() - 0.5) * 130;
-            const kinds = ['MOAI_JAW_PART', 'HULL_PLATE', 'TENTACLE_JOINT'];
-            particles.push(new BossDebris(cx + ox, cy + oy, kinds[i % kinds.length], {
-                stage: 3,
-                speed: 2.5 + Math.random() * 4.5,
-                size: 16 + Math.random() * 14,
-                subColor: '#ff2266',
-                decay: 0.0048
-            }));
-        }
-
-        // 2. ボス内部からボトボトと塊になって溢れ出る粘着質な脳・内臓器官・腸管
-        // （パラパラに散らばらないよう、複数の粘着クラスター塊として近い速度でドロッと押し出される）
-        const clusterCount = isFinalBlast ? 5 : 2;
-        const organKinds = ['VISCERA_BRAIN', 'VISCERA_ORGAN', 'VISCERA_INTESTINE', 'BIO_TENTACLE_CHUNK'];
-        for (let c = 0; c < clusterCount; c++) {
-            const baseAng = Math.PI + (Math.random() - 0.5) * 2.4;
-            const baseSpd = 1.6 + Math.random() * 2.6;
-            const clusterOx = (Math.random() - 0.4) * 90;
-            const clusterOy = (Math.random() - 0.5) * 85;
-
-            for (let m = 0; m < 3; m++) {
-                const kind = organKinds[(c + m) % organKinds.length];
-                const ang = baseAng + (Math.random() - 0.5) * 0.35;
-                const spd = baseSpd + (Math.random() - 0.5) * 0.9;
-                particles.push(new BossDebris(cx + clusterOx + (Math.random() - 0.5) * 24, cy + clusterOy + (Math.random() - 0.5) * 24, kind, {
+            // 中央の巨大生体眼球コアが太い視神経コードを長く引きずりながら前方へボロッと飛び出す（1回のみ）
+            if (!boss._eyeballSpawned) {
+                boss._eyeballSpawned = true;
+                particles.push(new BossDebris(cx - 10, cy, 'EYEBALL_CHUNK', {
                     stage: 3,
-                    vx: Math.cos(ang) * spd,
-                    vy: Math.sin(ang) * spd - 0.6,
-                    drag: 0.968,    // 強い粘性抵抗でベトベトと重く減速
-                    gravity: 0.075, // ドロッと重力で垂れ落ちる
-                    vAngle: (Math.random() - 0.5) * 0.04,
-                    size: 16 + Math.random() * 16,
+                    vx: -3.2 - Math.random() * 1.2,
+                    vy: -2.0 + (Math.random() - 0.5) * 1.4,
+                    drag: 0.984,
+                    gravity: 0.055,
+                    size: 35,
+                    rot: Math.PI,
+                    vAngle: -0.025,
                     decay: 0.0040
                 }));
             }
         }
 
-        // 3. 濃厚な粘液血糊クラウド（BLOOD_MIST）と、糸を引いてうねる粘着血液塊（BLOOD_SPLATTER）
-        const mistCount = Math.round(4 * mult);
-        for (let i = 0; i < mistCount; i++) {
-            const ox = (Math.random() - 0.4) * 100;
-            const oy = (Math.random() - 0.5) * 90;
-            particles.push(new BossDebris(cx + ox, cy + oy, 'BLOOD_MIST', {
+        // 1. モアイ巨石顎アーマー＆機械部品の飛散（数を絞って大ぶりに）
+        const armorCount = isFinalBlast ? 4 : 1;
+        for (let i = 0; i < armorCount; i++) {
+            const ox = (Math.random() - 0.5) * 140;
+            const oy = (Math.random() - 0.5) * 120;
+            const kinds = ['MOAI_JAW_PART', 'HULL_PLATE', 'TENTACLE_JOINT'];
+            particles.push(new BossDebris(cx + ox, cy + oy, kinds[i % kinds.length], {
                 stage: 3,
-                speed: 0.8 + Math.random() * 2.2,
-                drag: 0.96,
-                gravity: 0.035,
-                size: 30 + Math.random() * 28,
-                decay: 0.0075
+                speed: 2.2 + Math.random() * 3.8,
+                size: 24 + Math.random() * 16,
+                subColor: '#ff2266',
+                decay: 0.0060
             }));
         }
 
-        const bloodCount = Math.round(14 * mult);
+        // 2. ボス内部からボトボトと塊になって溢れ出る大ぶりな粘着質の脳・内臓器官・腸管
+        const clusterCount = isFinalBlast ? 3 : 1;
+        const organKinds = ['VISCERA_BRAIN', 'VISCERA_ORGAN', 'VISCERA_INTESTINE', 'BIO_TENTACLE_CHUNK'];
+        for (let c = 0; c < clusterCount; c++) {
+            const baseAng = Math.PI + (Math.random() - 0.5) * 2.2;
+            const baseSpd = 1.5 + Math.random() * 2.2;
+            const clusterOx = (Math.random() - 0.4) * 80;
+            const clusterOy = (Math.random() - 0.5) * 75;
+
+            for (let m = 0; m < 2; m++) {
+                const kind = organKinds[(c * 2 + m) % organKinds.length];
+                const ang = baseAng + (Math.random() - 0.5) * 0.32;
+                const spd = baseSpd + (Math.random() - 0.5) * 0.7;
+                particles.push(new BossDebris(cx + clusterOx + (Math.random() - 0.5) * 28, cy + clusterOy + (Math.random() - 0.5) * 28, kind, {
+                    stage: 3,
+                    vx: Math.cos(ang) * spd,
+                    vy: Math.sin(ang) * spd - 0.5,
+                    drag: 0.966,    // 強い粘性抵抗でベトベトと重く減速
+                    gravity: 0.078, // ドロッと重力で垂れ落ちる
+                    vAngle: (Math.random() - 0.5) * 0.035,
+                    size: 26 + Math.random() * 18, // 大きく存在感のある内臓塊
+                    decay: 0.0052
+                }));
+            }
+        }
+
+        // 3. 濃厚な粘液血糊クラウド（BLOOD_MIST）と、太く糸を引いてうねる大粒の粘着血液塊（BLOOD_SPLATTER）
+        const mistCount = isFinalBlast ? 3 : 1;
+        for (let i = 0; i < mistCount; i++) {
+            const ox = (Math.random() - 0.4) * 90;
+            const oy = (Math.random() - 0.5) * 80;
+            particles.push(new BossDebris(cx + ox, cy + oy, 'BLOOD_MIST', {
+                stage: 3,
+                speed: 0.7 + Math.random() * 1.8,
+                drag: 0.96,
+                gravity: 0.035,
+                size: 42 + Math.random() * 30,
+                decay: 0.0090
+            }));
+        }
+
+        const bloodCount = isFinalBlast ? 7 : 3;
         const bloodPalette = ['#e11d48', '#be123c', '#9f1239', '#881337'];
         for (let i = 0; i < bloodCount; i++) {
-            const streamAng = Math.PI + (i % 5 - 2) * 0.45 + (Math.random() - 0.5) * 0.25;
-            const spd = 1.8 + (i % 4) * 0.95 + Math.random() * 1.2;
-            const ox = (Math.random() - 0.4) * 95;
-            const oy = (Math.random() - 0.5) * 85;
+            const streamAng = Math.PI + (i % 5 - 2) * 0.42 + (Math.random() - 0.5) * 0.25;
+            const spd = 1.6 + (i % 3) * 0.9 + Math.random() * 1.0;
+            const ox = (Math.random() - 0.4) * 85;
+            const oy = (Math.random() - 0.5) * 75;
             particles.push(new BossDebris(cx + ox, cy + oy, 'BLOOD_SPLATTER', {
                 stage: 3,
                 vx: Math.cos(streamAng) * spd,
-                vy: Math.sin(streamAng) * spd - 0.8,
-                drag: 0.965,    // パラパラ飛ばず、粘り気のある流体として減速
-                gravity: 0.085, // 重く垂れ落ちる血塊
-                size: 8.5 + Math.random() * 7.5,
+                vy: Math.sin(streamAng) * spd - 0.7,
+                drag: 0.964,    // 粘り気のある流体として減速
+                gravity: 0.085, // 重く垂れ落ちる大粒血塊
+                size: 14 + Math.random() * 10, // より大きく粘着感のある血塊
                 color: bloodPalette[i % bloodPalette.length],
-                decay: 0.0065
+                decay: 0.0075
             }));
         }
     }
