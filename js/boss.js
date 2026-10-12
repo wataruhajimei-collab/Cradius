@@ -1864,15 +1864,15 @@ class BigCoreBoss {
 
     _drawBioMechaTentacles(ctx) {
         const tentacles = this._getBioMechaTentacles();
-        const thickScale = this.tentacleThicknessScale || 3;
+        const thickScale = this.tentacleThicknessScale || 1.8;
         ctx.save();
 
         tentacles.forEach(t => {
             const nodes = t.nodes;
 
-            // 生体動脈ラインまたは高圧エネルギー導管（太さ3倍）
-            ctx.strokeStyle = t.isBio ? 'rgba(225, 29, 72, 0.7)' : 'rgba(56, 189, 248, 0.55)';
-            ctx.lineWidth = (t.isBio ? 8 : 6) * thickScale;
+            // 生体動脈ラインまたは高圧装甲エネルギー導管
+            ctx.strokeStyle = t.isBio ? 'rgba(225, 29, 72, 0.75)' : 'rgba(14, 165, 233, 0.65)';
+            ctx.lineWidth = (t.isBio ? 7.5 : 6.5) * thickScale;
             ctx.beginPath();
             nodes.forEach((n, idx) => {
                 if (idx === 0) ctx.moveTo(n.x, n.y);
@@ -1880,71 +1880,83 @@ class BigCoreBoss {
             });
             ctx.stroke();
 
-            // 各関節の描画（太さ3倍）
+            // 各関節の精密3D描画
             for (let i = 0; i < nodes.length; i++) {
                 const n = nodes[i];
-                const r = (n.radius !== undefined) ? n.radius : (Math.max(6, 15 - i * 1.0) * thickScale);
+                const r = (n.radius !== undefined) ? n.radius : (Math.max(6, 14 - i * 0.9) * thickScale);
                 ctx.save();
                 ctx.translate(n.x, n.y);
                 ctx.rotate(n.angle);
 
                 if (t.isBio) {
-                    // 生体触手：脈動する赤紫の筋肉組織＆内臓血管節（太さ3倍）
-                    const pulseR = r + Math.sin(this.organPulse + i * 0.7) * 1.8 * thickScale;
-                    const bioGrad = ctx.createRadialGradient(-2 * thickScale, -2 * thickScale, 1 * thickScale, 0, 0, pulseR);
-                    bioGrad.addColorStop(0, '#fda4af');
-                    bioGrad.addColorStop(0.45, '#e11d48');
-                    bioGrad.addColorStop(0.85, '#881337');
-                    bioGrad.addColorStop(1, '#4c0519');
+                    // 生体触手：脈動する赤紫の筋肉組織＆生体発光リング
+                    const pulseR = r + Math.sin(this.organPulse + i * 0.7) * 1.5 * thickScale;
+                    const bioGrad = ctx.createRadialGradient(-2 * thickScale, -2 * thickScale, 1, 0, 0, pulseR);
+                    bioGrad.addColorStop(0, '#ffe4e6');
+                    bioGrad.addColorStop(0.35, '#f43f5e');
+                    bioGrad.addColorStop(0.75, '#9f1239');
+                    bioGrad.addColorStop(1, '#3b0764');
                     ctx.fillStyle = bioGrad;
                     ctx.beginPath();
-                    ctx.ellipse(0, 0, pulseR * 1.15, pulseR * 0.85, 0, 0, Math.PI * 2);
+                    ctx.ellipse(0, 0, pulseR * 1.12, pulseR * 0.82, 0, 0, Math.PI * 2);
                     ctx.fill();
-                    ctx.strokeStyle = '#fb7185';
-                    ctx.lineWidth = 1 * thickScale;
+                    ctx.strokeStyle = '#fda4af';
+                    ctx.lineWidth = 1.1;
                     ctx.stroke();
                 } else {
-                    // 機械触手：重厚なチタン装甲リング＆モアイ岩石節（太さ3倍）
-                    const mechGrad = ctx.createRadialGradient(-2 * thickScale, -2 * thickScale, 1 * thickScale, 0, 0, r);
-                    mechGrad.addColorStop(0, '#e2e8f0');
-                    mechGrad.addColorStop(0.5, '#475569');
-                    mechGrad.addColorStop(1, '#0f172a');
+                    // 機械触手：多層ベベル加工のクローム＆ガンメタル円筒アクチュエーター節
+                    const w = r * 1.65;
+                    const h = r * 1.35;
+                    const mechGrad = ctx.createLinearGradient(0, -h / 2, 0, h / 2);
+                    mechGrad.addColorStop(0.0, '#f8fafc');
+                    mechGrad.addColorStop(0.22, '#cbd5e1');
+                    mechGrad.addColorStop(0.55, '#475569');
+                    mechGrad.addColorStop(0.85, '#1e293b');
+                    mechGrad.addColorStop(1.0, '#090d16');
                     ctx.fillStyle = mechGrad;
-                    ctx.fillRect(-r * 0.85, -r * 0.7, r * 1.7, r * 1.4);
-                    ctx.strokeStyle = '#94a3b8';
-                    ctx.lineWidth = 1.2 * thickScale;
-                    ctx.strokeRect(-r * 0.85, -r * 0.7, r * 1.7, r * 1.4);
+                    ctx.fillRect(-w / 2, -h / 2, w, h);
 
-                    ctx.fillStyle = '#00ffee';
+                    // ゴールド油圧カラー＆スリット装甲枠
+                    ctx.fillStyle = '#f59e0b';
+                    ctx.fillRect(-w / 2 + 1, -h / 2, 3, h);
+                    ctx.strokeStyle = '#e2e8f0';
+                    ctx.lineWidth = 1.2;
+                    ctx.strokeRect(-w / 2, -h / 2, w, h);
+
+                    // 関節中央の高輝度リアクターベアリング
+                    ctx.fillStyle = '#00f0ff';
                     ctx.beginPath();
                     ctx.arc(0, 0, r * 0.28, 0, Math.PI * 2);
                     ctx.fill();
                 }
 
-                // 触手先端のクロー／生体牙ノズル（太さ3倍）
+                // 触手先端の連装メカニカル・レーザー砲ユニット
                 if (i === nodes.length - 1) {
                     ctx.save();
                     ctx.scale(thickScale, thickScale);
-                    ctx.fillStyle = t.isBio ? '#fecdd3' : '#cbd5e1';
-                    ctx.beginPath();
-                    ctx.moveTo(2, -6);
-                    ctx.lineTo(16, -10);
-                    ctx.lineTo(10, -2);
-                    ctx.closePath();
-                    ctx.fill();
 
-                    ctx.beginPath();
-                    ctx.moveTo(2, 6);
-                    ctx.lineTo(16, 10);
-                    ctx.lineTo(10, 2);
-                    ctx.closePath();
-                    ctx.fill();
+                    // 砲身マウントハウジング
+                    const tipGrad = ctx.createLinearGradient(-4, -8, 14, 8);
+                    tipGrad.addColorStop(0, '#e2e8f0');
+                    tipGrad.addColorStop(0.5, '#334155');
+                    tipGrad.addColorStop(1, '#0f172a');
+                    ctx.fillStyle = tipGrad;
+                    ctx.fillRect(-2, -7, 14, 14);
+                    ctx.strokeStyle = '#94a3b8';
+                    ctx.lineWidth = 1;
+                    ctx.strokeRect(-2, -7, 14, 14);
 
+                    // 上下スタビライザーバレル
+                    ctx.fillStyle = '#cbd5e1';
+                    ctx.fillRect(8, -6, 10, 3);
+                    ctx.fillRect(8, 3, 10, 3);
+
+                    // 中央集束レンズコア
                     ctx.fillStyle = t.isBio ? '#ff0055' : '#00ffff';
                     ctx.shadowColor = ctx.fillStyle;
                     ctx.shadowBlur = 10;
                     ctx.beginPath();
-                    ctx.arc(6, 0, 4.5, 0, Math.PI * 2);
+                    ctx.arc(10, 0, 4.2, 0, Math.PI * 2);
                     ctx.fill();
                     ctx.restore();
                 }
@@ -1960,11 +1972,49 @@ class BigCoreBoss {
         ctx.save();
         const beat = Math.sin(this.organPulse) * 4.5;
 
-        // A. 後部〜中央に広がる「巨大生体脳みそ（大脳半球）」
-        const brainX = cx + 32;
+        // A. 後部4連大型プラズマ・ベクタースラスター＆アフターバーナー噴射炎
+        const nozzleYs = [-54, -22, 22, 54];
+        const flameLen = 34 + Math.sin(Date.now() * 0.025) * 12;
+        nozzleYs.forEach((ny, idx) => {
+            const bx = cx + hw + 4;
+            const by = cy + ny;
+
+            // スラスター噴射プラズマプルーム
+            const pGrad = ctx.createLinearGradient(bx, by, bx + flameLen, by);
+            pGrad.addColorStop(0, '#ffffff');
+            pGrad.addColorStop(0.35, (idx % 2 === 0) ? '#00f0ff' : '#ff2266');
+            pGrad.addColorStop(1, 'rgba(0, 200, 255, 0)');
+            ctx.fillStyle = pGrad;
+            ctx.beginPath();
+            ctx.moveTo(bx, by - 9);
+            ctx.lineTo(bx + flameLen, by);
+            ctx.lineTo(bx, by + 9);
+            ctx.closePath();
+            ctx.fill();
+
+            // 装甲ベクターノズル本体
+            const nGrad = ctx.createLinearGradient(bx - 16, by - 11, bx + 6, by + 11);
+            nGrad.addColorStop(0, '#cbd5e1');
+            nGrad.addColorStop(0.5, '#334155');
+            nGrad.addColorStop(1, '#090d16');
+            ctx.fillStyle = nGrad;
+            ctx.beginPath();
+            ctx.moveTo(bx - 16, by - 11);
+            ctx.lineTo(bx + 4, by - 8);
+            ctx.lineTo(bx + 4, by + 8);
+            ctx.lineTo(bx - 16, by + 11);
+            ctx.closePath();
+            ctx.fill();
+            ctx.strokeStyle = '#94a3b8';
+            ctx.lineWidth = 1.2;
+            ctx.stroke();
+        });
+
+        // B. 後部〜中央に広がる「巨大生体脳みそ（大脳半球）」
+        const brainX = cx + 28;
         const brainY = cy;
-        const brainW = 92 + beat;
-        const brainH = 74 + beat * 0.8;
+        const brainW = 90 + beat;
+        const brainH = 72 + beat * 0.8;
 
         const brainGrad = ctx.createRadialGradient(brainX - 18, brainY - 14, 8, brainX, brainY, brainW);
         brainGrad.addColorStop(0, '#ffe4e6');
@@ -1983,28 +2033,27 @@ class BigCoreBoss {
 
         // 脳みそのリアルな皺（大脳皮質の溝・回）と神経シナプス発光
         ctx.strokeStyle = '#4c0519';
-        ctx.lineWidth = 3.2;
+        ctx.lineWidth = 3.0;
         ctx.beginPath();
         for (let row = -2; row <= 2; row++) {
-            const ry = brainY + row * 19;
-            ctx.moveTo(brainX - 55, ry);
-            ctx.bezierCurveTo(brainX - 25, ry - 14, brainX + 5, ry + 14, brainX + 35, ry - 6);
-            ctx.bezierCurveTo(brainX + 55, ry - 16, brainX + 70, ry + 10, brainX + 78, ry);
+            const ry = brainY + row * 18;
+            ctx.moveTo(brainX - 52, ry);
+            ctx.bezierCurveTo(brainX - 24, ry - 13, brainX + 5, ry + 13, brainX + 34, ry - 6);
+            ctx.bezierCurveTo(brainX + 52, ry - 15, brainX + 66, ry + 10, brainX + 74, ry);
         }
         ctx.stroke();
 
-        // 脳皺のハイライト＆神経パルス
-        ctx.strokeStyle = 'rgba(255, 200, 220, 0.55)';
-        ctx.lineWidth = 1.4;
+        ctx.strokeStyle = 'rgba(255, 210, 225, 0.55)';
+        ctx.lineWidth = 1.3;
         ctx.beginPath();
         for (let row = -2; row <= 2; row++) {
-            const ry = brainY + row * 19 - 2;
-            ctx.moveTo(brainX - 50, ry);
-            ctx.bezierCurveTo(brainX - 20, ry - 12, brainX + 10, ry + 12, brainX + 45, ry - 4);
+            const ry = brainY + row * 18 - 2;
+            ctx.moveTo(brainX - 48, ry);
+            ctx.bezierCurveTo(brainX - 18, ry - 11, brainX + 10, ry + 11, brainX + 42, ry - 4);
         }
         ctx.stroke();
 
-        // B. 上下に拍動する「内臓器官（バイオ臓器サック）」
+        // C. 上下に拍動する「内臓器官（バイオ臓器サック）」
         [-1, 1].forEach(sign => {
             const ox = cx - 18;
             const oy = cy + sign * (42 + beat * 0.4);
@@ -2024,9 +2073,9 @@ class BigCoreBoss {
             ctx.stroke();
         });
 
-        // C. 前方のシールドコアと脳・内臓を繋ぐ太い生体動脈・血管束
+        // D. 前方のシールドコアと脳・内臓を繋ぐ太い生体動脈・血管束
         ctx.strokeStyle = '#e11d48';
-        ctx.lineWidth = 4;
+        ctx.lineWidth = 3.8;
         ctx.beginPath();
         for (let v = -2; v <= 2; v++) {
             if (v === 0) continue;
@@ -2035,90 +2084,239 @@ class BigCoreBoss {
         }
         ctx.stroke();
 
-        // D. 脳の後方を保護するサイバネティック脊椎・機械外骨格ケーシング
-        const spineGrad = ctx.createLinearGradient(cx + 75, cy - 70, cx + hw + 10, cy + 70);
-        spineGrad.addColorStop(0, '#475569');
-        spineGrad.addColorStop(0.5, '#1e293b');
-        spineGrad.addColorStop(1, '#090d16');
+        // E. 脳の後方〜側面を重厚に装甲する多層サイバネティック・リアクター脊椎フレーム
+        const spineGrad = ctx.createLinearGradient(cx + 55, cy - 78, cx + hw + 16, cy + 78);
+        spineGrad.addColorStop(0.0, '#f1f5f9');
+        spineGrad.addColorStop(0.25, '#94a3b8');
+        spineGrad.addColorStop(0.55, '#334155');
+        spineGrad.addColorStop(0.85, '#0f172a');
+        spineGrad.addColorStop(1.0, '#020617');
         ctx.fillStyle = spineGrad;
         ctx.beginPath();
-        ctx.moveTo(cx + 75, cy - 68);
-        ctx.lineTo(cx + hw + 12, cy - 42);
-        ctx.lineTo(cx + hw + 18, cy);
-        ctx.lineTo(cx + hw + 12, cy + 42);
-        ctx.lineTo(cx + 75, cy + 68);
-        ctx.lineTo(cx + 95, cy);
+        ctx.moveTo(cx + 58, cy - 76);
+        ctx.lineTo(cx + hw + 6, cy - 64);
+        ctx.lineTo(cx + hw + 18, cy - 28);
+        ctx.lineTo(cx + hw + 22, cy);
+        ctx.lineTo(cx + hw + 18, cy + 28);
+        ctx.lineTo(cx + hw + 6, cy + 64);
+        ctx.lineTo(cx + 58, cy + 76);
+        ctx.lineTo(cx + 82, cy + 38);
+        ctx.lineTo(cx + 68, cy);
+        ctx.lineTo(cx + 82, cy - 38);
         ctx.closePath();
         ctx.fill();
-        ctx.strokeStyle = '#94a3b8';
+        ctx.strokeStyle = '#cbd5e1';
         ctx.lineWidth = 2;
         ctx.stroke();
+
+        // 後部リアクター装甲の内部ベベルパネル＆ゴールド油圧シリンダー＆発光スリット
+        ctx.fillStyle = '#0f172a';
+        ctx.fillRect(cx + 84, cy - 46, 26, 92);
+        ctx.strokeStyle = '#38bdf8';
+        ctx.lineWidth = 1.2;
+        ctx.strokeRect(cx + 84, cy - 46, 26, 92);
+
+        for (let s = -3; s <= 3; s++) {
+            ctx.fillStyle = (s % 2 === 0) ? '#00f0ff' : '#f59e0b';
+            ctx.fillRect(cx + 88, cy + s * 11 - 2, 18, 4);
+        }
+
+        // 後部中央の回転式大型エネルギータービン・ローター
+        ctx.save();
+        ctx.translate(cx + 97, cy);
+        ctx.rotate(-this.rotationAngle * 1.4);
+        ctx.strokeStyle = '#e2e8f0';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.arc(0, 0, 14, 0, Math.PI * 2);
+        ctx.stroke();
+        for (let b = 0; b < 4; b++) {
+            const a = (Math.PI / 2) * b;
+            ctx.beginPath();
+            ctx.moveTo(0, 0);
+            ctx.lineTo(Math.cos(a) * 13, Math.sin(a) * 13);
+            ctx.stroke();
+        }
+        ctx.fillStyle = '#00f0ff';
+        ctx.beginPath();
+        ctx.arc(0, 0, 5, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
 
         ctx.restore();
     }
 
-    // 古代モアイ巨石の顔彫刻とサイボーグ重機械が融合した上下顎アーマー
+    // 豪華な多層3D重武装メカ・ウイングポッド＆連装ヘビーレーザー砲塔（上下アーム）
     _drawMoaiCyberJaw(ctx, cx, cy, hw, isBottom) {
         ctx.save();
         const sign = isBottom ? 1 : -1;
-        const jawShift = this.jawOpen * 16 * sign;
+        const jawShift = this.jawOpen * 14 * sign;
         const baseY = cy + jawShift;
 
-        // 1. 古代モアイ岩石カウル（風化花崗岩＆玄武岩グラデーション）
-        const rockGrad = ctx.createLinearGradient(cx - hw, baseY + sign * 25, cx + hw, baseY + sign * 92);
-        rockGrad.addColorStop(0, '#cbd5e1');
-        rockGrad.addColorStop(0.3, '#64748b');
-        rockGrad.addColorStop(0.75, '#334155');
-        rockGrad.addColorStop(1, '#0f172a');
-        ctx.fillStyle = rockGrad;
+        // --- 1. 中央フレームと上下メカポッドを連結する可動式ツイン油圧ダンパー＆ゴールドピストン ---
+        const pistonXs = [cx - 32, cx + 24];
+        pistonXs.forEach(px => {
+            // シリンダー外筒
+            ctx.fillStyle = '#1e293b';
+            ctx.fillRect(px - 6, Math.min(cy + sign * 18, baseY + sign * 42), 12, Math.abs(baseY + sign * 42 - (cy + sign * 18)));
+            // ゴールド油圧シャフト
+            const rodGrad = ctx.createLinearGradient(px - 3, 0, px + 3, 0);
+            rodGrad.addColorStop(0, '#fef08a');
+            rodGrad.addColorStop(0.5, '#f59e0b');
+            rodGrad.addColorStop(1, '#78350f');
+            ctx.fillStyle = rodGrad;
+            ctx.fillRect(px - 3, Math.min(cy + sign * 14, baseY + sign * 44), 6, Math.abs(baseY + sign * 44 - (cy + sign * 14)));
+        });
+
+        // --- 2. 前方に突き出す多段バレル式・連装ヘビーレーザー砲身（2門×上下＝4門） ---
+        const barrelOffsets = [38, 66];
+        barrelOffsets.forEach((bo, bIdx) => {
+            const by = baseY + sign * bo;
+            const bLen = (bIdx === 0) ? 36 : 26;
+            const bxStart = cx - hw - bLen + 12;
+
+            // 砲身メタリックシリンダー
+            const bGrad = ctx.createLinearGradient(bxStart, by - 6, bxStart, by + 6);
+            bGrad.addColorStop(0, '#f8fafc');
+            bGrad.addColorStop(0.4, '#94a3b8');
+            bGrad.addColorStop(0.8, '#1e293b');
+            bGrad.addColorStop(1, '#090d16');
+            ctx.fillStyle = bGrad;
+            ctx.fillRect(bxStart, by - 5, bLen + 20, 10);
+            ctx.strokeStyle = '#cbd5e1';
+            ctx.lineWidth = 1;
+            ctx.strokeRect(bxStart, by - 5, bLen + 20, 10);
+
+            // マズルブレーキ＆冷却ジャケットリング
+            ctx.fillStyle = '#0f172a';
+            for (let r = 0; r < 3; r++) {
+                ctx.fillRect(bxStart + 6 + r * 7, by - 6, 3, 12);
+            }
+
+            // 砲口プラズマチェンバー発光
+            const muzzleColor = (bIdx === 0) ? '#00f0ff' : '#ff2266';
+            ctx.fillStyle = muzzleColor;
+            ctx.shadowColor = muzzleColor;
+            ctx.shadowBlur = 10;
+            ctx.fillRect(bxStart - 3, by - 3.5, 5, 7);
+            ctx.shadowBlur = 0;
+        });
+
+        // --- 3. 第1層：重厚な多面体チタン＆ガンメタル主装甲ハル（3Dベベルシェーディング） ---
+        const hullGrad = ctx.createLinearGradient(cx - hw, baseY + sign * 26, cx + hw, baseY + sign * 96);
+        hullGrad.addColorStop(0.0, '#f8fafc');
+        hullGrad.addColorStop(0.18, '#cbd5e1');
+        hullGrad.addColorStop(0.45, '#64748b');
+        hullGrad.addColorStop(0.78, '#1e293b');
+        hullGrad.addColorStop(1.0, '#090d16');
+        ctx.fillStyle = hullGrad;
 
         ctx.beginPath();
-        // モアイ特有の彫りの深い眉・鷲鼻・顎シルエットを上下装甲として造形
-        ctx.moveTo(cx + hw - 10, baseY + sign * 32);
-        ctx.lineTo(cx + hw - 24, baseY + sign * 86);
-        ctx.lineTo(cx - 10, baseY + sign * 92);
-        ctx.lineTo(cx - 55, baseY + sign * 76);      // モアイの眉庇突起
-        ctx.lineTo(cx - 72, baseY + sign * 62);      // 深い眼窩くぼみ
-        ctx.lineTo(cx - hw - 6, baseY + sign * 52);  // 突き出たモアイの鷲鼻先端
-        ctx.lineTo(cx - hw + 14, baseY + sign * 30); // 口元の巨石牙
-        ctx.lineTo(cx - 35, baseY + sign * 26);
+        ctx.moveTo(cx + hw + 4, baseY + sign * 30);
+        ctx.lineTo(cx + hw - 14, baseY + sign * 88);
+        ctx.lineTo(cx + 18, baseY + sign * 96);
+        ctx.lineTo(cx - 58, baseY + sign * 86);
+        ctx.lineTo(cx - hw + 4, baseY + sign * 72);
+        ctx.lineTo(cx - hw - 8, baseY + sign * 48);
+        ctx.lineTo(cx - hw + 10, baseY + sign * 28);
+        ctx.lineTo(cx - 24, baseY + sign * 24);
         ctx.closePath();
         ctx.fill();
 
-        ctx.strokeStyle = '#090d16';
+        ctx.strokeStyle = '#020617';
         ctx.lineWidth = 2.5;
         ctx.stroke();
 
-        // 2. モアイ眼窩の暗黒影＆サイバー光学センサーアイ
-        ctx.fillStyle = '#030712';
+        // エッジの鋭い鏡面クロームハイライトライン
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.75)';
+        ctx.lineWidth = 1.6;
         ctx.beginPath();
-        ctx.arc(cx - 56, baseY + sign * 60, 10, 0, Math.PI * 2);
+        ctx.moveTo(cx - hw + 10, baseY + sign * 29);
+        ctx.lineTo(cx - 24, baseY + sign * 25);
+        ctx.lineTo(cx + hw, baseY + sign * 31);
+        ctx.stroke();
+
+        // --- 4. 第2層：内部段差アーマープレート＆放熱ラジエーター・ルーバースリット ---
+        const innerY = isBottom ? (baseY + 38) : (baseY - 78);
+        const plateGrad = ctx.createLinearGradient(cx - 85, innerY, cx + 80, innerY + 40);
+        plateGrad.addColorStop(0, '#0f172a');
+        plateGrad.addColorStop(0.5, '#1e293b');
+        plateGrad.addColorStop(1, '#334155');
+        ctx.fillStyle = plateGrad;
+        ctx.beginPath();
+        ctx.moveTo(cx - 88, baseY + sign * 38);
+        ctx.lineTo(cx + 78, baseY + sign * 38);
+        ctx.lineTo(cx + 64, baseY + sign * 76);
+        ctx.lineTo(cx - 72, baseY + sign * 72);
+        ctx.closePath();
         ctx.fill();
-        ctx.fillStyle = '#00ffee';
-        ctx.shadowColor = '#00ffee';
+        ctx.strokeStyle = '#94a3b8';
+        ctx.lineWidth = 1.4;
+        ctx.stroke();
+
+        // 斜め発光ラジエーター・放熱スリット群（6連ネオンルーバー）
+        ctx.save();
+        const glowPulse = 0.65 + Math.sin(Date.now() * 0.01 + (isBottom ? 1.5 : 0)) * 0.35;
+        ctx.fillStyle = `rgba(0, 240, 255, ${glowPulse})`;
+        ctx.shadowColor = '#00f0ff';
         ctx.shadowBlur = 8;
+        for (let v = 0; v < 6; v++) {
+            const vx = cx - 42 + v * 17;
+            const vy = baseY + sign * 48;
+            ctx.beginPath();
+            ctx.moveTo(vx, vy);
+            ctx.lineTo(vx + 9, vy);
+            ctx.lineTo(vx + 5, vy + sign * 16);
+            ctx.lineTo(vx - 4, vy + sign * 16);
+            ctx.closePath();
+            ctx.fill();
+        }
+        ctx.restore();
+
+        // --- 5. 第3層：前方精密レーザー照準ポッド＆回転式メカニカル・サブタレット ---
+        const podX = cx - 72;
+        const podY = baseY + sign * 56;
+
+        // 照準ポッド装甲リング
+        const podGrad = ctx.createRadialGradient(podX - 3, podY - 3, 2, podX, podY, 16);
+        podGrad.addColorStop(0, '#f8fafc');
+        podGrad.addColorStop(0.5, '#475569');
+        podGrad.addColorStop(1, '#090d16');
+        ctx.fillStyle = podGrad;
         ctx.beginPath();
-        ctx.arc(cx - 58, baseY + sign * 60, 4, 0, Math.PI * 2);
+        ctx.arc(podX, podY, 15, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.strokeStyle = '#e2e8f0';
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
+
+        // 光学レーザースキャナーレンズ
+        ctx.fillStyle = '#ff0055';
+        ctx.shadowColor = '#ff0055';
+        ctx.shadowBlur = 10;
+        ctx.beginPath();
+        ctx.arc(podX - 2, podY, 6.5, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = '#ffffff';
+        ctx.beginPath();
+        ctx.arc(podX - 4, podY - 2, 2.2, 0, Math.PI * 2);
         ctx.fill();
         ctx.shadowBlur = 0;
 
-        // 3. サイボーグ機械フレーム＆生体チューブ・金属牙
-        ctx.fillStyle = '#1e293b';
-        ctx.fillRect(cx - 15, baseY + sign * 42 - (isBottom ? 14 : 0), 95, 14);
-        ctx.strokeStyle = '#38bdf8';
-        ctx.lineWidth = 1.2;
-        ctx.strokeRect(cx - 15, baseY + sign * 42 - (isBottom ? 14 : 0), 95, 14);
+        // 後方側のゴールドトリム装甲リブ＆リベットボルト列
+        ctx.strokeStyle = '#f59e0b';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(cx + 52, baseY + sign * 36);
+        ctx.lineTo(cx + 38, baseY + sign * 84);
+        ctx.moveTo(cx + 76, baseY + sign * 36);
+        ctx.lineTo(cx + 62, baseY + sign * 82);
+        ctx.stroke();
 
-        // 内側のメカニカル・ファング（金属の牙）
         ctx.fillStyle = '#e2e8f0';
-        for (let t = 0; t < 4; t++) {
-            const tx = cx - hw + 22 + t * 18;
-            const ty = baseY + sign * 28;
+        for (let b = 0; b < 7; b++) {
             ctx.beginPath();
-            ctx.moveTo(tx, ty);
-            ctx.lineTo(tx + 6, ty - sign * 11);
-            ctx.lineTo(tx + 12, ty);
-            ctx.closePath();
+            ctx.arc(cx - 80 + b * 24, baseY + sign * 32, 2.0, 0, Math.PI * 2);
             ctx.fill();
         }
 
