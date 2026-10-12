@@ -353,7 +353,7 @@ class Boss {
     triggerDeathScream() {
         if (this.isScreaming) return;
         this.isScreaming = true;
-        this.screamText = 'ウワーーーー！';
+        this.screamText = '';
         if (typeof Sound !== 'undefined' && typeof Sound.playBossScream === 'function') {
             Sound.playBossScream();
         }
@@ -584,7 +584,7 @@ class GolemBoss {
     triggerDeathScream() {
         if (this.isScreaming) return;
         this.isScreaming = true;
-        this.screamText = 'ウワーーーー！';
+        this.screamText = '';
         if (typeof Sound !== 'undefined' && typeof Sound.playBossScream === 'function') {
             Sound.playBossScream();
         }
@@ -1426,7 +1426,7 @@ class BigCoreBoss {
     triggerDeathScream() {
         if (this.isScreaming) return;
         this.isScreaming = true;
-        this.screamText = 'ウワーーーー！';
+        this.screamText = '';
         if (typeof Sound !== 'undefined' && typeof Sound.playBossScream === 'function') {
             Sound.playBossScream();
         }

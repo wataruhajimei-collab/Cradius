@@ -898,12 +898,11 @@ function triggerBossDefeatExplosion(boss) {
     if (boss.isDying) return;
     boss.isDying = true;
 
-    // ボスを倒した時は大声で「ウワーーーー！」と断末魔の叫び声をあげる！
     if (typeof boss.triggerDeathScream === 'function') {
         boss.triggerDeathScream();
     } else {
         boss.isScreaming = true;
-        boss.screamText = 'ウワーーーー！';
+        boss.screamText = '';
         if (typeof Sound !== 'undefined' && typeof Sound.playBossScream === 'function') {
             Sound.playBossScream();
         }

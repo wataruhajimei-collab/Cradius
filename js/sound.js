@@ -917,7 +917,7 @@ class SoundManager {
     // ボス撃破時の断末魔の絶叫: 3倍の大声量＋極端に響き渡るロングエコーで「ウワァァァーー！！」を轟かせる
     playBossScream() {
         this.screamCount = (this.screamCount || 0) + 1;
-        this.lastScreamText = 'ウワーーーー！';
+        this.lastScreamText = '';
         this._lastScreamTime = Date.now();
         this.init();
         if (this.ctx && this.ctx.state === 'suspended') {
