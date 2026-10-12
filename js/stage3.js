@@ -1156,10 +1156,14 @@ class Stage3 {
                 }
             }
 
-        } else if (this.state === 'ALL_CLEAR') {
+        } else if (this.state === 'ALL_CLEAR' || this.state === 'STAGE_CLEAR') {
             this.terrain.update(dt);
             this.stageClearTimer += dt;
-            // 自機を右端に押し付けず、そのままの自由操作を維持
+            // 自機を右端に押し付けず、そのままの自由操作を維持したまま3秒後にステージ4（逆火山面）へ突入！
+            if (this.stageClearTimer > 3000 && typeof levelManager !== 'undefined' && levelManager && typeof levelManager.startStage4 === 'function') {
+                this.active = false;
+                levelManager.startStage4();
+            }
         }
     }
 

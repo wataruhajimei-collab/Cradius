@@ -1,0 +1,2116 @@
+// ==========================================
+// CRADIUS STAGE 4: INVERTED VOLCANO（４面：逆火山）
+// 1985年アーケード版『グラディウス』4面「逆火山」完全再現：
+// ・1面を天地逆転させた重厚な逆さ火山山脈＆溶岩脈地形
+// ・4門のレーザー砲台を備えた中空の逆さ浮遊大陸（3基）
+// ・天井と床のハッチ（ハッチャー）、ダッカー、砲台（ディー01）
+// ・4面名物：豪快に飛び跳ねながら3WAY弾を放つ「ジャンパー (JumperEnemy)」
+// ・4面最大の難所：回転しながらジグザグに自機を囲い込む中ボス群「アイアンメイデン (IronMaidenEnemy)」
+// ・天井から垂れ下がる「超巨大逆火山 (InvertedSuperVolcano)」の逆重力放物線・大噴火サバイバル
+// ・最深部で待ち受ける4面ボス「重装マグマ・ビッグコア (Stage4Boss)」！
+// ==========================================
+
+// ==========================================
+// 1. ジャンパー (JumperEnemy: 飛び跳ねながら弾をばら撒く4面名物メカ)
+// ==========================================
+class JumperEnemy extends Enemy {
+    constructor(x, y, isCeiling = false, isRed = false) {
+        super(x, y, isRed);
+        this.width = 40;
+        this.height = 42;
+        this.isCeiling = isCeiling;
+        this.hp = 1;
+        this.vx = -1.65;
+        this.vy = isCeiling ? 7.2 : -7.8;
+        this.gravity = isCeiling ? -0.22 : 0.24;
+        this.groundY = y;
+        this.springCompress = 0; // 着地時のバネ脚収縮量 (0〜1)
+        this.hasShotInJump = false;
+        this.legAnim = 0;
+    }
+
+    update() {
+        const st4 = window.stage4 || (typeof stage4 !== 'undefined' ? stage4 : null);
+        const terrain = (st4 && st4.terrain && st4.terrain.wallActive) ? st4.terrain : null;
+        const scrollSpeed = terrain ? terrain.scrollSpeed : 1.8;
+
+        this.legAnim += 0.2;
+
+        if (this.springCompress > 0) {
+            // 着地してバネを縮めている瞬間
+            this.x -= scrollSpeed;
+            this.springCompress -= 0.12;
+            if (this.springCompress <= 0) {
+                this.springCompress = 0;
+                // 再び大ジャンプ！
+                this.vy = this.isCeiling ? (6.8 + Math.random() * 1.8) : -(7.2 + Math.random() * 1.8);
+                this.vx = (Math.random() < 0.28) ? 0.9 : -(1.3 + Math.random() * 0.9);
+                this.hasShotInJump = false;
+            }
+        } else {
+            // 空中ジャンプ移動中
+            this.x += this.vx - scrollSpeed * 0.65;
+            this.y += this.vy;
+            this.vy += this.gravity;
+
+            // ジャンプの頂点付近で3WAY弾（または自機狙い拡散弾）を発射！
+            if (!this.hasShotInJump && Math.abs(this.vy) < 1.6 && this.x > 30 && this.x < 770) {
+                this.hasShotInJump = true;
+                this.shoot();
+            }
+        }
+
+        if (terrain) {
+            const cx = this.x + this.width / 2;
+            const topY = terrain.getTopY(cx);
+            const botY = terrain.getBottomY(cx);
+
+            if (this.isCeiling) {
+                this.groundY = topY;
+                if (this.y <= topY) {
+                    this.y = topY;
+                    this.vy = 0;
+                    this.springCompress = 1.0;
+                } else if (this.y + this.height > botY - 10) {
+                    // 下の地面にぶつかる前に折り返す
+                    this.vy = -Math.abs(this.vy) * 0.7;
+                }
+            } else {
+                this.groundY = botY;
+                if (this.y + this.height >= botY) {
+                    this.y = botY - this.height;
+                    this.vy = 0;
+                    this.springCompress = 1.0;
+                } else if (this.y < topY + 10) {
+                    // 天井にぶつかる前に折り返す
+                    this.vy = Math.abs(this.vy) * 0.7;
+                }
+            }
+        }
+
+        if (this.x + this.width < -100 || this.x > 920) {
+            this.active = false;
+        }
+    }
+
+    shoot() {
+        if (typeof enemyBullets === 'undefined' || typeof EnemyBullet === 'undefined') return;
+        const cx = this.x + this.width / 2;
+        const cy = this.y + this.height / 2;
+
+        let baseAngle = Math.PI;
+        if (typeof player !== 'undefined' && player) {
+            baseAngle = Math.atan2((player.y + player.height / 2) - cy, (player.x + player.width / 2) - cx);
+        }
+
+        // 本家4面ジャンパー特有の頂点ばら撒きショット（3方向）
+        const spread = [-0.32, 0, 0.32];
+        const spd = 3.5;
+        spread.forEach(offset => {
+            const ang = baseAngle + offset;
+            enemyBullets.push(new EnemyBullet(cx, cy, Math.cos(ang) * spd, Math.sin(ang) * spd));
+        });
+
+        if (typeof particles !== 'undefined' && typeof Particle !== 'undefined') {
+            for (let i = 0; i < 4; i++) {
+                particles.push(new Particle(cx, cy, '#ffaa00'));
+            }
+        }
+    }
+
+    draw(ctx) {
+        if (!this.active) return;
+        ctx.save();
+
+        const cx = this.x + this.width / 2;
+        const cy = this.isCeiling ? this.y : (this.y + this.height);
+        ctx.translate(cx, cy);
+        if (this.isCeiling) ctx.scale(1, -1);
+
+        // バネ脚の伸縮高さ
+        const legHeight = Math.max(6, 18 * (1 - this.springCompress * 0.55));
+        const bodyCenterY = -legHeight - 12;
+
+        // 1. 左右の油圧スプリング脚（コイルばね造形）
+        ctx.strokeStyle = '#94a3b8';
+        ctx.lineWidth = 3;
+        [-9, 9].forEach(lx => {
+            ctx.beginPath();
+            ctx.moveTo(lx, bodyCenterY + 8);
+            ctx.lineTo(lx + (lx < 0 ? -5 : 5), -legHeight * 0.6);
+            ctx.lineTo(lx - (lx < 0 ? -3 : 3), -legHeight * 0.3);
+            ctx.lineTo(lx, 0);
+            ctx.stroke();
+
+            // 足先の接地クローパッド
+            ctx.fillStyle = '#334155';
+            ctx.fillRect(lx - 6, -4, 12, 4);
+            ctx.strokeStyle = '#cbd5e1';
+            ctx.lineWidth = 1;
+            ctx.strokeRect(lx - 6, -4, 12, 4);
+            ctx.lineWidth = 3;
+            ctx.strokeStyle = '#94a3b8';
+        });
+
+        // 2. 3D球面装甲ポッドボディ
+        const domeGrad = ctx.createRadialGradient(-5, bodyCenterY - 5, 2, 0, bodyCenterY, 17);
+        if (this.isRed) {
+            domeGrad.addColorStop(0.0, '#ffffff');
+            domeGrad.addColorStop(0.28, '#ff6b81');
+            domeGrad.addColorStop(0.68, '#e11d48');
+            domeGrad.addColorStop(1.0, '#4c0519');
+        } else {
+            domeGrad.addColorStop(0.0, '#ffffff');
+            domeGrad.addColorStop(0.28, '#bae6fd');
+            domeGrad.addColorStop(0.65, '#0284c7');
+            domeGrad.addColorStop(1.0, '#0f172a');
+        }
+        ctx.fillStyle = domeGrad;
+        ctx.beginPath();
+        ctx.ellipse(0, bodyCenterY, 17, 13, 0, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.strokeStyle = '#0f172a';
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
+
+        // 3. 中央の発光カメラアイ（発射時は黄金フラッシュ）
+        ctx.fillStyle = '#020617';
+        ctx.fillRect(-11, bodyCenterY - 4, 22, 7);
+
+        const eyeColor = this.hasShotInJump ? '#ffea00' : (this.isRed ? '#ff0044' : '#00ffcc');
+        ctx.fillStyle = eyeColor;
+        ctx.shadowColor = eyeColor;
+        ctx.shadowBlur = 8;
+        ctx.beginPath();
+        ctx.arc(0, bodyCenterY - 0.5, 4.5, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.shadowBlur = 0;
+
+        ctx.restore();
+    }
+}
+
+// ==========================================
+// 2. アイアンメイデン (IronMaidenEnemy & IronMaidenSquad)
+// 1985年AC版4面最大の難所：高速回転しながら列をなして自機を囲い込む鋼鉄の処女！
+// ==========================================
+class IronMaidenSquad extends FormationBase {
+    constructor(pattern = 'ZIGZAG_BOX', startY = 160, count = 4) {
+        super(count);
+        this.enemies = [];
+
+        for (let i = 0; i < count; i++) {
+            const isRed = (i === count - 1); // 編隊最後尾を赤色（または全滅カプセル）に
+            const maiden = new IronMaidenEnemy(pattern, startY, i * 16, this, isRed);
+            this.enemies.push(maiden);
+            if (typeof enemies !== 'undefined') {
+                enemies.push(maiden);
+            }
+        }
+    }
+}
+
+class IronMaidenEnemy extends Enemy {
+    constructor(pattern = 'ZIGZAG_BOX', startY = 160, delay = 0, formation = null, isRed = false) {
+        const initX = (pattern === 'LEFT_AMBUSH') ? -36 : 830;
+        super(initX, startY, isRed);
+        this.width = 42;
+        this.height = 42;
+        this.pattern = pattern; // 'ZIGZAG_BOX' | 'LEFT_AMBUSH' | 'WAVE_SWEEP'
+        this.startY = startY;
+        this.delay = delay;
+        this.formation = formation;
+        this.visible = (delay <= 0);
+        this.hp = 4; // 硬い鋼鉄装甲（レーザーや連射で撃破する手応え）
+        this.maxHp = 4;
+        this.flashTimer = 0;
+
+        this.phase = 0;
+        this.phaseTimer = 0;
+        this.spinAngle = 0;
+        this.vx = (pattern === 'LEFT_AMBUSH') ? 3.8 : -3.6;
+        this.vy = (startY < 300) ? 2.8 : -2.8;
+    }
+
+    update() {
+        if (this.delay > 0) {
+            this.delay--;
+            if (this.delay <= 0) {
+                this.visible = true;
+            }
+            return;
+        }
+
+        if (this.flashTimer > 0) this.flashTimer--;
+        this.spinAngle += 0.22;
+        this.phaseTimer++;
+
+        const st4 = window.stage4 || (typeof stage4 !== 'undefined' ? stage4 : null);
+        const terrain = (st4 && st4.terrain && st4.terrain.wallActive) ? st4.terrain : null;
+        const cx = this.x + this.width / 2;
+        const minY = terrain ? (terrain.getTopY(cx) + 12) : 45;
+        const maxY = terrain ? (terrain.getBottomY(cx) - this.height - 12) : (555 - this.height);
+
+        if (this.pattern === 'ZIGZAG_BOX') {
+            // 原作4面象徴の動き：斜めジグザグに上下反射しながら自機を囲い込むように突進！
+            if (this.phase === 0) {
+                // フェーズ0: 右から進入しつつ上下に大きくジグザグバウンド
+                this.x += this.vx;
+                this.y += this.vy;
+                if (this.y <= minY) {
+                    this.y = minY;
+                    this.vy = Math.abs(this.vy);
+                } else if (this.y >= maxY) {
+                    this.y = maxY;
+                    this.vy = -Math.abs(this.vy);
+                }
+                // 画面左寄りまで到達したら一旦垂直昇降して自機を閉じ込める（囲い込み）！
+                if (this.x <= 180) {
+                    this.phase = 1;
+                    this.phaseTimer = 0;
+                    this.vx = 0;
+                    const py = (typeof player !== 'undefined' && player) ? player.y : 300;
+                    this.vy = (py > this.y) ? 3.4 : -3.4;
+                }
+            } else if (this.phase === 1) {
+                // フェーズ1: 垂直に自機の高さへスライド
+                this.y += this.vy;
+                if (this.y <= minY) { this.y = minY; this.vy = Math.abs(this.vy); }
+                if (this.y >= maxY) { this.y = maxY; this.vy = -Math.abs(this.vy); }
+                if (this.phaseTimer >= 36) {
+                    this.phase = 2;
+                    this.phaseTimer = 0;
+                    this.vx = 3.8; // 右へ折り返し
+                    this.vy = (this.vy > 0 ? 1.8 : -1.8);
+                }
+            } else if (this.phase === 2) {
+                // フェーズ2: 右中盤まで戻ってから最後に左へ全力突撃！
+                this.x += this.vx;
+                this.y += this.vy;
+                if (this.y <= minY) { this.y = minY; this.vy = Math.abs(this.vy); }
+                if (this.y >= maxY) { this.y = maxY; this.vy = -Math.abs(this.vy); }
+                if (this.x >= 460 || this.phaseTimer >= 55) {
+                    this.phase = 3;
+                    this.vx = -4.6;
+                    const py = (typeof player !== 'undefined' && player) ? player.y : this.y;
+                    this.vy = Math.max(-2.4, Math.min(2.4, (py - this.y) * 0.03));
+                }
+            } else {
+                // フェーズ3: 画面左外へ高速離脱
+                this.x += this.vx;
+                this.y += this.vy;
+                if (this.y <= minY) { this.y = minY; this.vy = Math.abs(this.vy); }
+                if (this.y >= maxY) { this.y = maxY; this.vy = -Math.abs(this.vy); }
+            }
+        } else if (this.pattern === 'LEFT_AMBUSH') {
+            // 原作4面名物：画面左端（背後）から出現し、中央まで進んでから上下ジグザグで左へ戻る包囲軌道！
+            if (this.phase === 0) {
+                this.x += 4.2;
+                this.y += Math.sin(this.phaseTimer * 0.08) * 1.8;
+                if (this.x >= 520) {
+                    this.phase = 1;
+                    this.vx = -3.8;
+                    this.vy = (this.y < 300) ? 3.2 : -3.2;
+                }
+            } else {
+                this.x += this.vx;
+                this.y += this.vy;
+                if (this.y <= minY) { this.y = minY; this.vy = Math.abs(this.vy); }
+                if (this.y >= maxY) { this.y = maxY; this.vy = -Math.abs(this.vy); }
+            }
+        } else {
+            // WAVE_SWEEP: 滑らかな高速コサイン波で画面を横断
+            this.x -= 3.6;
+            this.y = this.startY + Math.sin(this.phaseTimer * 0.07) * 95;
+            if (this.y < minY) this.y = minY;
+            if (this.y > maxY) this.y = maxY;
+        }
+
+        if (this.x < -90 || this.x > 900) {
+            this.active = false;
+        }
+    }
+
+    draw(ctx) {
+        if (!this.visible || !this.active) return;
+        ctx.save();
+
+        const cx = this.x + this.width / 2;
+        const cy = this.y + this.height / 2;
+        ctx.translate(cx, cy);
+
+        const isFlash = (this.flashTimer > 0) || (this.hp < this.maxHp && Math.floor(Date.now() / 55) % 2 === 0);
+
+        // 1. 外周の高速回転する鋼鉄スパイクブレード（本家アイアンメイデンのトゲ付き重装甲球体）
+        ctx.save();
+        ctx.rotate(this.spinAngle);
+        const spikeCount = 8;
+        for (let i = 0; i < spikeCount; i++) {
+            const ang = (Math.PI * 2 * i) / spikeCount;
+            ctx.save();
+            ctx.rotate(ang);
+            ctx.fillStyle = isFlash ? '#ffffff' : (this.isRed ? '#fb7185' : '#cbd5e1');
+            ctx.beginPath();
+            ctx.moveTo(14, -4);
+            ctx.lineTo(22, 0);
+            ctx.lineTo(14, 4);
+            ctx.closePath();
+            ctx.fill();
+            ctx.restore();
+        }
+        ctx.restore();
+
+        // 2. 上下の円錐状・重装甲シェル（アイアンメイデン本体）
+        const shellGrad = ctx.createRadialGradient(-5, -6, 2, 0, 0, 17);
+        if (isFlash) {
+            shellGrad.addColorStop(0.0, '#ffffff');
+            shellGrad.addColorStop(0.6, '#fde047');
+            shellGrad.addColorStop(1.0, '#ea580c');
+        } else if (this.isRed) {
+            shellGrad.addColorStop(0.0, '#ffffff');
+            shellGrad.addColorStop(0.3, '#fda4af');
+            shellGrad.addColorStop(0.7, '#e11d48');
+            shellGrad.addColorStop(1.0, '#4c0519');
+        } else {
+            shellGrad.addColorStop(0.0, '#ffffff');
+            shellGrad.addColorStop(0.28, '#e2e8f0');
+            shellGrad.addColorStop(0.65, '#64748b');
+            shellGrad.addColorStop(1.0, '#0f172a');
+        }
+
+        ctx.fillStyle = shellGrad;
+        ctx.beginPath();
+        ctx.arc(0, 0, 16.5, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.strokeStyle = '#0f172a';
+        ctx.lineWidth = 2;
+        ctx.stroke();
+
+        // 3. 回転する縦リブ装甲スリット（立体的に回転して見える縦縞）
+        ctx.strokeStyle = 'rgba(15, 23, 42, 0.75)';
+        ctx.lineWidth = 1.6;
+        for (let k = -1; k <= 1; k++) {
+            const rx = Math.sin(this.spinAngle + k * 0.9) * 13;
+            ctx.beginPath();
+            ctx.moveTo(rx * 0.4, -15);
+            ctx.quadraticCurveTo(rx, 0, rx * 0.4, 15);
+            ctx.stroke();
+        }
+
+        // 4. 赤道部の灼熱コアバンド（アイアンメイデン象徴の赤く光る中央スリット）
+        ctx.fillStyle = '#090d16';
+        ctx.fillRect(-16, -4.5, 32, 9);
+
+        const coreGlow = 0.65 + Math.sin(this.spinAngle * 2) * 0.35;
+        ctx.fillStyle = isFlash ? '#ffffff' : `rgba(255, 50, 20, ${coreGlow})`;
+        ctx.shadowColor = '#ff2200';
+        ctx.shadowBlur = 10;
+        ctx.fillRect(-14, -2.5, 28, 5);
+
+        // 回転するコアの光点
+        const eyeX = Math.sin(this.spinAngle * 1.5) * 9;
+        ctx.fillStyle = '#ffffaa';
+        ctx.beginPath();
+        ctx.arc(eyeX, 0, 2.8, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.shadowBlur = 0;
+
+        ctx.restore();
+    }
+}
+
+// ==========================================
+// 3. 天井の逆火山 (InvertedVolcano) ＆ 超巨大逆火山 (InvertedSuperVolcano) ＆ 逆重力火山弾 (InvertedVolcanoRock)
+// ==========================================
+class InvertedVolcanoRock extends Enemy {
+    constructor(x, y, vx, vy, size = 28, gravity = -0.135) {
+        super(x, y);
+        this.size = size;
+        this.width = size;
+        this.height = size;
+        this.vx = vx;
+        this.vy = vy;
+        // ★原作1985年AC版4面「逆火山」の象徴：
+        // 天井火口から下向き(vy > 0)に噴き出し、逆重力(gravity < 0)で再び天井へと弧を描いて吸い上げられる逆放物線！
+        this.gravity = gravity;
+        this.hp = size > 34 ? 2 : 1;
+        this.rot = Math.random() * Math.PI * 2;
+        this.rotSpd = (Math.random() - 0.5) * 0.22;
+        this.framesAlive = 0;
+    }
+
+    update() {
+        this.framesAlive++;
+        this.x += this.vx;
+        this.y += this.vy;
+        this.vy += this.gravity;
+        this.rot += this.rotSpd;
+
+        if (this.y < -80 || this.y > 680 || this.x < -120 || this.x > 950) {
+            this.active = false;
+            return;
+        }
+
+        // 発射直後（火口付近）を抜けたら天井・地面との衝突で消滅
+        if (this.framesAlive > 18) {
+            const st4 = window.stage4 || (typeof stage4 !== 'undefined' ? stage4 : null);
+            if (st4 && st4.terrain && st4.terrain.wallActive) {
+                const cx = this.x + this.width / 2;
+                const topY = st4.terrain.getTopY(cx);
+                const botY = st4.terrain.getBottomY(cx);
+                if (this.gravity < 0 && this.vy < 0 && this.y <= topY) {
+                    this.active = false;
+                } else if (this.gravity > 0 && this.vy > 0 && this.y + this.height >= botY) {
+                    this.active = false;
+                }
+            }
+        }
+    }
+
+    draw(ctx) {
+        ctx.save();
+        ctx.translate(this.x + this.width / 2, this.y + this.height / 2);
+        ctx.rotate(this.rot);
+
+        const rBase = this.size / 2;
+        ctx.shadowColor = 'rgba(255, 80, 0, 0.8)';
+        ctx.shadowBlur = Math.max(6, rBase * 0.6);
+
+        const magmaGrad = ctx.createRadialGradient(rBase * 0.15, -rBase * 0.15, 1, 0, 0, rBase);
+        magmaGrad.addColorStop(0.0, '#ffffff');
+        magmaGrad.addColorStop(0.28, '#fde047');
+        magmaGrad.addColorStop(0.60, '#f97316');
+        magmaGrad.addColorStop(0.88, '#991b1b');
+        magmaGrad.addColorStop(1.0, '#1c1917');
+
+        ctx.fillStyle = magmaGrad;
+        ctx.beginPath();
+        const points = 8;
+        for (let i = 0; i < points; i++) {
+            const angle = (i / points) * Math.PI * 2;
+            const r = rBase * (0.85 + ((i % 2 === 0) ? 0.2 : -0.1));
+            const px = Math.cos(angle) * r;
+            const py = Math.sin(angle) * r;
+            if (i === 0) ctx.moveTo(px, py);
+            else ctx.lineTo(px, py);
+        }
+        ctx.closePath();
+        ctx.fill();
+
+        ctx.strokeStyle = '#450a0a';
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
+
+        ctx.restore();
+    }
+}
+
+// 道中の天井・床に配置される小型逆火山クレーター
+class InvertedVolcano extends Enemy {
+    constructor(x, y, isCeiling = true) {
+        super(x, y);
+        this.width = 92;
+        this.height = 66;
+        this.isCeiling = isCeiling;
+        this.groundY = y;
+        this.burstTimer = Math.floor(Math.random() * 50);
+        this.magmaAnim = Math.random() * 10;
+        this.hp = 9999; // 破壊不能な地形火山ギミック
+    }
+
+    update() {
+        const st4 = window.stage4 || (typeof stage4 !== 'undefined' ? stage4 : null);
+        const terrain = (st4 && st4.terrain && st4.terrain.wallActive) ? st4.terrain : null;
+
+        if (terrain) {
+            this.x -= terrain.scrollSpeed;
+            const cx = this.x + this.width / 2;
+            if (this.isCeiling) {
+                this.groundY = terrain.getTopY(cx);
+                this.y = this.groundY;
+            } else {
+                this.groundY = terrain.getBottomY(cx);
+                this.y = this.groundY - this.height;
+            }
+        } else {
+            this.x -= this.speed;
+        }
+
+        if (this.x + this.width < -100) {
+            this.active = false;
+            return;
+        }
+
+        this.magmaAnim += 0.14;
+        this.burstTimer++;
+        if (this.burstTimer > 105 && this.x > 40 && this.x < 760) {
+            this.burstTimer = 0;
+            if (typeof enemies !== 'undefined') {
+                const craterX = this.x + this.width / 2;
+                const craterY = this.isCeiling ? (this.groundY + this.height - 14) : (this.groundY - this.height + 14);
+                for (let i = 0; i < 3; i++) {
+                    const vx = (Math.random() - 0.62) * 4.2 - 1.0;
+                    if (this.isCeiling) {
+                        // 天井から下へ噴き出し、逆重力で天井へ戻る本家4面軌道！
+                        const vy = Math.random() * 4.2 + 5.6;
+                        enemies.push(new InvertedVolcanoRock(craterX + (Math.random() - 0.5) * 20, craterY, vx, vy, 26, -0.13));
+                    } else {
+                        const vy = -(Math.random() * 4.5 + 5.8);
+                        enemies.push(new InvertedVolcanoRock(craterX + (Math.random() - 0.5) * 20, craterY, vx, vy, 26, 0.13));
+                    }
+                }
+            }
+        }
+    }
+
+    draw(ctx) {
+        if (!this.active) return;
+        ctx.save();
+        ctx.translate(this.x + this.width / 2, this.groundY);
+        if (this.isCeiling) ctx.scale(1, -1);
+
+        const mountainGrad = ctx.createLinearGradient(0, -this.height, 0, 0);
+        mountainGrad.addColorStop(0.0, '#7c2d12');
+        mountainGrad.addColorStop(0.4, '#431407');
+        mountainGrad.addColorStop(1.0, '#1c0a04');
+        ctx.fillStyle = mountainGrad;
+
+        ctx.beginPath();
+        ctx.moveTo(-this.width / 2, 0);
+        ctx.lineTo(-24, -this.height);
+        ctx.lineTo(24, -this.height);
+        ctx.lineTo(this.width / 2, 0);
+        ctx.closePath();
+        ctx.fill();
+
+        ctx.strokeStyle = '#1c0a04';
+        ctx.lineWidth = 2.5;
+        ctx.stroke();
+
+        // マグマ亀裂
+        ctx.strokeStyle = `rgba(255, 85, 0, ${0.65 + Math.sin(this.magmaAnim) * 0.3})`;
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(-10, -this.height + 6);
+        ctx.lineTo(-18, -this.height * 0.45);
+        ctx.lineTo(-28, 0);
+        ctx.moveTo(10, -this.height + 6);
+        ctx.lineTo(16, -this.height * 0.48);
+        ctx.lineTo(26, 0);
+        ctx.stroke();
+
+        // 火口の煮え滾る溶岩
+        ctx.shadowColor = '#ff3300';
+        ctx.shadowBlur = 14;
+        ctx.fillStyle = '#ffaa00';
+        ctx.beginPath();
+        ctx.ellipse(0, -this.height + 4, 22, 6.5, 0, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.restore();
+    }
+}
+
+// 4面クライマックス：天井から垂れ下がる「超巨大逆火山 (InvertedSuperVolcano)」
+class InvertedSuperVolcano extends Enemy {
+    constructor(x, ceilingY) {
+        super(x, ceilingY);
+        this.width = 220;
+        this.height = 148;
+        this.ceilingY = ceilingY;
+        this.burstTimer = 0;
+        this.erupting = false;
+        this.magmaAnim = 0;
+        this.hp = 99999;
+        this.targetX = 485; // 画面中央やや右の天井に堂々と陣取る
+        this.positioned = false;
+    }
+
+    startMajorEruption() {
+        this.erupting = true;
+        this.burstTimer = 0;
+    }
+
+    stopEruption() {
+        this.erupting = false;
+    }
+
+    update() {
+        const st4 = window.stage4 || (typeof stage4 !== 'undefined' ? stage4 : null);
+        const terrain = (st4 && st4.terrain && st4.terrain.wallActive) ? st4.terrain : null;
+        const scrollSpeed = terrain ? terrain.scrollSpeed : 0;
+
+        if (!this.positioned) {
+            const spd = scrollSpeed > 0 ? scrollSpeed : 2.2;
+            this.x -= spd;
+            if (terrain) {
+                this.ceilingY = terrain.getTopY(this.x + this.width / 2);
+            }
+            this.y = this.ceilingY;
+            if (this.x <= this.targetX) {
+                this.x = this.targetX;
+                this.positioned = true;
+            }
+        } else if (!this.erupting) {
+            // 大噴火終了後、左へ高速スクロール退場
+            const exitSpd = Math.max(scrollSpeed, 4.5);
+            this.x -= exitSpd;
+            if (terrain) {
+                this.ceilingY = terrain.getTopY(this.x + this.width / 2);
+            }
+            this.y = this.ceilingY;
+            if (this.x + this.width < -60) {
+                this.active = false;
+            }
+        } else {
+            if (terrain) {
+                this.ceilingY = terrain.getTopY(this.x + this.width / 2);
+                this.y = this.ceilingY;
+            }
+        }
+
+        this.magmaAnim += 0.16;
+
+        if (this.erupting) {
+            this.burstTimer++;
+            // 約11フレームごとに天井の巨大火口から灼熱の火山弾を大量噴射！
+            if (this.burstTimer > 11) {
+                this.burstTimer = 0;
+                if (typeof enemies !== 'undefined') {
+                    const count = Math.floor(Math.random() * 3) + 3; // 3〜5個
+                    const craterX = this.x + this.width / 2;
+                    const craterY = this.ceilingY + this.height - 8;
+
+                    for (let i = 0; i < count; i++) {
+                        const sizes = [20, 28, 38];
+                        const s = sizes[Math.floor(Math.random() * sizes.length)];
+                        const vx = (Math.random() - 0.70) * 6.4 - 1.1;
+                        const spawnX = craterX + (Math.random() - 0.5) * 44;
+
+                        if (i % 3 === 0) {
+                            // 地面側までそのまま降り注ぐ直下型火山弾
+                            const vy = Math.random() * 2.8 + 2.2;
+                            enemies.push(new InvertedVolcanoRock(spawnX, craterY, vx, vy, s, 0.08));
+                        } else {
+                            // ★1985年AC版4面象徴：天井火口から下へ勢いよく噴き出し、画面下部まで迫ってから
+                            // 逆重力（上向き加速度）で天井へと豪快に舞い戻る逆さ放物線火山弾！
+                            const vy = Math.random() * 5.2 + 6.4;
+                            enemies.push(new InvertedVolcanoRock(spawnX, craterY, vx, vy, s, -0.14));
+                        }
+                    }
+
+                    if (typeof particles !== 'undefined' && typeof Particle !== 'undefined') {
+                        for (let p = 0; p < 8; p++) {
+                            particles.push(new Particle(craterX + (Math.random() - 0.5) * 30, craterY, Math.random() < 0.65 ? '#ff4400' : '#fde047'));
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    checkCollision(rect) {
+        if (!this.active) return false;
+        if (rect.x + rect.width < this.x || rect.x > this.x + this.width) return false;
+        if (rect.y > this.ceilingY + this.height) return false;
+
+        const midX = this.x + this.width / 2;
+        const relX = Math.abs((rect.x + rect.width / 2) - midX);
+        const slopeH = this.height * (1 - Math.max(0, (relX - 42) / (this.width / 2 - 42)));
+        return (rect.y <= this.ceilingY + slopeH);
+    }
+
+    draw(ctx) {
+        if (!this.active) return;
+        ctx.save();
+        // 天井（ceilingY）から下向きに山体が突き出すよう上下反転描画！
+        ctx.translate(this.x + this.width / 2, this.ceilingY);
+        ctx.scale(1, -1);
+
+        // 1. 超巨大逆火山の山体（赤褐色〜黒曜石グラデーション）
+        const mountainGrad = ctx.createLinearGradient(0, -this.height, 0, 0);
+        mountainGrad.addColorStop(0.0, '#7c2d12');
+        mountainGrad.addColorStop(0.35, '#9a3412');
+        mountainGrad.addColorStop(0.7, '#431407');
+        mountainGrad.addColorStop(1.0, '#1c0a04');
+        ctx.fillStyle = mountainGrad;
+
+        ctx.beginPath();
+        ctx.moveTo(-this.width / 2, 0);
+        ctx.lineTo(-42, -this.height);
+        ctx.lineTo(42, -this.height);
+        ctx.lineTo(this.width / 2, 0);
+        ctx.closePath();
+        ctx.fill();
+
+        ctx.strokeStyle = '#1c0a04';
+        ctx.lineWidth = 3;
+        ctx.stroke();
+
+        // 2. 山肌を走る灼熱マグマの血管亀裂
+        ctx.strokeStyle = `rgba(255, 80, 0, ${0.72 + Math.sin(this.magmaAnim) * 0.28})`;
+        ctx.lineWidth = 2.8;
+        ctx.beginPath();
+        ctx.moveTo(-22, -this.height + 10);
+        ctx.lineTo(-34, -this.height * 0.45);
+        ctx.lineTo(-60, 0);
+        ctx.moveTo(18, -this.height + 10);
+        ctx.lineTo(32, -this.height * 0.52);
+        ctx.lineTo(55, 0);
+        ctx.moveTo(0, -this.height + 12);
+        ctx.lineTo(-6, -this.height * 0.35);
+        ctx.lineTo(8, 0);
+        ctx.stroke();
+
+        // 3. 下向きに開いた巨大火口の超高温マグマ湖
+        const glow = Math.sin(this.magmaAnim * 2) * 0.3 + 0.7;
+        ctx.shadowColor = '#ff2200';
+        ctx.shadowBlur = 26 * glow;
+
+        const magmaGrad = ctx.createLinearGradient(0, -this.height - 4, 0, -this.height + 24);
+        magmaGrad.addColorStop(0.0, '#ffffff');
+        magmaGrad.addColorStop(0.28, '#fde047');
+        magmaGrad.addColorStop(0.68, '#ff4400');
+        magmaGrad.addColorStop(1.0, '#7f1d1d');
+        ctx.fillStyle = magmaGrad;
+
+        ctx.beginPath();
+        ctx.ellipse(0, -this.height + 6, 40, 12, 0, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.restore();
+    }
+}
+
+// ==========================================
+// 4. 逆火山・浮遊大陸 (InvertedFloatingIsland: 上下4門のレーザー砲台付き)
+// ==========================================
+class InvertedFloatingIsland {
+    constructor(x, y, width, height, scrollSpeed = 1.8) {
+        this.x = x;
+        this.y = y;
+        this.width = width;
+        this.height = height;
+        this.scrollSpeed = scrollSpeed;
+        this.active = true;
+        this.turrets = [];
+
+        // 浮遊大陸の上面2基・下面2基にレーザー砲台を設置
+        if (typeof LaserTurretEnemy !== 'undefined' && typeof enemies !== 'undefined') {
+            const relX1 = width * 0.20;
+            const relX2 = width * 0.68;
+
+            const tTop1 = new LaserTurretEnemy(this, relX1, false);
+            const tTop2 = new LaserTurretEnemy(this, relX2, false);
+            const tBot1 = new LaserTurretEnemy(this, relX1, true);
+            const tBot2 = new LaserTurretEnemy(this, relX2, true);
+
+            this.turrets.push(tTop1, tTop2, tBot1, tBot2);
+            enemies.push(tTop1, tTop2, tBot1, tBot2);
+        }
+    }
+
+    update(currentScrollSpeed) {
+        const spd = (typeof currentScrollSpeed === 'number') ? currentScrollSpeed : this.scrollSpeed;
+        this.x -= spd;
+        if (this.x + this.width < -150) {
+            this.active = false;
+        }
+        this.turrets.forEach(t => {
+            if (t.active) t.updatePosition();
+        });
+    }
+
+    checkCollision(rect) {
+        if (!this.active) return false;
+        return (
+            rect.x < this.x + this.width &&
+            rect.x + rect.width > this.x &&
+            rect.y < this.y + this.height &&
+            rect.y + rect.height > this.y
+        );
+    }
+
+    draw(ctx) {
+        if (!this.active) return;
+        ctx.save();
+
+        const w = this.width;
+        const h = this.height;
+        const bevelX = 34;
+        const bevelY = 18;
+
+        // 1面とは上下逆転した照明グラデーション（下面がマグマ照り返しで赤明るく、上面が深い玄武岩色）
+        const grad = ctx.createLinearGradient(this.x, this.y, this.x, this.y + h);
+        grad.addColorStop(0.0, '#1c0f08');
+        grad.addColorStop(0.25, '#431407');
+        grad.addColorStop(0.65, '#7c2d12');
+        grad.addColorStop(1.0, '#c2410c');
+        ctx.fillStyle = grad;
+
+        ctx.beginPath();
+        ctx.moveTo(this.x + bevelX + 10, this.y);
+        ctx.lineTo(this.x + w - bevelX - 10, this.y);
+        ctx.lineTo(this.x + w - 10, this.y + bevelY);
+        ctx.lineTo(this.x + w, this.y + h - bevelY);
+        ctx.lineTo(this.x + w - bevelX, this.y + h);
+        ctx.lineTo(this.x + bevelX, this.y + h);
+        ctx.lineTo(this.x, this.y + h - bevelY);
+        ctx.lineTo(this.x + 10, this.y + bevelY);
+        ctx.closePath();
+        ctx.fill();
+
+        ctx.strokeStyle = '#180904';
+        ctx.lineWidth = 2.5;
+        ctx.stroke();
+
+        // 下面のマグマ反射ハイライトライン（逆火山らしさの強調）
+        ctx.strokeStyle = 'rgba(255, 160, 80, 0.65)';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(this.x + bevelX, this.y + h - 2);
+        ctx.lineTo(this.x + w - bevelX, this.y + h - 2);
+        ctx.stroke();
+
+        // 内部の赤熱マグマ地層ライン
+        ctx.strokeStyle = 'rgba(255, 90, 20, 0.45)';
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.moveTo(this.x + 22, this.y + h * 0.36);
+        ctx.lineTo(this.x + w * 0.45, this.y + h * 0.42);
+        ctx.lineTo(this.x + w - 24, this.y + h * 0.34);
+        ctx.moveTo(this.x + 30, this.y + h * 0.68);
+        ctx.lineTo(this.x + w * 0.55, this.y + h * 0.62);
+        ctx.lineTo(this.x + w - 28, this.y + h * 0.70);
+        ctx.stroke();
+
+        // 4基のレーザー砲台マウントベース
+        const relX1 = w * 0.20 + 21;
+        const relX2 = w * 0.68 + 21;
+        [relX1, relX2].forEach(rx => {
+            ctx.fillStyle = '#334155';
+            ctx.fillRect(this.x + rx - 22, this.y - 2, 44, 6);
+            ctx.fillRect(this.x + rx - 22, this.y + h - 4, 44, 6);
+            ctx.strokeStyle = '#00ffff';
+            ctx.lineWidth = 1;
+            ctx.strokeRect(this.x + rx - 22, this.y - 2, 44, 6);
+            ctx.strokeRect(this.x + rx - 22, this.y + h - 4, 44, 6);
+        });
+
+        ctx.restore();
+    }
+}
+
+// ==========================================
+// 5. InvertedVolcanoTerrain クラス（1面を天地逆転させた逆火山山脈地形）
+// ==========================================
+class InvertedVolcanoTerrain {
+    constructor(canvasWidth, canvasHeight) {
+        this.width = canvasWidth;
+        this.height = canvasHeight;
+        this.scrollSpeed = 1.85;
+        this.baseScrollSpeed = 1.85;
+
+        // ★逆火山：天井側（top）に高い山脈が垂れ下がり、床側（bottom）も起伏する天地逆転構造！
+        this.baseTopY = 92;
+        this.baseBottomY = canvasHeight - 72;
+
+        this.active = false;
+        this.wallActive = false;
+        this.generating = true;
+        this.wallTransition = 0;
+
+        this.terrainStep = 32;
+        this.scrollOffset = 0;
+        this.generatedWorldX = 0;
+        this.topHeights = [];
+        this.bottomHeights = [];
+
+        this.floatingIslands = [];
+        this.distance = 0;
+
+        // 星空背景
+        this.stars = [];
+        for (let i = 0; i < 95; i++) {
+            this.stars.push({
+                x: Math.random() * canvasWidth,
+                y: Math.random() * canvasHeight,
+                speed: Math.random() * 2.0 + 0.5,
+                size: Math.random() * 2.0 + 0.8,
+                color: (Math.random() < 0.25) ? '#fed7aa' : '#ffffff'
+            });
+        }
+    }
+
+    _computeTerrainHeights(d) {
+        if (!this.generating) {
+            return { top: 0, bottom: this.height };
+        }
+        // 天井（逆さ山脈）は大きく鋭い山嶺が垂れ下がり、床はうねる溶岩大地を形成
+        const invMountainTop = Math.sin(d * 0.0075) * 56 + Math.sin(d * 0.021) * 32 + Math.cos(d * 0.045) * 16;
+        const lavaRidgeBot = Math.cos(d * 0.0085) * 38 + Math.sin(d * 0.024) * 22 + Math.sin(d * 0.050) * 12;
+        return {
+            top: Math.max(36, Math.min(205, this.baseTopY + invMountainTop)),
+            bottom: Math.min(this.height - 34, Math.max(this.height - 165, this.baseBottomY - lavaRidgeBot))
+        };
+    }
+
+    start() {
+        this.active = true;
+        this.wallActive = false;
+        this.generating = true;
+        this.wallTransition = 0;
+        this.scrollSpeed = this.baseScrollSpeed;
+        this.floatingIslands = [];
+        this.distance = 0;
+        this.scrollOffset = 0;
+        this.generatedWorldX = 0;
+
+        const count = Math.ceil(this.width / this.terrainStep) + 16;
+        this.topHeights = [];
+        this.bottomHeights = [];
+        for (let i = 0; i < count; i++) {
+            const d = i * this.terrainStep;
+            this.generatedWorldX = d;
+            const h = this._computeTerrainHeights(d);
+            this.topHeights.push(h.top);
+            this.bottomHeights.push(h.bottom);
+        }
+    }
+
+    startWalls() {
+        this.wallActive = true;
+        this.generating = true;
+        this.wallTransition = 0;
+    }
+
+    stopGenerating() {
+        this.generating = false;
+    }
+
+    getTopY(x) {
+        if (!this.wallActive) return 0;
+        const clampedTransition = Math.max(0, Math.min(1, this.wallTransition));
+        const exactIdx = (x + this.scrollOffset) / this.terrainStep;
+        const idx = Math.floor(exactIdx);
+        if (idx < 0) return (this.topHeights[0] || 0) * clampedTransition;
+        if (idx >= this.topHeights.length - 1) return (this.topHeights[this.topHeights.length - 1] || 0) * clampedTransition;
+
+        const t = exactIdx - idx;
+        const rawY = this.topHeights[idx] + (this.topHeights[idx + 1] - this.topHeights[idx]) * t;
+        return rawY * clampedTransition;
+    }
+
+    getBottomY(x) {
+        if (!this.wallActive) return this.height;
+        const clampedTransition = Math.max(0, Math.min(1, this.wallTransition));
+        const exactIdx = (x + this.scrollOffset) / this.terrainStep;
+        const idx = Math.floor(exactIdx);
+        let rawY = this.baseBottomY;
+        if (idx < 0) {
+            rawY = this.bottomHeights[0] || this.height;
+        } else if (idx >= this.bottomHeights.length - 1) {
+            rawY = this.bottomHeights[this.bottomHeights.length - 1] || this.height;
+        } else {
+            const t = exactIdx - idx;
+            rawY = this.bottomHeights[idx] + (this.bottomHeights[idx + 1] - this.bottomHeights[idx]) * t;
+        }
+        return this.height - (this.height - rawY) * clampedTransition;
+    }
+
+    getGroundY(x) {
+        return this.getBottomY(x);
+    }
+
+    checkCollision(rect) {
+        if (!this.active || !this.wallActive || this.wallTransition < 0.25) return false;
+
+        const cx = rect.x + rect.width / 2;
+        const topY = this.getTopY(cx);
+        const bottomY = this.getBottomY(cx);
+
+        if (rect.y < topY && topY > 4) return true;
+        if (rect.y + rect.height > bottomY && bottomY < this.height - 4) return true;
+
+        for (let i = 0; i < this.floatingIslands.length; i++) {
+            if (this.floatingIslands[i].checkCollision(rect)) return true;
+        }
+
+        return false;
+    }
+
+    update(dt = 16.6, canSpawnTerrainEnemies = true) {
+        if (!this.active) return;
+
+        // 星空スクロール
+        this.stars.forEach(s => {
+            s.x -= s.speed;
+            if (s.x < 0) {
+                s.x = this.width;
+                s.y = Math.random() * this.height;
+            }
+        });
+
+        if (!this.wallActive) return;
+
+        if (this.wallTransition < 1.0 && this.generating) {
+            this.wallTransition = Math.min(1.0, this.wallTransition + 0.016);
+        } else if (!this.generating) {
+            this.wallTransition = Math.max(0.0, this.wallTransition - 0.012);
+            if (this.wallTransition <= 0.02) {
+                this.wallActive = false;
+                return;
+            }
+        }
+
+        this.distance += this.scrollSpeed;
+        this.scrollOffset += this.scrollSpeed;
+
+        while (this.scrollOffset >= this.terrainStep) {
+            this.scrollOffset -= this.terrainStep;
+            this.topHeights.shift();
+            this.bottomHeights.shift();
+
+            this.generatedWorldX += this.terrainStep;
+            const h = this._computeTerrainHeights(this.generatedWorldX);
+            this.topHeights.push(h.top);
+            this.bottomHeights.push(h.bottom);
+
+            // 新しい地形セグメントが右端から生成される際、原作4面どおりに砲台・ハッチ・ダッカー・ジャンパー・逆火山を配置！
+            if (this.generating && canSpawnTerrainEnemies && typeof enemies !== 'undefined') {
+                const spawnX = this.width + 24;
+                const topY = h.top;
+                const botY = h.bottom;
+                const roll = Math.random();
+
+                if (roll < 0.075 && typeof TurretEnemy !== 'undefined') {
+                    // 天井の砲台（逆火山なので天井砲台が多め）
+                    enemies.push(new TurretEnemy(spawnX, topY, true, Math.random() < 0.22));
+                } else if (roll < 0.135 && typeof TurretEnemy !== 'undefined') {
+                    // 地面の砲台
+                    enemies.push(new TurretEnemy(spawnX, botY, false, Math.random() < 0.22));
+                } else if (roll < 0.195 && typeof DuckerEnemy !== 'undefined') {
+                    // ダッカー（天井または地面を走行）
+                    const isCeil = Math.random() < 0.55;
+                    enemies.push(new DuckerEnemy(spawnX, isCeil ? topY : botY, isCeil, Math.random() < 0.30));
+                } else if (roll < 0.255) {
+                    // ★4面名物：ジャンパー（飛び跳ねながら3WAY弾を撃つ難敵！）
+                    const isCeil = Math.random() < 0.30;
+                    enemies.push(new JumperEnemy(spawnX, isCeil ? topY : (botY - 42), isCeil, Math.random() < 0.35));
+                } else if (roll < 0.295 && typeof HatcherEnemy !== 'undefined') {
+                    // 天井・床のハッチ（ハッチャー）
+                    const isCeil = Math.random() < 0.60;
+                    enemies.push(new HatcherEnemy(spawnX, isCeil ? topY : botY, isCeil));
+                } else if (roll < 0.320) {
+                    // 天井の小規模逆火山クレーター
+                    enemies.push(new InvertedVolcano(spawnX, topY, true));
+                }
+            }
+        }
+
+        // 浮遊大陸の更新
+        this.floatingIslands.forEach(island => island.update(this.scrollSpeed));
+        this.floatingIslands = this.floatingIslands.filter(i => i.active);
+    }
+
+    draw(ctx) {
+        ctx.save();
+
+        // 1. 4面・逆火山の深宇宙＆赤熱マグマ大気グラデーション背景
+        const bgGrad = ctx.createLinearGradient(0, 0, 0, this.height);
+        bgGrad.addColorStop(0.0, '#180604');
+        bgGrad.addColorStop(0.45, '#070510');
+        bgGrad.addColorStop(1.0, '#160705');
+        ctx.fillStyle = bgGrad;
+        ctx.fillRect(0, 0, this.width, this.height);
+
+        // 2. 星空
+        this.stars.forEach(s => {
+            ctx.globalAlpha = s.speed / 2.6;
+            ctx.fillStyle = s.color;
+            ctx.fillRect(s.x, s.y, s.size, s.size);
+        });
+        ctx.globalAlpha = 1.0;
+
+        // 3. 天地逆転の火山地形＆浮遊大陸の描画
+        if (this.wallActive && this.wallTransition > 0.02) {
+            this.floatingIslands.forEach(island => island.draw(ctx));
+            this._drawInvertedVolcanoCeiling(ctx);
+            this._drawVolcanoFloor(ctx);
+        }
+
+        ctx.restore();
+    }
+
+    _drawInvertedVolcanoCeiling(ctx) {
+        ctx.save();
+        const clampedTransition = Math.max(0, Math.min(1, this.wallTransition));
+
+        ctx.beginPath();
+        ctx.moveTo(0, 0);
+        ctx.lineTo(this.width, 0);
+
+        for (let i = this.topHeights.length - 1; i >= 0; i--) {
+            const x = i * this.terrainStep - this.scrollOffset;
+            if (x < -this.terrainStep || x > this.width + this.terrainStep) continue;
+            const y = this.topHeights[i] * clampedTransition;
+            ctx.lineTo(x, y);
+        }
+        ctx.lineTo(0, this.getTopY(0));
+        ctx.closePath();
+
+        // 逆さ火山岩盤グラデーション（天井から垂れ下がる赤褐色〜アンバーの火山地層）
+        const grad = ctx.createLinearGradient(0, 0, 0, 210 * clampedTransition);
+        grad.addColorStop(0.0, '#1a0a04');
+        grad.addColorStop(0.40, '#431407');
+        grad.addColorStop(0.78, '#9a3412');
+        grad.addColorStop(1.0, '#ea580c');
+        ctx.fillStyle = grad;
+        ctx.fill();
+
+        // 岩肌エッジの灼熱ハイライトライン
+        ctx.strokeStyle = '#fb923c';
+        ctx.lineWidth = 2.5;
+        ctx.beginPath();
+        let started = false;
+        for (let i = 0; i < this.topHeights.length; i++) {
+            const x = i * this.terrainStep - this.scrollOffset;
+            if (x < -this.terrainStep || x > this.width + this.terrainStep) continue;
+            const y = this.topHeights[i] * clampedTransition;
+            if (!started) {
+                ctx.moveTo(x, y);
+                started = true;
+            } else {
+                ctx.lineTo(x, y);
+            }
+        }
+        ctx.stroke();
+
+        // 天井岩盤を走るマグマ地層クレバス
+        const shift = this.distance % 64;
+        ctx.strokeStyle = 'rgba(251, 146, 60, 0.32)';
+        ctx.lineWidth = 1.6;
+        ctx.beginPath();
+        for (let x = -shift; x <= this.width + 64; x += 64) {
+            const y = this.getTopY(x);
+            ctx.moveTo(x, 0);
+            ctx.lineTo(x - 14, y * 0.55);
+            ctx.lineTo(x + 6, y - 3);
+        }
+        ctx.stroke();
+
+        ctx.restore();
+    }
+
+    _drawVolcanoFloor(ctx) {
+        ctx.save();
+        const clampedTransition = Math.max(0, Math.min(1, this.wallTransition));
+
+        ctx.beginPath();
+        ctx.moveTo(0, this.height);
+        ctx.lineTo(this.width, this.height);
+
+        for (let i = this.bottomHeights.length - 1; i >= 0; i--) {
+            const x = i * this.terrainStep - this.scrollOffset;
+            if (x < -this.terrainStep || x > this.width + this.terrainStep) continue;
+            const rawY = this.bottomHeights[i];
+            const y = this.height - (this.height - rawY) * clampedTransition;
+            ctx.lineTo(x, y);
+        }
+        ctx.lineTo(0, this.getBottomY(0));
+        ctx.closePath();
+
+        const grad = ctx.createLinearGradient(0, this.height - 175 * clampedTransition, 0, this.height);
+        grad.addColorStop(0.0, '#c2410c');
+        grad.addColorStop(0.25, '#7c2d12');
+        grad.addColorStop(0.65, '#431407');
+        grad.addColorStop(1.0, '#1a0a04');
+        ctx.fillStyle = grad;
+        ctx.fill();
+
+        ctx.strokeStyle = '#fb923c';
+        ctx.lineWidth = 2.5;
+        ctx.beginPath();
+        let started = false;
+        for (let i = 0; i < this.bottomHeights.length; i++) {
+            const x = i * this.terrainStep - this.scrollOffset;
+            if (x < -this.terrainStep || x > this.width + this.terrainStep) continue;
+            const rawY = this.bottomHeights[i];
+            const y = this.height - (this.height - rawY) * clampedTransition;
+            if (!started) {
+                ctx.moveTo(x, y);
+                started = true;
+            } else {
+                ctx.lineTo(x, y);
+            }
+        }
+        ctx.stroke();
+
+        // 床岩盤のマグマクレバス
+        const shift = this.distance % 64;
+        ctx.strokeStyle = 'rgba(251, 146, 60, 0.28)';
+        ctx.lineWidth = 1.6;
+        ctx.beginPath();
+        for (let x = 32 - shift; x <= this.width + 64; x += 64) {
+            const y = this.getBottomY(x);
+            ctx.moveTo(x, this.height);
+            ctx.lineTo(x + 14, (this.height + y) * 0.52);
+            ctx.lineTo(x - 6, y + 3);
+        }
+        ctx.stroke();
+
+        ctx.restore();
+    }
+}
+
+// ==========================================
+// 6. STAGE 4 BOSS: 重装マグマ・ビッグコア Mk-II (Stage4Boss)
+// 本家4面ボスの「ビッグコア（遮蔽板4枚＋中央コア＋4連レーザー＋高速上下追尾）」をベースに、
+// 逆火山の灼熱マグマ装甲＆アイアンメイデン射出ポッドを融合した4面クライマックスボス！
+// ==========================================
+class Stage4Boss {
+    constructor(x, y) {
+        this.scale = 2;
+        this.drawW = 280;
+        this.drawH = 260;
+        this.width = 240;
+        this.height = 200;
+        this.x = (x || 800) + 150;
+        this.targetX = 635;
+        this.baseY = y || 300;
+        this.y = this.baseY;
+        this.vy = 2.8;
+
+        this.maxHp = 12;
+        this.hp = 12;
+        this.active = true;
+        this.isEntering = true;
+        this.isDying = false;
+
+        // 本家ビッグコア準拠：前面4枚の重装シールドプレート
+        this.maxShields = 4;
+        this.shields = 4;
+        this.shieldHpPerPlate = 7;
+        this.currentShieldHp = this.shieldHpPerPlate;
+        this.shieldHitCooldown = 0;
+        this.shieldFlashTimer = 0;
+        this.hitFlashTimer = 0;
+
+        this.coreOpen = false;
+        this.laserTimer = 0;
+        this.magmaRingTimer = 0;
+        this.maidenOrbAngle = 0;
+        this.rotationAngle = 0;
+        this.bullets = [];
+
+        this.isScreaming = false;
+        this.screamText = '';
+    }
+
+    triggerDeathScream() {
+        if (this.isScreaming) return;
+        this.isScreaming = true;
+        this.screamText = 'ウワーーーー！';
+        if (typeof Sound !== 'undefined' && typeof Sound.playBossScream === 'function') {
+            Sound.playBossScream();
+        }
+        if (!this._initialDismembered && typeof spawnBossDismembermentWave === 'function') {
+            this._initialDismembered = true;
+            spawnBossDismembermentWave(this, true);
+        }
+    }
+
+    update() {
+        if (this.isDying) return;
+
+        if (this.x > this.targetX) {
+            this.x -= 3.2;
+            this.isEntering = true;
+            return;
+        }
+        this.isEntering = false;
+
+        // 本家4面ビッグコア特有の機敏な上下移動（自機のY座標を意識しつつ上下に反復スイープ）
+        this.y += this.vy;
+        if (this.y < 145) {
+            this.y = 145;
+            this.vy = Math.abs(this.vy);
+        } else if (this.y > 435) {
+            this.y = 435;
+            this.vy = -Math.abs(this.vy);
+        }
+
+        // 自機と高さが合った瞬間に少しフェイントを入れる本家風の動き
+        if (typeof player !== 'undefined' && player && Math.random() < 0.018) {
+            const py = player.y + player.height / 2;
+            this.vy = (py > this.y) ? 3.0 : -3.0;
+        }
+
+        this.rotationAngle += 0.05;
+        this.maidenOrbAngle += 0.06;
+
+        if (this.shieldHitCooldown > 0) this.shieldHitCooldown--;
+        if (this.shieldFlashTimer > 0) this.shieldFlashTimer--;
+        if (this.hitFlashTimer > 0) this.hitFlashTimer--;
+
+        this.coreOpen = (this.shields <= 0);
+
+        // 攻撃1: ビッグコア伝統の4連平行レーザー斉射！
+        this.laserTimer++;
+        const laserInterval = this.coreOpen ? 72 : 92;
+        if (this.laserTimer >= laserInterval) {
+            this.laserTimer = 0;
+            this.shootTwinLasers();
+        }
+
+        // 攻撃2: 逆火山マグマ・イオンリング弾（撃ち落とし可能）
+        this.magmaRingTimer++;
+        const ringInterval = this.coreOpen ? 105 : 135;
+        if (this.magmaRingTimer >= ringInterval) {
+            this.magmaRingTimer = 0;
+            this.shootMagmaRings();
+        }
+
+        this.bullets.forEach(b => b.update(600));
+        this.bullets = this.bullets.filter(b => b.active);
+    }
+
+    shootTwinLasers() {
+        const startX = this.x - 112;
+        const cy = this.y;
+        const spd = this.coreOpen ? -6.0 : -5.2;
+        const LaserClass = (typeof EnemyLaser !== 'undefined') ? EnemyLaser : Bullet;
+
+        // 上下4門のアーム砲門から4連レーザー発射！
+        this.bullets.push(new LaserClass(startX, cy - 52, spd, 0, '#00ffff'));
+        this.bullets.push(new LaserClass(startX, cy - 18, spd, 0, '#ffaa00'));
+        this.bullets.push(new LaserClass(startX, cy + 18, spd, 0, '#ffaa00'));
+        this.bullets.push(new LaserClass(startX, cy + 52, spd, 0, '#00ffff'));
+
+        if (typeof Sound !== 'undefined' && typeof Sound.playLaser === 'function') {
+            Sound.playLaser();
+        }
+    }
+
+    shootMagmaRings() {
+        if (typeof RingBullet === 'undefined') return;
+        const cx = this.x - 30;
+        const cy = this.y;
+        const angles = this.coreOpen ? [-0.26, 0, 0.26] : [-0.20, 0.20];
+        angles.forEach((a, idx) => {
+            const spd = 3.5;
+            const col = (idx % 2 === 0) ? '#ff5500' : '#ffaa00';
+            this.bullets.push(new RingBullet(cx, cy, -Math.cos(a) * spd, Math.sin(a) * spd, col));
+        });
+    }
+
+    hitShield(damage = 1) {
+        if (this.shieldHitCooldown > 0) return false;
+        this.shieldHitCooldown = 1;
+        this.shieldFlashTimer = 5;
+        this.currentShieldHp -= damage;
+        let destroyedAny = false;
+        while (this.currentShieldHp <= 0 && this.shields > 0) {
+            this.shields--;
+            destroyedAny = true;
+            if (this.shields > 0) {
+                this.currentShieldHp += this.shieldHpPerPlate;
+            } else {
+                this.currentShieldHp = 0;
+                break;
+            }
+        }
+        return destroyedAny;
+    }
+
+    hitCore(damage = 1) {
+        this.hitFlashTimer = 5;
+        this.hp -= damage;
+        if (this.hp <= 0 && !this.isDying) {
+            this.triggerDeathScream();
+            if (typeof triggerBossDefeatExplosion === 'function') {
+                triggerBossDefeatExplosion(this);
+            }
+        }
+    }
+
+    getShieldBounds() {
+        if (this.shields <= 0) return null;
+        const coreX = this.x - 5;
+        const coreY = this.y;
+        const plateW = 6;
+        const plateH = 30;
+        const spacing = 8;
+        const startX = coreX - 22;
+        const frontX = startX - (this.shields - 1) * spacing;
+        const totalW = (this.shields - 1) * spacing + plateW;
+        return {
+            x: frontX,
+            y: coreY - plateH / 2,
+            width: totalW,
+            height: plateH
+        };
+    }
+
+    getCoreBounds() {
+        const coreX = this.x - 5;
+        const coreY = this.y;
+        const r = 27;
+        return {
+            x: coreX - r,
+            y: coreY - r,
+            width: r * 2,
+            height: r * 2
+        };
+    }
+
+    getTopHullBounds() {
+        return {
+            x: this.x - 120,
+            y: this.y - 105,
+            width: 230,
+            height: 68
+        };
+    }
+
+    getBottomHullBounds() {
+        return {
+            x: this.x - 120,
+            y: this.y + 37,
+            width: 230,
+            height: 68
+        };
+    }
+
+    handleBulletCollision(bullet) {
+        if (this.isEntering || this.isDying || !this.active) return;
+
+        const topHull = this.getTopHullBounds();
+        const bottomHull = this.getBottomHullBounds();
+        const shieldBounds = this.getShieldBounds();
+        const coreHitbox = this.getCoreBounds();
+
+        if (typeof Laser !== 'undefined' && bullet instanceof Laser) {
+            if (bullet.bossHitCooldown && bullet.bossHitCooldown > 0) {
+                bullet.bossHitCooldown--;
+                return;
+            }
+            bullet.bossHitCooldown = 16;
+        }
+
+        const isDouble = bullet.isDouble || (typeof player !== 'undefined' && player && player.weaponType === 'DOUBLE');
+        const shieldDamage = isDouble ? 2 : 1;
+
+        // 1. 前面4枚の遮蔽板への命中判定
+        if (this.shields > 0 && shieldBounds && checkCollision(bullet, shieldBounds)) {
+            if (typeof Laser === 'undefined' || !(bullet instanceof Laser)) {
+                bullet.active = false;
+            }
+            const hitX = Math.min(bullet.x + bullet.width, shieldBounds.x);
+            const destroyed = this.hitShield(shieldDamage);
+            if (destroyed) {
+                if (typeof createExplosion === 'function') {
+                    createExplosion(hitX, bullet.y, '#ff8800');
+                    createExplosion(hitX, bullet.y, '#00ffff');
+                }
+                if (typeof addScore === 'function') {
+                    addScore(1000, hitX, bullet.y, '#ffea00');
+                }
+                if (typeof Sound !== 'undefined' && typeof Sound.playShieldBreak === 'function') {
+                    Sound.playShieldBreak();
+                }
+            } else {
+                if (typeof createExplosion === 'function') {
+                    createExplosion(hitX, bullet.y, '#ffffaa');
+                }
+                if (typeof Sound !== 'undefined' && typeof Sound.playBossHit === 'function') {
+                    Sound.playBossHit();
+                }
+            }
+            return;
+        }
+
+        // 2. 遮蔽板全破壊後のコア直撃判定
+        if (this.shields === 0 && checkCollision(bullet, coreHitbox)) {
+            if (typeof Laser === 'undefined' || !(bullet instanceof Laser)) {
+                bullet.active = false;
+            }
+            this.hitCore(1);
+            if (typeof createExplosion === 'function') {
+                createExplosion(bullet.x + bullet.width / 2, bullet.y, '#ff4400');
+            }
+            if (typeof Sound !== 'undefined' && typeof Sound.playBossHit === 'function') {
+                Sound.playBossHit();
+            }
+            return;
+        }
+
+        // 3. 上下無敵装甲アームへの弾かれ判定
+        if (checkCollision(bullet, topHull) || checkCollision(bullet, bottomHull)) {
+            if (typeof Laser === 'undefined' || !(bullet instanceof Laser)) {
+                bullet.active = false;
+                if (typeof createExplosion === 'function') {
+                    createExplosion(bullet.x, bullet.y, '#94a3b8');
+                }
+                if (typeof Sound !== 'undefined' && typeof Sound.playBossHit === 'function') {
+                    Sound.playBossHit();
+                }
+            }
+        }
+    }
+
+    draw(ctx) {
+        if (!this.active) return;
+        ctx.save();
+
+        if (this.isDying) {
+            ctx.translate((Math.random() - 0.5) * 14, (Math.random() - 0.5) * 14);
+            if (Math.floor(Date.now() / 60) % 2 === 0) {
+                ctx.filter = 'brightness(2.3) saturate(2.0)';
+            }
+        }
+
+        const cx = this.x;
+        const cy = this.y;
+
+        // 1. ビッグコア本体ハル（boss.pngがある場合は灼熱マグマティントを纏わせて描画、なければ重装メカニカル描画）
+        if (typeof images !== 'undefined' && images.boss && images.boss.complete && images.boss.naturalWidth > 0) {
+            ctx.save();
+            ctx.translate(cx, cy);
+            ctx.scale(-1, 1);
+            ctx.shadowColor = 'rgba(255, 68, 0, 0.7)';
+            ctx.shadowBlur = 18;
+            ctx.drawImage(images.boss, -this.drawW / 2, -this.drawH / 2, this.drawW, this.drawH);
+            ctx.restore();
+        } else {
+            this._drawVolcanicBigCoreHull(ctx, cx, cy);
+        }
+
+        // 2. 上下ウイングに搭載された回転アイアンメイデン・サブポッド（4面ボス固有の重装ディテール）
+        [-78, 78].forEach((oy, idx) => {
+            ctx.save();
+            ctx.translate(cx - 25, cy + oy);
+            ctx.rotate(this.maidenOrbAngle * (idx === 0 ? 1 : -1));
+            ctx.fillStyle = '#cbd5e1';
+            for (let s = 0; s < 6; s++) {
+                ctx.rotate(Math.PI / 3);
+                ctx.beginPath();
+                ctx.moveTo(10, -3);
+                ctx.lineTo(17, 0);
+                ctx.lineTo(10, 3);
+                ctx.closePath();
+                ctx.fill();
+            }
+            const podGrad = ctx.createRadialGradient(-2, -2, 1, 0, 0, 11);
+            podGrad.addColorStop(0, '#ffffff');
+            podGrad.addColorStop(0.45, '#f97316');
+            podGrad.addColorStop(1, '#7c2d12');
+            ctx.fillStyle = podGrad;
+            ctx.beginPath();
+            ctx.arc(0, 0, 11, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.restore();
+        });
+
+        // 3. 中央の灼熱マグマ・クリスタルコア
+        const coreX = cx - 5;
+        const coreY = cy;
+        const coreR = 27;
+        this._drawMagmaCore(ctx, coreX, coreY, coreR);
+
+        // 4. 前面4枚の超耐熱タングステン遮蔽板
+        this._drawShieldPlates(ctx, coreX, coreY);
+
+        // 5. 撃破時の大声断末魔シャウト演出（「ウワーーーー！」）
+        if (this.isDying || this.isScreaming) {
+            ctx.save();
+            const sx = cx + (Math.random() - 0.5) * 16;
+            const sy = Math.max(60, cy - 115) + (Math.random() - 0.5) * 16;
+            ctx.font = '900 44px "Impact", "Arial Black", sans-serif';
+            ctx.textAlign = 'center';
+            ctx.shadowColor = '#ff2200';
+            ctx.shadowBlur = 22;
+            ctx.strokeStyle = '#ffffff';
+            ctx.lineWidth = 6;
+            const txt = this.screamText || 'ウワーーーー！';
+            ctx.strokeText(txt, sx, sy);
+            ctx.fillStyle = '#ff3300';
+            ctx.fillText(txt, sx, sy);
+            ctx.restore();
+        }
+
+        ctx.restore();
+
+        this.bullets.forEach(b => b.draw(ctx));
+    }
+
+    _drawVolcanicBigCoreHull(ctx, cx, cy) {
+        ctx.save();
+        const hullGrad = ctx.createLinearGradient(cx - 120, cy - 95, cx + 110, cy + 95);
+        hullGrad.addColorStop(0, '#94a3b8');
+        hullGrad.addColorStop(0.45, '#475569');
+        hullGrad.addColorStop(1, '#0f172a');
+        ctx.fillStyle = hullGrad;
+
+        // 上下レーザーアーム＆中央リアクター船体
+        [-1, 1].forEach(sign => {
+            ctx.beginPath();
+            ctx.moveTo(cx - 118, cy + sign * 48);
+            ctx.lineTo(cx - 30, cy + sign * 96);
+            ctx.lineTo(cx + 95, cy + sign * 62);
+            ctx.lineTo(cx + 115, cy + sign * 18);
+            ctx.lineTo(cx - 85, cy + sign * 24);
+            ctx.closePath();
+            ctx.fill();
+            ctx.strokeStyle = '#f97316';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+        });
+        ctx.restore();
+    }
+
+    _drawMagmaCore(ctx, coreX, coreY, r) {
+        ctx.save();
+        const pulse = Math.sin(Date.now() * 0.008) * 0.25 + 0.75;
+        const isFlash = this.hitFlashTimer > 0;
+
+        ctx.beginPath();
+        ctx.arc(coreX, coreY, r + 7, 0, Math.PI * 2);
+        ctx.fillStyle = '#1c1917';
+        ctx.fill();
+        ctx.strokeStyle = '#f97316';
+        ctx.lineWidth = 3.5;
+        ctx.stroke();
+
+        ctx.shadowColor = isFlash ? '#ffffff' : '#ff4400';
+        ctx.shadowBlur = (this.coreOpen ? 36 : 18) * pulse;
+
+        const sphereGrad = ctx.createRadialGradient(coreX - r * 0.3, coreY - r * 0.3, r * 0.1, coreX, coreY, r);
+        if (isFlash) {
+            sphereGrad.addColorStop(0, '#ffffff');
+            sphereGrad.addColorStop(1, '#ffffff');
+        } else {
+            sphereGrad.addColorStop(0, '#ffffff');
+            sphereGrad.addColorStop(0.28, '#fde047');
+            sphereGrad.addColorStop(0.65, '#f97316');
+            sphereGrad.addColorStop(1, '#7f1d1d');
+        }
+        ctx.fillStyle = sphereGrad;
+        ctx.beginPath();
+        ctx.arc(coreX, coreY, r, 0, Math.PI * 2);
+        ctx.fill();
+
+        // 回転する六角形マグマ・クリスタル格子
+        ctx.save();
+        ctx.translate(coreX, coreY);
+        ctx.rotate(this.rotationAngle);
+        ctx.strokeStyle = `rgba(255, 255, 255, ${0.55 * pulse})`;
+        ctx.lineWidth = 2.2;
+        ctx.beginPath();
+        for (let i = 0; i < 6; i++) {
+            const a = (Math.PI / 3) * i;
+            const px = Math.cos(a) * (r * 0.65);
+            const py = Math.sin(a) * (r * 0.65);
+            if (i === 0) ctx.moveTo(px, py);
+            else ctx.lineTo(px, py);
+        }
+        ctx.closePath();
+        ctx.stroke();
+        ctx.restore();
+
+        ctx.restore();
+    }
+
+    _drawShieldPlates(ctx, coreX, coreY) {
+        if (this.shields <= 0) return;
+
+        const plateW = 6;
+        const plateH = 30;
+        const spacing = 8;
+        const startX = coreX - 22;
+
+        for (let i = 0; i < this.shields; i++) {
+            const px = startX - (this.shields - 1 - i) * spacing;
+            const py = coreY - plateH / 2;
+            const isFront = (i === 0);
+            const isFlashing = isFront && (this.shieldFlashTimer > 0);
+
+            ctx.save();
+            const grad = ctx.createLinearGradient(px, py, px + plateW, py);
+            if (isFlashing) {
+                grad.addColorStop(0, '#ffffff');
+                grad.addColorStop(1, '#fde047');
+            } else {
+                grad.addColorStop(0, '#fed7aa');
+                grad.addColorStop(0.4, '#ea580c');
+                grad.addColorStop(1, '#431407');
+            }
+            ctx.fillStyle = grad;
+            ctx.fillRect(px, py, plateW, plateH);
+            ctx.strokeStyle = isFlashing ? '#ffffff' : '#fb923c';
+            ctx.lineWidth = 1;
+            ctx.strokeRect(px, py, plateW, plateH);
+            ctx.restore();
+        }
+    }
+}
+
+// ==========================================
+// 7. Stage4 クラス（4面・逆火山ステージ全体進行統括）
+// ==========================================
+class Stage4 {
+    constructor(canvasWidth, canvasHeight) {
+        this.width = canvasWidth;
+        this.height = canvasHeight;
+
+        this.state = 'STAGE'; // 'STAGE' -> 'VOLCANO_SURVIVAL' -> 'POST_VOLCANO' -> 'BOSS' -> 'ALL_CLEAR'
+        this.stageTime = 0;
+
+        this.terrain = new InvertedVolcanoTerrain(canvasWidth, canvasHeight);
+        this.boss = null;
+        this.active = true;
+
+        // 浮遊大陸（3基）の出現タイミング
+        this.islandSpawnTimes = [16500, 26500, 36000];
+        this.islandSpawnedCount = 0;
+
+        // アイアンメイデン地帯のウェーブ管理（40秒〜55秒）
+        this.maidenWaveTimer = 0;
+        this.maidenWaveCount = 0;
+
+        // 天井の超巨大逆火山・大噴火サバイバル管理（56秒〜）
+        this.volcanoSpawned = false;
+        this.superVolcano = null;
+        this.floorVolcano = null;
+        this.volcanoSurvivalTimer = 0;
+        this.postVolcanoTimer = 0;
+        this.stageClearTimer = 0;
+
+        this.flyingTimer = 0;
+    }
+
+    start() {
+        this.state = 'STAGE';
+        this.stageTime = 0;
+        this.active = true;
+        this.boss = null;
+        this.islandSpawnedCount = 0;
+        this.maidenWaveTimer = 0;
+        this.maidenWaveCount = 0;
+        this.volcanoSpawned = false;
+        this.superVolcano = null;
+        this.floorVolcano = null;
+        this.volcanoSurvivalTimer = 0;
+        this.postVolcanoTimer = 0;
+        this.stageClearTimer = 0;
+        this.flyingTimer = 0;
+
+        this.terrain.start();
+    }
+
+    update(dt) {
+        if (!this.active) return;
+
+        if (this.state === 'STAGE') {
+            this.stageTime += dt;
+
+            // 1. 開幕8秒間の空中戦の後、天地逆転した逆火山地形が出現！
+            if (this.stageTime >= 8000 && !this.terrain.wallActive) {
+                this.terrain.startWalls();
+            }
+
+            // アイアンメイデン地帯や火山出現後は過剰な通常地形敵を抑える
+            const canSpawnTerrainEnemies = (this.stageTime >= 8500 && this.stageTime < 53000);
+            this.terrain.update(dt, canSpawnTerrainEnemies);
+
+            // 2. 空中編隊の出現（ファン・ガルン・ザブ・ルグラでカプセル補給）
+            if (this.stageTime < 53000) {
+                this.updateFlyingEnemies(dt);
+            }
+
+            // 3. 中空の逆火山・浮遊大陸（4門レーザー砲台付き）を3基順次出現！
+            if (this.islandSpawnedCount < this.islandSpawnTimes.length &&
+                this.stageTime >= this.islandSpawnTimes[this.islandSpawnedCount]) {
+                const idx = this.islandSpawnedCount;
+                const heights = [255, 195, 290];
+                const widths = [265, 285, 295];
+                const thicks = [68, 74, 70];
+                const island = new InvertedFloatingIsland(
+                    this.width + 50,
+                    heights[idx],
+                    widths[idx],
+                    thicks[idx],
+                    this.terrain.scrollSpeed
+                );
+                this.terrain.floatingIslands.push(island);
+                this.islandSpawnedCount++;
+            }
+
+            // 4. ★4面後半の名場面：アイアンメイデン包囲ラッシュ地帯（39秒〜55秒）！
+            if (this.stageTime >= 39000 && this.stageTime < 55000) {
+                this.maidenWaveTimer += dt;
+                if (this.maidenWaveTimer >= 2700) {
+                    this.maidenWaveTimer = 0;
+                    this.maidenWaveCount++;
+                    const patterns = ['ZIGZAG_BOX', 'LEFT_AMBUSH', 'ZIGZAG_BOX', 'WAVE_SWEEP'];
+                    const pat = patterns[(this.maidenWaveCount - 1) % patterns.length];
+                    const startY = (this.maidenWaveCount % 2 === 0) ? 165 : 385;
+                    new IronMaidenSquad(pat, startY, 4);
+                }
+            }
+
+            // 5. ★56秒経過で天井に「超巨大逆火山 (InvertedSuperVolcano)」が堂々と出現！
+            if (this.stageTime >= 56000 && !this.volcanoSpawned) {
+                this.volcanoSpawned = true;
+                const spawnX = this.width + 30;
+                const ceilY = this.terrain.getTopY(spawnX + 110);
+                this.superVolcano = new InvertedSuperVolcano(spawnX, ceilY);
+                if (typeof enemies !== 'undefined') {
+                    enemies.push(this.superVolcano);
+                    // 地面側にも小型火山を同時配置して本家4面の上下挟撃火山を再現！
+                    const floorY = this.terrain.getBottomY(spawnX + 140);
+                    this.floorVolcano = new InvertedVolcano(spawnX + 60, floorY, false);
+                    enemies.push(this.floorVolcano);
+                }
+            }
+
+            // 超巨大逆火山が定位置（x <= 485）に到達したら画面スクロール停止＆大噴火サバイバル開始！
+            if (this.superVolcano && this.superVolcano.positioned) {
+                this.state = 'VOLCANO_SURVIVAL';
+                this.volcanoSurvivalTimer = 24000; // 24秒間の逆火山大噴火サバイバル！
+                this.terrain.scrollSpeed = 0;      // スクロール完全停止！
+                this.superVolcano.startMajorEruption();
+                if (typeof Sound !== 'undefined' && typeof Sound.playVolcanoSurvivalBgm === 'function') {
+                    Sound.playVolcanoSurvivalBgm();
+                }
+            }
+
+        } else if (this.state === 'VOLCANO_SURVIVAL') {
+            this.terrain.update(dt, false);
+            this.volcanoSurvivalTimer -= dt;
+
+            // 大噴火を耐え抜いたら噴火停止＆スクロール再開してボス戦へ！
+            if (this.volcanoSurvivalTimer <= 0) {
+                this.volcanoSurvivalTimer = 0;
+                if (this.superVolcano) {
+                    this.superVolcano.stopEruption();
+                }
+                this.terrain.scrollSpeed = 4.2;
+                this.terrain.stopGenerating();
+                this.state = 'POST_VOLCANO';
+                this.postVolcanoTimer = 0;
+            }
+
+        } else if (this.state === 'POST_VOLCANO') {
+            this.postVolcanoTimer += dt;
+            this.terrain.update(dt, false);
+
+            if (this.postVolcanoTimer >= 4200 || !this.terrain.wallActive) {
+                this.state = 'BOSS';
+                this.terrain.wallActive = false;
+                if (this.superVolcano) {
+                    this.superVolcano.active = false;
+                    this.superVolcano = null;
+                }
+                if (this.floorVolcano) {
+                    this.floorVolcano.active = false;
+                    this.floorVolcano = null;
+                }
+                if (typeof Sound !== 'undefined' && typeof Sound.playBossBgm === 'function') {
+                    Sound.playBossBgm();
+                }
+                this.boss = new Stage4Boss(this.width, this.height / 2);
+            }
+
+        } else if (this.state === 'BOSS') {
+            this.terrain.update(dt, false);
+
+            if (this.boss) {
+                this.boss.update();
+                if (!this.boss.active) {
+                    this.state = 'ALL_CLEAR';
+                    this.stageClearTimer = 0;
+                    if (typeof addScore === 'function') {
+                        addScore(100000, this.width / 2, this.height / 2 - 40, '#ffea00');
+                    }
+                    setTimeout(() => {
+                        if (this.active && typeof Sound !== 'undefined' && typeof Sound.playStage4Bgm === 'function') {
+                            Sound.playStage4Bgm();
+                        }
+                    }, 650);
+                }
+            }
+
+        } else if (this.state === 'ALL_CLEAR') {
+            this.terrain.update(dt, false);
+            this.stageClearTimer += dt;
+        }
+    }
+
+    updateFlyingEnemies(dt) {
+        this.flyingTimer += dt;
+        if (this.flyingTimer < 1050) return;
+        this.flyingTimer = 0;
+
+        const roll = Math.random();
+        const safeY = this.terrain.wallActive
+            ? Math.random() * (this.terrain.baseBottomY - this.terrain.baseTopY - 150) + this.terrain.baseTopY + 75
+            : Math.random() * (this.height - 240) + 120;
+
+        if (roll < 0.38) {
+            if (typeof Formation !== 'undefined') {
+                new Formation(safeY, 4);
+            }
+        } else if (roll < 0.65) {
+            if (typeof GarunFormation !== 'undefined') {
+                new GarunFormation(safeY, Math.random() < 0.5, 4);
+            }
+        } else if (roll < 0.88) {
+            if (typeof ZabSquad !== 'undefined') {
+                new ZabSquad('ANYWHERE', safeY, 3);
+            }
+        } else {
+            if (typeof RugraEnemy !== 'undefined' && typeof enemies !== 'undefined') {
+                enemies.push(new RugraEnemy(this.width, safeY));
+            }
+        }
+    }
+
+    checkCollision(rect) {
+        if (this.terrain && this.terrain.wallActive) {
+            if (this.terrain.checkCollision(rect)) return true;
+        }
+        if (this.superVolcano && this.superVolcano.active && this.superVolcano.checkCollision(rect)) {
+            return true;
+        }
+        return false;
+    }
+
+    draw(ctx) {
+        if (this.terrain) {
+            this.terrain.draw(ctx);
+        }
+
+        // 1. 開幕ステージタイトル演出（0〜4.2秒）
+        if (this.state === 'STAGE' && this.stageTime < 4200) {
+            const alpha = Math.min(1, Math.sin((this.stageTime / 4200) * Math.PI));
+            ctx.save();
+            ctx.textAlign = 'center';
+
+            ctx.font = 'bold 36px "Courier New", monospace';
+            ctx.fillStyle = `rgba(255, 120, 30, ${alpha})`;
+            ctx.shadowColor = '#ff3300';
+            ctx.shadowBlur = 16;
+            ctx.fillText('STAGE 4 : INVERTED VOLCANO', this.width / 2, this.height / 2 - 40);
+
+            ctx.font = 'bold 18px "Courier New", monospace';
+            ctx.fillStyle = `rgba(255, 235, 120, ${alpha})`;
+            ctx.shadowColor = '#ff8800';
+            ctx.shadowBlur = 8;
+            ctx.fillText('BEWARE OF JUMPERS, IRON MAIDENS & CEILING ERUPTION!', this.width / 2, this.height / 2 + 10);
+
+            ctx.restore();
+        }
+
+        // 2. アイアンメイデン包囲網接近警告（38〜41秒）
+        if (this.state === 'STAGE' && this.stageTime >= 38000 && this.stageTime < 41000) {
+            if (Math.floor(Date.now() / 180) % 2 === 0) {
+                ctx.save();
+                ctx.textAlign = 'center';
+                ctx.font = 'bold 22px "Courier New", monospace';
+                ctx.fillStyle = '#ff3366';
+                ctx.shadowColor = '#ff0044';
+                ctx.shadowBlur = 12;
+                ctx.fillText('WARNING: IRON MAIDEN ASSAULT SQUAD INCOMING!', this.width / 2, 52);
+                ctx.restore();
+            }
+        }
+
+        // 3. 天井の超巨大逆火山・大噴火サバイバルHUD演出
+        if (this.state === 'VOLCANO_SURVIVAL') {
+            ctx.save();
+            const remainSec = Math.max(0, (this.volcanoSurvivalTimer / 1000)).toFixed(1);
+            const pulse = Math.sin(Date.now() * 0.008);
+
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.72)';
+            ctx.fillRect(this.width / 2 - 265, 14, 530, 56);
+            ctx.strokeStyle = `rgba(255, 68, 0, ${0.7 + pulse * 0.3})`;
+            ctx.lineWidth = 2.5;
+            ctx.strokeRect(this.width / 2 - 265, 14, 530, 56);
+
+            ctx.textAlign = 'center';
+            ctx.font = 'bold 20px "Courier New", monospace';
+            ctx.fillStyle = '#ff3300';
+            ctx.shadowColor = '#ff5500';
+            ctx.shadowBlur = 12;
+            ctx.fillText('WARNING: INVERTED VOLCANO ERUPTION!', this.width / 2, 38);
+
+            ctx.font = 'bold 18px "Courier New", monospace';
+            ctx.fillStyle = '#ffea00';
+            ctx.shadowColor = '#ffaa00';
+            ctx.shadowBlur = 10;
+            ctx.fillText(`SURVIVE : ${remainSec}s`, this.width / 2, 60);
+
+            ctx.restore();
+        } else if (this.state === 'POST_VOLCANO') {
+            ctx.save();
+            ctx.textAlign = 'center';
+            ctx.font = 'bold 22px "Courier New", monospace';
+            ctx.fillStyle = '#00ffff';
+            ctx.shadowColor = '#0088ff';
+            ctx.shadowBlur = 10;
+            ctx.fillText('ERUPTION SUBSIDED - MAGMA BIG CORE APPROACHING!', this.width / 2, 48);
+            ctx.restore();
+        }
+
+        // 4. ボスの描画
+        if (this.state === 'BOSS' && this.boss) {
+            this.boss.draw(ctx);
+        }
+
+        // 5. STAGE 4 ALL CLEAR 演出
+        if (this.state === 'ALL_CLEAR') {
+            ctx.save();
+            ctx.textAlign = 'center';
+
+            ctx.font = 'bold 44px "Courier New", monospace';
+            ctx.fillStyle = '#ffea00';
+            ctx.shadowColor = '#ff6600';
+            ctx.shadowBlur = 20;
+            ctx.fillText('STAGE 4 ALL CLEAR!', this.width / 2, this.height / 2 - 80);
+
+            ctx.font = 'bold 26px "Courier New", monospace';
+            ctx.fillStyle = '#00ffee';
+            ctx.shadowColor = '#0088ff';
+            ctx.shadowBlur = 12;
+            ctx.fillText('CONGRATULATIONS! INVERTED VOLCANO CONQUERED!', this.width / 2, this.height / 2 - 20);
+
+            ctx.font = 'bold 20px "Courier New", monospace';
+            ctx.fillStyle = '#ffffff';
+            ctx.shadowBlur = 0;
+            ctx.fillText('ALL MISSIONS COMPLETED!', this.width / 2, this.height / 2 + 30);
+
+            ctx.font = 'bold 18px "Courier New", monospace';
+            ctx.fillStyle = '#ffcc00';
+            ctx.fillText('SPECIAL MISSION BONUS : 100,000 PTS', this.width / 2, this.height / 2 + 70);
+
+            ctx.restore();
+        }
+    }
+}
+
+// グローバル公開
+window.JumperEnemy = JumperEnemy;
+window.IronMaidenEnemy = IronMaidenEnemy;
+window.IronMaidenSquad = IronMaidenSquad;
+window.InvertedVolcanoRock = InvertedVolcanoRock;
+window.InvertedVolcano = InvertedVolcano;
+window.InvertedSuperVolcano = InvertedSuperVolcano;
+window.InvertedFloatingIsland = InvertedFloatingIsland;
+window.InvertedVolcanoTerrain = InvertedVolcanoTerrain;
+window.Stage4Boss = Stage4Boss;
+window.Stage4 = Stage4;
+let stage4 = null;
+window.stage4 = stage4;

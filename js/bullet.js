@@ -84,6 +84,8 @@ class Missile {
         if (typeof levelManager !== 'undefined') {
             if (levelManager.stage === 3 && window.stage3 && window.stage3.terrain && window.stage3.terrain.wallActive) {
                 groundY = window.stage3.terrain.getBottomY(this.x + this.width / 2);
+            } else if (levelManager.stage === 4 && window.stage4 && window.stage4.terrain && window.stage4.terrain.wallActive) {
+                groundY = window.stage4.terrain.getBottomY(this.x + this.width / 2);
             } else if (levelManager.terrain && levelManager.terrain.active) {
                 groundY = levelManager.terrain.getGroundY(this.x + this.width / 2);
             }

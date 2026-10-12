@@ -1059,29 +1059,30 @@ function spawnBossDismembermentWave(boss, isFinalBlast = false) {
 
     const isStage2 = (typeof GolemBoss !== 'undefined' && boss instanceof GolemBoss);
     const isStage3 = (typeof BigCoreBoss !== 'undefined' && boss instanceof BigCoreBoss);
+    const isStage4 = (typeof Stage4Boss !== 'undefined' && boss instanceof Stage4Boss);
 
-    // ボス中心座標の算出（Stage 2は左上基準、Stage 1 / Stage 3は中心基準）
+    // ボス中心座標の算出（Stage 2は左上基準、Stage 1 / Stage 3 / Stage 4は中心基準）
     const cx = isStage2 ? (boss.x + boss.width / 2) : boss.x;
     const cy = isStage2 ? (boss.y + boss.height / 2) : boss.y;
     const mult = isFinalBlast ? 2.4 : 1.0;
 
     if (!isStage2 && !isStage3) {
         // ====================================================
-        // STAGE 1 BOSS: 機械部品（砲台アーム・装甲板・歯車・ピストン・コア）がバラバラに飛散！
+        // STAGE 1 / STAGE 4 BOSS: 機械部品（砲台アーム・装甲板・歯車・ピストン・コア）がバラバラに飛散！
         // ====================================================
         if (isFinalBlast) {
             [-1, 1].forEach(sign => {
                 particles.push(new BossDebris(cx - 50, cy + sign * 55, 'CANNON_ARM', {
-                    stage: 1,
+                    stage: isStage4 ? 4 : 1,
                     vx: -3.5 - Math.random() * 3.0,
                     vy: sign * (2.5 + Math.random() * 3.0),
                     size: 24,
                     vAngle: sign * 0.08,
-                    subColor: '#00ffff',
+                    subColor: isStage4 ? '#ff5500' : '#00ffff',
                     decay: 0.0045
                 }));
                 particles.push(new BossDebris(cx + 15, cy + sign * 45, 'CANNON_ARM', {
-                    stage: 1,
+                    stage: isStage4 ? 4 : 1,
                     vx: 1.5 + Math.random() * 3.5,
                     vy: sign * (2.0 + Math.random() * 2.8),
                     size: 20,
@@ -1099,13 +1100,31 @@ function spawnBossDismembermentWave(boss, isFinalBlast = false) {
             const kinds = ['HULL_PLATE', 'MECH_GEAR', 'PISTON_ROD', 'CORE_SHARD'];
             const kind = kinds[i % kinds.length];
             particles.push(new BossDebris(cx + ox, cy + oy, kind, {
-                stage: 1,
+                stage: isStage4 ? 4 : 1,
                 speed: (2.5 + Math.random() * 6.0) * (isFinalBlast ? 1.25 : 1.0),
                 size: (kind === 'CORE_SHARD') ? (10 + Math.random() * 10) : (12 + Math.random() * 14),
-                color: (i % 2 === 0) ? '#64748b' : '#475569',
-                subColor: (i % 2 === 0) ? '#00ffff' : '#ffaa00',
+                color: isStage4 ? ((i % 2 === 0) ? '#7f1d1d' : '#450a0a') : ((i % 2 === 0) ? '#64748b' : '#475569'),
+                subColor: isStage4 ? '#ff5500' : ((i % 2 === 0) ? '#00ffff' : '#ffaa00'),
                 decay: 0.0055
             }));
+        }
+
+        if (isStage4) {
+            const magmaCount = Math.round(6 * mult);
+            const magmaColors = ['#ff4400', '#b91c1c', '#ea580c', '#7c2d12'];
+            for (let i = 0; i < magmaCount; i++) {
+                const ox = (Math.random() - 0.5) * 150;
+                const oy = (Math.random() - 0.5) * 130;
+                particles.push(new BossDebris(cx + ox, cy + oy, 'ROCK_BOULDER', {
+                    stage: 4,
+                    speed: 3.0 + Math.random() * 6.5,
+                    gravity: (i % 2 === 0) ? -0.05 : 0.06, // 逆火山らしく上下両方へ飛散
+                    size: 11 + Math.random() * 15,
+                    color: magmaColors[i % magmaColors.length],
+                    vertCount: 7,
+                    decay: 0.005
+                }));
+            }
         }
     } else if (isStage2) {
         // ====================================================

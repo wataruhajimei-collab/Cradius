@@ -143,20 +143,39 @@ class Player {
 
         // テスト用ショートカット: 2キーで即座にステージ2（ストーンヘンジ面）へワープ
         if (Input.isDown('Digit2')) {
-            if (typeof levelManager !== 'undefined' && levelManager.stage === 1) {
+            if (typeof levelManager !== 'undefined' && levelManager.stage !== 2) {
                 levelManager.startStage2();
             }
         }
 
-        // テスト用ショートカット: Vキーで即座に火山大噴火ゾーン（65.5秒）へワープ
-        if (Input.isDown('KeyV')) {
-            if (typeof levelManager !== 'undefined' && levelManager.stage === 1) {
-                levelManager.time = 65500;
-                if (!levelManager.terrain.active) levelManager.terrain.start();
+        // テスト用ショートカット: 3キーで即座にステージ3（モアイ面）へワープ
+        if (Input.isDown('Digit3')) {
+            if (typeof levelManager !== 'undefined' && levelManager.stage !== 3) {
+                levelManager.startStage3();
             }
         }
 
-        // テスト用ショートカット: Bキーで即座にボス戦へワープ（1面: ビッグコア / 2面: ゴーレムコア）
+        // テスト用ショートカット: 4キーで即座にステージ4（逆火山面）へワープ
+        if (Input.isDown('Digit4')) {
+            if (typeof levelManager !== 'undefined' && levelManager.stage !== 4) {
+                levelManager.startStage4();
+            }
+        }
+
+        // テスト用ショートカット: Vキーで即座に火山大噴火ゾーンへワープ（1面 / 4面）
+        if (Input.isDown('KeyV')) {
+            if (typeof levelManager !== 'undefined') {
+                if (levelManager.stage === 1) {
+                    levelManager.time = 65500;
+                    if (!levelManager.terrain.active) levelManager.terrain.start();
+                } else if (levelManager.stage === 4 && window.stage4 && window.stage4.state === 'STAGE') {
+                    window.stage4.stageTime = 55500;
+                    if (!window.stage4.terrain.wallActive) window.stage4.terrain.startWalls();
+                }
+            }
+        }
+
+        // テスト用ショートカット: Bキーで即座にボス戦へワープ（1面〜4面）
         if (Input.isDown('KeyB')) {
             if (typeof levelManager !== 'undefined') {
                 if (levelManager.stage === 1 && levelManager.state !== 'BOSS') {
@@ -173,6 +192,21 @@ class Player {
                     if (typeof Sound !== 'undefined') Sound.playBossBgm();
                     if (typeof GolemBoss !== 'undefined') {
                         stonehengeStage.boss = new GolemBoss(stonehengeStage.width, 185);
+                    }
+                } else if (levelManager.stage === 3 && window.stage3 && window.stage3.state !== 'BOSS') {
+                    window.stage3.state = 'BOSS';
+                    window.stage3.terrain.wallActive = false;
+                    if (typeof Sound !== 'undefined') Sound.playBossBgm();
+                    if (typeof BigCoreBoss !== 'undefined') {
+                        window.stage3.boss = new BigCoreBoss(window.stage3.width + 130, window.stage3.height / 2);
+                    }
+                } else if (levelManager.stage === 4 && window.stage4 && window.stage4.state !== 'BOSS') {
+                    window.stage4.state = 'BOSS';
+                    window.stage4.terrain.wallActive = false;
+                    window.stage4.terrain.floatingIslands = [];
+                    if (typeof Sound !== 'undefined') Sound.playBossBgm();
+                    if (typeof Stage4Boss !== 'undefined') {
+                        window.stage4.boss = new Stage4Boss(window.stage4.width, window.stage4.height / 2);
                     }
                 }
             }

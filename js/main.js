@@ -203,9 +203,12 @@ function init() {
             } else if (trackId === 'STAGE3') {
                 Sound.playStage3Bgm(true);
                 label = '♪ 再生中: 05. BLANK MASK (3面・モアイ遺跡)';
+            } else if (trackId === 'STAGE4') {
+                Sound.playStage4Bgm(true);
+                label = '♪ 再生中: 06. FREE FLYER (4面・逆火山)';
             } else if (trackId === 'BOSS') {
                 Sound.playBossBgm(true);
-                label = '♪ 再生中: 06. AIRCRAFT CARRIER (ボス戦BGM)';
+                label = '♪ 再生中: 07. AIRCRAFT CARRIER (ボス戦BGM)';
             }
             if (bgmNowPlaying && label) {
                 bgmNowPlaying.textContent = label;
@@ -394,8 +397,8 @@ function handleCollisions() {
 
     // プレイヤーの弾と敵の当たり判定
     playerBullets.forEach(bullet => {
-        // 弾と地形・浮遊大陸（ステージ1）
-        if (levelManager.stage === 1 && bullet.active && levelManager.checkCollision(bullet)) {
+        // 弾と地形・浮遊大陸（ステージ1・ステージ4）
+        if ((levelManager.stage === 1 || levelManager.stage === 4) && bullet.active && levelManager.checkCollision(bullet)) {
             if (!(bullet instanceof Missile) && !(typeof Laser !== 'undefined' && bullet instanceof Laser)) {
                 bullet.active = false;
                 createExplosion(bullet.x, bullet.y, '#555555');
@@ -404,6 +407,7 @@ function handleCollisions() {
 
         enemies.forEach(enemy => {
             if (enemy instanceof FanEnemy && !enemy.visible) return;
+            if (typeof IronMaidenEnemy !== 'undefined' && enemy instanceof IronMaidenEnemy && !enemy.visible) return;
             if (typeof ZabEnemy !== 'undefined' && enemy instanceof ZabEnemy && enemy.delay > 0) return;
             if (typeof WarpSphereEnemy !== 'undefined' && enemy instanceof WarpSphereEnemy && enemy.state === 'WARPING') return;
 
@@ -412,6 +416,10 @@ function handleCollisions() {
                     bullet.active = false;
                 }
                 enemy.hp--;
+                if (typeof IronMaidenEnemy !== 'undefined' && enemy instanceof IronMaidenEnemy && enemy.hp > 0) {
+                    enemy.flashTimer = 6;
+                    if (typeof Sound !== 'undefined' && typeof Sound.playBossHit === 'function') Sound.playBossHit();
+                }
                 if (enemy.hp <= 0) {
                     enemy.active = false;
                     const ex = enemy.x + enemy.width / 2;
@@ -444,9 +452,12 @@ function handleCollisions() {
     // プレイヤーと敵の当たり判定
     enemies.forEach(enemy => {
         if (enemy instanceof FanEnemy && !enemy.visible) return;
+        if (typeof IronMaidenEnemy !== 'undefined' && enemy instanceof IronMaidenEnemy && !enemy.visible) return;
         if (typeof ZabEnemy !== 'undefined' && enemy instanceof ZabEnemy && (enemy.delay > 0 || enemy.state === 'WARP_IN')) return;
         if (typeof WarpSphereEnemy !== 'undefined' && enemy instanceof WarpSphereEnemy && enemy.state === 'WARPING') return;
         if (typeof SuperVolcano !== 'undefined' && enemy instanceof SuperVolcano) return; // 火山山体はシールドで消滅させない
+        if (typeof InvertedVolcano !== 'undefined' && enemy instanceof InvertedVolcano) return;
+        if (typeof InvertedSuperVolcano !== 'undefined' && enemy instanceof InvertedSuperVolcano) return;
 
         if (enemy.active && checkCollision(player, enemy)) {
             if (player.shieldActive) {
@@ -518,10 +529,12 @@ function handleCollisions() {
         }
     });
 
-    // ボス戦の当たり判定（ステージ1ボス または ステージ2ボス または ステージ3ボス）
+    // ボス戦の当たり判定（ステージ1ボス〜ステージ4ボス）
+    const st4 = window.stage4 || (typeof stage4 !== 'undefined' ? stage4 : null);
     const currentBoss = (levelManager.stage === 1 && levelManager.state === 'BOSS') ? levelManager.boss :
                         (levelManager.stage === 2 && typeof stonehengeStage !== 'undefined' && stonehengeStage && stonehengeStage.boss) ? stonehengeStage.boss :
-                        (levelManager.stage === 3 && (window.stage3 || (typeof stage3 !== 'undefined' ? stage3 : null)) && (window.stage3 || stage3).boss) ? (window.stage3 || stage3).boss : null;
+                        (levelManager.stage === 3 && (window.stage3 || (typeof stage3 !== 'undefined' ? stage3 : null)) && (window.stage3 || stage3).boss) ? (window.stage3 || stage3).boss :
+                        (levelManager.stage === 4 && st4 && st4.boss) ? st4.boss : null;
 
     if (currentBoss && currentBoss.active) {
         const boss = currentBoss;
@@ -606,10 +619,12 @@ function handleCollisions() {
 
 function getEnemyScore(enemy) {
     if (!enemy) return 100;
+    if (typeof IronMaidenEnemy !== 'undefined' && enemy instanceof IronMaidenEnemy) return 500;
     if (typeof HatcherEnemy !== 'undefined' && enemy instanceof HatcherEnemy) return 500;
     if (typeof LaserTurretEnemy !== 'undefined' && enemy instanceof LaserTurretEnemy) return 400;
     if (typeof RuneTurret !== 'undefined' && enemy instanceof RuneTurret) return 400;
     if (typeof StoneEyeEnemy !== 'undefined' && enemy instanceof StoneEyeEnemy) return 300;
+    if (typeof JumperEnemy !== 'undefined' && enemy instanceof JumperEnemy) return 300;
     if (typeof DuckerEnemy !== 'undefined' && enemy instanceof DuckerEnemy) return 200;
     if (typeof TurretEnemy !== 'undefined' && enemy instanceof TurretEnemy) return 200;
     if (typeof WarpSphereEnemy !== 'undefined' && enemy instanceof WarpSphereEnemy) return 200;
@@ -645,6 +660,7 @@ function triggerBossDefeatExplosion(boss) {
 
     const isStage2 = (typeof GolemBoss !== 'undefined' && boss instanceof GolemBoss);
     const isStage3 = (typeof BigCoreBoss !== 'undefined' && boss instanceof BigCoreBoss);
+    const isStage4 = (typeof Stage4Boss !== 'undefined' && boss instanceof Stage4Boss);
     const getBossCenter = () => ({
         cx: isStage2 ? (boss.x + boss.width / 2) : boss.x,
         cy: isStage2 ? (boss.y + boss.height / 2) : boss.y
@@ -653,7 +669,7 @@ function triggerBossDefeatExplosion(boss) {
     // ボス撃破特大ボーナススコア加算！
     if (typeof addScore === 'function') {
         const { cx, cy } = getBossCenter();
-        const bossPts = isStage3 ? 30000 : (isStage2 ? 20000 : 10000);
+        const bossPts = isStage4 ? 40000 : (isStage3 ? 30000 : (isStage2 ? 20000 : 10000));
         addScore(bossPts, cx, cy - 20, '#ffea00');
     }
 
@@ -677,7 +693,7 @@ function triggerBossDefeatExplosion(boss) {
                 particles.push(new BossExplosion(explosionX, explosionY, radius));
             }
             if (!isStage3) {
-                const sparkColor = isStage2 ? '#e6ccb2' : '#ffaa00';
+                const sparkColor = isStage2 ? '#e6ccb2' : (isStage4 ? '#ff5500' : '#ffaa00');
                 createExplosion(explosionX, explosionY, sparkColor);
             }
             if (i % 3 === 0 && typeof spawnBossDismembermentWave === 'function') {
@@ -700,7 +716,7 @@ function triggerBossDefeatExplosion(boss) {
         }
         if (!isStage3) {
             for (let j = 0; j < 20; j++) {
-                createExplosion(centerX, centerY, isStage2 ? '#ddb892' : '#ffffff');
+                createExplosion(centerX, centerY, isStage2 ? '#ddb892' : (isStage4 ? '#ffaa00' : '#ffffff'));
             }
         }
     }, 1100);

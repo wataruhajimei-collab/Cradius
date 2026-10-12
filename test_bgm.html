@@ -57,7 +57,7 @@
 <body>
 
 <h1>🎵 クラディウス 本格BGMコレクション 試聴</h1>
-<p>全6曲のKONAMI矩形波倶楽部スタイルBGM</p>
+<p>全7曲のKONAMI矩形波倶楽部スタイルBGM</p>
 
 <div class="card">
   <h2>01. 空中戦BGM: 『BEGINNING OF THE HISTORY』</h2>
@@ -90,7 +90,13 @@
 </div>
 
 <div class="card">
-  <h2>06. ボス戦BGM: 『AIRCRAFT CARRIER : DISSONANT FORTRESS ASSAULT』</h2>
+  <h2>06. 4面メインBGM: 『FREE FLYER』</h2>
+  <p>4面逆火山用 / 152 BPM / 1985年AC版4面・疾走する16ビートオクターブベースと飛翔するクリスタルアルペジオ＆パルスリード！</p>
+  <button onclick="startStage4Bgm()">4面メインBGM 再生</button>
+</div>
+
+<div class="card">
+  <h2>07. ボス戦BGM: 『AIRCRAFT CARRIER : DISSONANT FORTRESS ASSAULT』</h2>
   <p>要塞ボス用 / 176 BPM / 不協和音クラスター（減5度・短2度・長7度）・強靭な金属＆重低音パーカッション・16分小刻み重低音ベースによる死闘テーマ！</p>
   <button onclick="startBossBgm()">ボス戦BGM 再生</button>
 </div>
@@ -100,7 +106,7 @@
   <div id="status-text" class="status">停止中（ボタンを押して再生）</div>
 </div>
 
-<script src="js/sound.js?v=4.6"></script>
+<script src="js/sound.js?v=4.8"></script>
 <script>
 window.onerror = function(msg, url, line, col, err) {
     const el = document.getElementById('status-text');
@@ -143,6 +149,12 @@ function startStage3Bgm() {
     ensureAudio();
     Sound.playStage3Bgm(true);
     document.getElementById('status-text').innerHTML = '<span style="color:#58a6ff">再生中: 05. 3面メインBGM『BLANK MASK』</span>';
+}
+
+function startStage4Bgm() {
+    ensureAudio();
+    Sound.playStage4Bgm(true);
+    document.getElementById('status-text').innerHTML = '<span style="color:#58a6ff">再生中: 06. 4面メインBGM『FREE FLYER』</span>';
 }
 
 function startBossBgm() {

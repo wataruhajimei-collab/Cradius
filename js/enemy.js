@@ -723,7 +723,9 @@ class DuckerEnemy extends Enemy {
     update() {
         let activeTerrain = null;
         if (typeof levelManager !== 'undefined') {
-            if (levelManager.stage === 3 && window.stage3 && window.stage3.terrain && window.stage3.terrain.wallActive) {
+            if (levelManager.stage === 4 && window.stage4 && window.stage4.terrain && window.stage4.terrain.wallActive) {
+                activeTerrain = window.stage4.terrain;
+            } else if (levelManager.stage === 3 && window.stage3 && window.stage3.terrain && window.stage3.terrain.wallActive) {
                 activeTerrain = window.stage3.terrain;
             } else if (levelManager.terrain && levelManager.terrain.active) {
                 activeTerrain = levelManager.terrain;
@@ -922,6 +924,16 @@ class HatcherEnemy extends Enemy {
     update() {
         if (typeof levelManager !== 'undefined' && levelManager.stage === 2 && typeof stonehengeStage !== 'undefined' && stonehengeStage && stonehengeStage.active) {
             this.x -= stonehengeStage.scrollSpeed;
+        } else if (typeof levelManager !== 'undefined' && levelManager.stage === 4 && window.stage4 && window.stage4.terrain && window.stage4.terrain.wallActive) {
+            this.x -= window.stage4.terrain.scrollSpeed;
+            const centerX = this.x + this.width / 2;
+            if (this.isCeiling) {
+                this.groundY = window.stage4.terrain.getTopY(centerX);
+                this.y = this.groundY;
+            } else {
+                this.groundY = window.stage4.terrain.getBottomY(centerX);
+                this.y = this.groundY - this.height;
+            }
         } else if (typeof levelManager !== 'undefined' && levelManager.terrain && levelManager.terrain.active) {
             this.x -= levelManager.terrain.scrollSpeed;
             const centerX = this.x + this.width / 2;
@@ -1627,6 +1639,26 @@ class TurretEnemy extends Enemy {
     update() {
         if (typeof levelManager !== 'undefined' && levelManager.stage === 2 && typeof stonehengeStage !== 'undefined' && stonehengeStage && stonehengeStage.active) {
             this.x -= stonehengeStage.scrollSpeed;
+        } else if (typeof levelManager !== 'undefined' && levelManager.stage === 4 && window.stage4 && window.stage4.terrain && window.stage4.terrain.wallActive) {
+            this.x -= window.stage4.terrain.scrollSpeed;
+            const centerX = this.x + this.width / 2;
+            const sampleDist = 18;
+
+            if (this.isCeiling) {
+                const yL = window.stage4.terrain.getTopY(centerX - sampleDist);
+                const yR = window.stage4.terrain.getTopY(centerX + sampleDist);
+                const yC = window.stage4.terrain.getTopY(centerX);
+                this.slopeAngle = Math.atan2(yR - yL, sampleDist * 2);
+                this.groundY = yC;
+                this.y = yC;
+            } else {
+                const yL = window.stage4.terrain.getBottomY(centerX - sampleDist);
+                const yR = window.stage4.terrain.getBottomY(centerX + sampleDist);
+                const yC = window.stage4.terrain.getBottomY(centerX);
+                this.slopeAngle = Math.atan2(yR - yL, sampleDist * 2);
+                this.groundY = yC;
+                this.y = yC - this.height;
+            }
         } else if (typeof levelManager !== 'undefined' && levelManager.terrain && levelManager.terrain.active) {
             this.x -= levelManager.terrain.scrollSpeed;
             const centerX = this.x + this.width / 2;
