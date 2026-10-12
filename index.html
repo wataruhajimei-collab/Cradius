@@ -67,6 +67,16 @@
                     <button id="btn-bgm-collection" type="button" class="arcade-bgm-collection-btn">
                         🎵 BGM集を開く (SOUND TEST)
                     </button>
+
+                    <!-- iPad・タッチ端末対応：いきなり4面（逆火山／クラゲロボ大巡回）を試せるダイレクト出撃ボタン -->
+                    <div id="title-stage-select" class="arcade-stage-select-row">
+                        <button id="btn-start-stage4" type="button" class="arcade-stage4-direct-btn">
+                            🔥 4面 (逆火山) から開始
+                        </button>
+                        <button id="btn-start-stage4-jellyfish" type="button" class="arcade-stage4-direct-btn btn-jellyfish">
+                            👾 4面・クラゲロボ巡回から開始
+                        </button>
+                    </div>
                 </div>
 
                 <!-- 下部: コマミロゴ・著作権 & クレジット表示 -->
@@ -141,7 +151,7 @@
                         <span class="bgm-track-num">06</span>
                         <span class="bgm-track-info">
                             <span class="bgm-track-name">FREE FLYER (4面・逆火山)</span>
-                            <span class="bgm-track-desc">152 BPM / 1985年AC版4面・疾走オクターブベース＆クリスタルアルペジオ</span>
+                            <span class="bgm-track-desc">134 BPM / 1985年AC版4面「Free Flyer」実機13小節ループ完全採譜</span>
                         </span>
                         <span class="bgm-track-play">▶ 再生</span>
                     </button>
@@ -163,6 +173,14 @@
 
         <!-- 画面全体（余白を含む全域）をカバーするタッチ操作レイヤー -->
         <div id="touch-layer">
+            <!-- iPad・タッチ操作用：いつでもワンタップで4面・クラゲ巡回・ボス・フル装備を試せる上部ショートカットバー -->
+            <div id="touch-stage-bar" aria-label="ステージ選択ショートカット">
+                <button type="button" class="touch-jump-btn" data-jump="STAGE4">🔥 4面:逆火山</button>
+                <button type="button" class="touch-jump-btn jump-jelly" data-jump="STAGE4_JELLYFISH">👾 4面:クラゲ巡回</button>
+                <button type="button" class="touch-jump-btn jump-boss" data-jump="STAGE4_BOSS">👑 4面:ボス</button>
+                <button type="button" class="touch-jump-btn jump-power" data-jump="FULL_POWER">⚡ フル装備</button>
+            </div>
+
             <!-- 画面左側（余白〜画面中央）：どこでもスワイプ移動可能 -->
             <div id="touch-move-zone">
                 <div id="move-hint">画面のどこでもスワイプ移動</div>
@@ -186,21 +204,21 @@
         </div>
     </div>
 
-    <script src="js/sound.js?v=4.8"></script>
-    <script src="js/input.js?v=4.8"></script>
-    <script src="js/collision.js?v=4.8"></script>
-    <script src="js/particle.js?v=4.8"></script>
-    <script src="js/bullet.js?v=4.8"></script>
-    <script src="js/enemy.js?v=4.8"></script>
-    <script src="js/powerup.js?v=4.8"></script>
-    <script src="js/ui.js?v=4.8"></script>
-    <script src="js/option.js?v=4.8"></script>
-    <script src="js/boss.js?v=4.8"></script>
-    <script src="js/level.js?v=4.8"></script>
-    <script src="js/stonehenge.js?v=4.8"></script>
-    <script src="js/stage3.js?v=4.8"></script>
-    <script src="js/stage4.js?v=4.8"></script>
-    <script src="js/player.js?v=4.8"></script>
-    <script src="js/main.js?v=4.8"></script>
+    <script src="js/sound.js?v=4.9"></script>
+    <script src="js/input.js?v=4.9"></script>
+    <script src="js/collision.js?v=4.9"></script>
+    <script src="js/particle.js?v=4.9"></script>
+    <script src="js/bullet.js?v=4.9"></script>
+    <script src="js/enemy.js?v=4.9"></script>
+    <script src="js/powerup.js?v=4.9"></script>
+    <script src="js/ui.js?v=4.9"></script>
+    <script src="js/option.js?v=4.9"></script>
+    <script src="js/boss.js?v=4.9"></script>
+    <script src="js/level.js?v=4.9"></script>
+    <script src="js/stonehenge.js?v=4.9"></script>
+    <script src="js/stage3.js?v=4.9"></script>
+    <script src="js/stage4.js?v=4.9"></script>
+    <script src="js/player.js?v=4.9"></script>
+    <script src="js/main.js?v=4.9"></script>
 </body>
 </html>

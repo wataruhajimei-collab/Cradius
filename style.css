@@ -708,4 +708,95 @@ html, body {
     cursor: pointer;
 }
 
+/* ==========================================
+   iPad・タッチ端末対応：タイトル画面4面ダイレクト開始＆プレイ中クイックワープバー
+   ========================================== */
+.arcade-stage-select-row {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 10px;
+    margin-top: 4px;
+    z-index: 35;
+    position: relative;
+    pointer-events: auto;
+}
+
+.arcade-stage4-direct-btn {
+    padding: 9px 16px;
+    background: linear-gradient(180deg, #ea580c 0%, #9a3412 100%);
+    color: #fff7ed;
+    font-family: "Hiragino Kaku Gothic ProN", "Meiryo", sans-serif;
+    font-size: clamp(11px, 2.1vw, 14px);
+    font-weight: 900;
+    border: 2px solid #fb923c;
+    border-radius: 6px;
+    box-shadow: 0 0 14px rgba(249, 115, 22, 0.7);
+    cursor: pointer;
+    touch-action: manipulation;
+    transition: transform 0.1s ease, box-shadow 0.1s ease;
+}
+
+.arcade-stage4-direct-btn.btn-jellyfish {
+    background: linear-gradient(180deg, #0284c7 0%, #1e3a8a 100%);
+    border-color: #38bdf8;
+    color: #e0f2fe;
+    box-shadow: 0 0 14px rgba(56, 189, 248, 0.7);
+}
+
+.arcade-stage4-direct-btn:active {
+    transform: scale(0.94);
+}
+
+#touch-stage-bar {
+    position: absolute;
+    top: max(8px, env(safe-area-inset-top));
+    right: max(12px, env(safe-area-inset-right));
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    z-index: 120;
+    pointer-events: auto;
+}
+
+.touch-jump-btn {
+    padding: 6px 10px;
+    background: rgba(124, 45, 18, 0.82);
+    color: #ffedd5;
+    border: 1.5px solid #fb923c;
+    border-radius: 6px;
+    font-family: "Hiragino Kaku Gothic ProN", "Meiryo", sans-serif;
+    font-size: 11px;
+    font-weight: bold;
+    cursor: pointer;
+    touch-action: manipulation;
+    box-shadow: 0 0 8px rgba(249, 115, 22, 0.45);
+    transition: transform 0.08s ease, background 0.12s ease;
+}
+
+.touch-jump-btn.jump-jelly {
+    background: rgba(3, 105, 161, 0.82);
+    border-color: #38bdf8;
+    color: #e0f2fe;
+    box-shadow: 0 0 8px rgba(56, 189, 248, 0.45);
+}
+
+.touch-jump-btn.jump-boss {
+    background: rgba(136, 19, 55, 0.82);
+    border-color: #fb7185;
+    color: #ffe4e6;
+    box-shadow: 0 0 8px rgba(244, 63, 94, 0.45);
+}
+
+.touch-jump-btn.jump-power {
+    background: rgba(113, 63, 18, 0.85);
+    border-color: #fde047;
+    color: #fef08a;
+    box-shadow: 0 0 8px rgba(250, 204, 21, 0.45);
+}
+
+.touch-jump-btn:active {
+    transform: scale(0.92);
+}
+
 

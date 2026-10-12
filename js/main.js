@@ -26,6 +26,67 @@ images.capsule.src = 'img/capsule.png';
 let gameStarted = false;
 window.bgmModalOpen = false;
 
+function equipFullPowerForTest() {
+    if (!player) return;
+    player.speed = Math.max(player.speed, 5.0);
+    player.hasMissile = true;
+    player.weaponType = 'LASER';
+    player.shieldActive = true;
+    player.shieldHp = player.maxShieldHp || 3;
+    if (typeof Option !== 'undefined') {
+        while (player.options.length < (player.maxOptions || 4)) {
+            const idx = player.options.length + 1;
+            player.options.push(new Option(player, idx * 15));
+        }
+    }
+    if (typeof Sound !== 'undefined' && typeof Sound.playPowerUp === 'function') {
+        Sound.playPowerUp();
+    }
+}
+
+function startOrJumpStage4(mode = 'STAGE') {
+    if (window.bgmModalOpen) return;
+
+    const wasStarted = gameStarted;
+    gameStarted = true;
+
+    if (typeof Sound !== 'undefined') {
+        Sound.unlockAudio();
+        if (Sound.ctx && Sound.ctx.state === 'suspended') {
+            Sound.ctx.resume().catch(() => {});
+        }
+    }
+
+    const startScreen = document.getElementById('start-screen');
+    if (startScreen && !wasStarted) {
+        startScreen.style.opacity = '0';
+        setTimeout(() => {
+            startScreen.style.display = 'none';
+        }, 280);
+    }
+
+    // いきなり4面から試す際は快適に遊べるようフル装備（スピード・ミサイル・レーザー・オプション4・シールド）を付与！
+    equipFullPowerForTest();
+
+    if (levelManager) {
+        levelManager.startStage4();
+        if (mode === 'JELLYFISH' && window.stage4 && typeof window.stage4.startJellyfishRush === 'function') {
+            window.stage4.startJellyfishRush();
+        } else if (mode === 'BOSS' && window.stage4) {
+            window.stage4.state = 'BOSS';
+            window.stage4.terrain.wallActive = false;
+            window.stage4.terrain.floatingIslands = [];
+            if (typeof Sound !== 'undefined' && typeof Sound.playBossBgm === 'function') {
+                Sound.playBossBgm(true);
+            }
+            if (typeof Stage4Boss !== 'undefined') {
+                window.stage4.boss = new Stage4Boss(window.stage4.width, window.stage4.height / 2);
+            }
+        }
+    }
+    enemySpawnTimer = 0;
+}
+
 function startGame() {
     if (gameStarted || window.bgmModalOpen) return;
     gameStarted = true;
@@ -47,7 +108,7 @@ function startGame() {
 
     // スタートジングル（約0.35秒）が響き渡った瞬間、空中戦BGMが爆音でスタート！
     setTimeout(() => {
-        if (typeof Sound !== 'undefined') {
+        if (typeof Sound !== 'undefined' && levelManager && levelManager.stage === 1) {
             Sound.playAirBgm(true);
         }
     }, 360);
@@ -70,10 +131,16 @@ function init() {
     window.enemyBullets = enemyBullets;
     window.capsules = capsules;
     window.getCapsules = () => capsules;
+    window.startOrJumpStage4 = startOrJumpStage4;
+    window.equipFullPowerForTest = equipFullPowerForTest;
 
-    // スタート画面 & BGM集モーダル操作のバインド
+    // スタート画面 & BGM集モーダル & iPad4面ダイレクト開始ボタンのバインド
     const startScreen = document.getElementById('start-screen');
     const btnStart = document.getElementById('btn-start');
+    const btnStartStage4 = document.getElementById('btn-start-stage4');
+    const btnStartStage4Jellyfish = document.getElementById('btn-start-stage4-jellyfish');
+    const touchStageBar = document.getElementById('touch-stage-bar');
+    const touchJumpBtns = touchStageBar ? Array.from(touchStageBar.querySelectorAll('.touch-jump-btn')) : [];
     const btnBgmCollection = document.getElementById('btn-bgm-collection');
     const bgmModal = document.getElementById('bgm-modal');
     const btnBgmClose = document.getElementById('btn-bgm-close');
@@ -85,8 +152,63 @@ function init() {
     const isBgmUiEvent = (e) => {
         if (window.bgmModalOpen) return true;
         if (!e || !e.target || typeof e.target.closest !== 'function') return false;
-        return Boolean(e.target.closest('#btn-bgm-collection') || e.target.closest('#bgm-modal'));
+        return Boolean(
+            e.target.closest('#btn-bgm-collection') ||
+            e.target.closest('#bgm-modal') ||
+            e.target.closest('#title-stage-select') ||
+            e.target.closest('#touch-stage-bar')
+        );
     };
+
+    // タイトル画面の「4面から開始」「4面・クラゲロボ巡回から開始」ボタン
+    if (btnStartStage4) {
+        const handleStartStage4 = (e) => {
+            if (e) {
+                e.preventDefault();
+                e.stopPropagation();
+            }
+            startOrJumpStage4('STAGE');
+        };
+        btnStartStage4.addEventListener('pointerdown', handleStartStage4);
+        btnStartStage4.addEventListener('touchstart', handleStartStage4, { passive: false });
+        btnStartStage4.addEventListener('click', handleStartStage4);
+    }
+
+    if (btnStartStage4Jellyfish) {
+        const handleStartStage4Jelly = (e) => {
+            if (e) {
+                e.preventDefault();
+                e.stopPropagation();
+            }
+            startOrJumpStage4('JELLYFISH');
+        };
+        btnStartStage4Jellyfish.addEventListener('pointerdown', handleStartStage4Jelly);
+        btnStartStage4Jellyfish.addEventListener('touchstart', handleStartStage4Jelly, { passive: false });
+        btnStartStage4Jellyfish.addEventListener('click', handleStartStage4Jelly);
+    }
+
+    // プレイ中（画面右上）のiPadワンタップ・クイックワープバー
+    touchJumpBtns.forEach(btn => {
+        const handleQuickJump = (e) => {
+            if (e) {
+                e.preventDefault();
+                e.stopPropagation();
+            }
+            const jumpType = btn.getAttribute('data-jump');
+            if (jumpType === 'STAGE4') {
+                startOrJumpStage4('STAGE');
+            } else if (jumpType === 'STAGE4_JELLYFISH') {
+                startOrJumpStage4('JELLYFISH');
+            } else if (jumpType === 'STAGE4_BOSS') {
+                startOrJumpStage4('BOSS');
+            } else if (jumpType === 'FULL_POWER') {
+                equipFullPowerForTest();
+            }
+        };
+        btn.addEventListener('pointerdown', handleQuickJump);
+        btn.addEventListener('touchstart', handleQuickJump, { passive: false });
+        btn.addEventListener('click', handleQuickJump);
+    });
 
     const clearTrackSelection = () => {
         bgmTrackBtns.forEach(btn => {
@@ -243,7 +365,7 @@ function init() {
         });
     }
 
-    // 画面全体のどこをタップ・クリック・キー押ししても即座にゲーム開始＆BGM発音（BGM集モーダル表示中を除く）
+    // 画面全体のどこをタップ・クリック・キー押ししても即座にゲーム開始＆BGM発音（BGM集モーダル・4面ダイレクトボタン操作時を除く）
     const globalTrigger = (e) => {
         if (isBgmUiEvent(e)) return;
         if (!gameStarted) {

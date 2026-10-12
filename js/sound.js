@@ -3117,205 +3117,222 @@ class SoundManager {
 
     // =========================================================================
     // 4面 メインBGM: 『FREE FLYER (1985 ARCADE GRADIUS STAGE 4: INVERTED VOLCANO)』
-    // 1985年本家アーケード版『グラディウス』4面（逆火山面）の名曲「Free Flyer」を忠実再現！
-    // 152 BPM / 飛翔感あふれるシンコペーション・パルスリード、3度ハモリ、
-    // 跳ねるオクターブベース、煌びやかな16分クリスタルアルペジオ＆タムフィル！
+    // 1985年本家アーケード版『グラディウス』4面（逆火山面）の名曲「Free Flyer」（東野美紀 作曲）を
+    // 実機基板（Konami 005289 + AY-3-8910 PSG）の楽譜データ（134 BPM / 変則13小節＝208ステップループ）
+    // から完全採譜・忠実再現！
+    // ・0〜1小節: 象徴的な「F → G → Ab → Bb (on G)」シンコペーション・ファンファーレイントロ
+    // ・2〜12小節: オクターブ跳躍ベースに乗せて飛翔する「ソ・ソ・ソ・ファミドソ〜」の主旋律＆3度ハモリ
     // =========================================================================
     playStage4Bgm(forceRestart = false) {
         if (!forceRestart && this.currentBgm === 'STAGE4') return;
         this.currentBgm = 'STAGE4';
 
-        const bpm = 152;
-        const totalSteps = 256; // 全16小節ループ (1小節=16ステップ)
+        const bpm = 134;
+        const totalSteps = 208; // 原作通り 全13小節ループ (イントロ2小節 + 本編11小節 = 208ステップ)
 
-        // === 1. 疾走感あふれる16ビート・アーケードドラム ===
-        const dIntroA = [5,3,4,1, 2,3,9,3, 1,3,1,4, 2,3,6,7];
-        const dIntroB = [5,3,4,1, 2,3,9,2, 6,6,7,7, 8,8,2,5];
-        const dMainA  = [1,3,4,1, 2,3,9,3, 1,3,1,4, 2,3,4,3];
-        const dMainB  = [1,3,4,1, 2,3,9,3, 1,3,1,4, 2,3,2,4];
-        const dMainCym= [5,3,4,1, 2,3,9,3, 1,3,1,4, 2,3,4,3];
-        const dFillA  = [1,3,4,1, 2,3,2,3, 6,6,7,7, 8,8,2,5];
-        const dFillB  = [5,3,2,3, 1,2,9,2, 6,7,6,7, 8,8,2,5];
-
-        const drums = [
-            // 0-1: イントロ（Free Flyer特有の爽快なシンコペーション開幕）
-            dIntroA,  dIntroB,
-            // 2-5: Aメロ1（飛翔するメインテーマ）
-            dMainCym, dMainA,  dMainB,   dFillA,
-            // 6-9: Aメロ2（高音へ伸びる展開）
-            dMainCym, dMainA,  dMainB,   dFillA,
-            // 10-13: Bメロ（逆火山の緊迫感と哀愁のマイナー〜メジャー転調ブリッジ）
-            dMainCym, dMainB,  dMainCym, dFillA,
-            // 14-15: ターンアラウンド・クライマックス
-            dMainCym, dFillB
-        ].flat();
-
-        // === 2. 跳ねるオクターブ・フライングベース (F major / D minor 進行) ===
-        const bInt0 = [F1,_,F2,F1, Eb1,_,F1,_, Bb1,_,C2,_, D2,_,E2,_];
-        const bInt1 = [F1,_,F2,F1, Eb1,_,F1,_, Bb1,Bb2,C2,C3, D2,C2,G1,C2];
-
-        const bF    = [F1,_,F2,F1, _,F2,C2,_, F1,_,F2,F1, A1,_,C2,_];
-        const bC    = [C2,_,C3,C2, _,C3,G1,_, C2,_,C3,C2, E2,_,G2,_];
-        const bDm   = [D2,_,D3,D2, _,D3,A1,_, D2,_,D3,D2, A1,_,C2,_];
-        const bBb   = [Bb1,_,Bb2,Bb1, _,Bb2,F1,_, Bb1,_,Bb2,Bb1, C2,_,D2,_];
-        const bGmC  = [G1,_,G2,G1, A1,_,A2,A1, Bb1,_,B1,_, C2,C3,G2,E2];
-
-        const bAmDm = [A1,A2,_,A1, _,A2,E2,A1, D2,D3,_,D2, _,D3,A1,D2];
-        const bGmC2 = [G1,G2,_,G1, _,G2,D2,G1, C2,C3,_,C2, _,C3,G1,C2];
-        const bBbA  = [Bb1,Bb2,_,Bb1, _,Bb2,F2,Bb1, A1,A2,_,A1, _,A2,E2,A1];
-        const bGmC3 = [G1,G2,A1,A2, Bb1,Bb2,B1,B2, C2,C3,C2,C3, G1,A1,Bb1,C2];
-
-        const bEnd0 = [Bb1,_,Bb2,Bb1, C2,_,C3,C2, D2,_,D3,D2, G1,_,G2,G1];
-        const bEnd1 = [Bb1,Bb2,A1,A2, G1,G2,F1,F2, C2,_,C3,_, C2,G1,A1,C2];
-
-        const bass = [
-            bInt0, bInt1,
-            bF,    bC,    bDm,   bBb,
-            bF,    bC,    bBb,   bGmC,
-            bAmDm, bGmC2, bBbA,  bGmC3,
-            bEnd0, bEnd1
-        ].flat();
-
-        // === 3. 16分音符クリスタル・パルスアルペジオ ===
-        const arpF   = [F4,A4,C5,F5, C5,A4,F4,C5, F4,A4,C5,F5, A5,F5,C5,A4];
-        const arpC   = [E4,G4,C5,E5, C5,G4,E4,C5, E4,G4,C5,E5, G5,E5,C5,G4];
-        const arpDm  = [D4,F4,A4,D5, A4,F4,D4,A4, D4,F4,A4,D5, F5,D5,A4,F4];
-        const arpBb  = [D4,F4,Bb4,D5, Bb4,F4,D4,Bb4, C4,E4,G4,C5, E5,C5,G4,E4];
-        const arpAD  = [E4,A4,C5,E5, C5,A4,E4,A4, F4,A4,D5,F5, D5,A4,F4,A4];
-        const arpGC  = [D4,G4,Bb4,D5, Bb4,G4,D4,G4, E4,G4,C5,E5, C5,G4,E4,G4];
-
-        const arpeggio = [
-            arpF,  arpBb,
-            arpF,  arpC,  arpDm, arpBb,
-            arpF,  arpC,  arpBb, arpC,
-            arpAD, arpGC, arpAD, arpC,
-            arpBb, arpC
-        ].flat();
-
-        // === 4. 『FREE FLYER』飛翔メインメロディ (25%パルス波リード) ===
-        const lead = [
-            // 0-1: イントロ（Free Flyer象徴のシンコペーション・ファンファーレ）
-            F5,_,F5,_, Eb5,_,F5,_, _,A5,_,Bb5, C6,_,D6,_,
-            F6,_,E6,_, D6,_,C6,_, Bb5,_,C6,_, G5,_,A5,Bb5,
-
-            // 2-5: Aメロ1（爽快に宙を舞うメインテーマ）
-            C6,_,_,A5, _,F5,_,A5, G5,_,_,E5, _,C5,_,E5,
-            F5,_,G5,_, A5,_,C6,_, D6,_,_,C6, _,Bb5,A5,G5,
-            A5,_,_,F5, _,C5,_,F5, G5,_,_,E5, _,C5,_,G5,
-            Bb5,_,A5,_, G5,_,F5,_, G5,_,_,_,  _,C5,F5,A5,
-
-            // 6-9: Aメロ2（高音域へ翔け上がるエモーショナル展開）
-            C6,_,_,D6, _,C6,_,A5, E6,_,_,D6, _,C6,_,G5,
-            Bb5,_,C6,_, D6,_,E6,_, F6,_,_,E6, _,D6,C6,Bb5,
-            D6,_,C6,_, Bb5,_,A5,_, G5,_,A5,_, Bb5,_,C6,D6,
-            C6,_,_,_,  G5,_,A5,_, C6,_,_,_,  _,_,A5,Bb5,
-
-            // 10-13: Bメロ（逆火山地帯のスリリングなシンコペーション・ブリッジ）
-            C6,_,A5,_, E6,_,C6,_, D6,_,_,A5, _,F5,G5,A5,
-            Bb5,_,G5,_, D6,_,Bb5,_, C6,_,_,G5, _,E5,F5,G5,
-            D6,_,_,C6, _,Bb5,_,A5, C6,_,_,B5, _,A5,_,E5,
-            G5,_,A5,_, Bb5,_,D6,_, C6,_,_,_,  _,C5,F5,G5,
-
-            // 14-15: ターンアラウンド（ループへの華麗な帰還）
-            Bb5,_,A5,_, G5,_,F5,_, A5,_,G5,_, F5,_,E5,_,
-            D5,_,F5,_, Bb5,_,D6,_, C6,_,_,_,  _,_,_,_
+        // 主旋律 (ch5: Konami 005289 波形メモリリード, 数値はゲート長ステップ数, -1は16分ウラ発音マーカー)
+        const sccLead = [
+            // Bar 0 (Steps 0-15): F -> G シンコペーション・ファンファーレ
+            [C5,3], _, _, [C5,2], _, [C5,1], [C5,2], _,  [D5,2], _, [D5,6], _, _, _, _, _,
+            // Bar 1 (Steps 16-31): Ab -> Bb (on G) ファンファーレ
+            [Eb5,3], _, _, [Eb5,3], _, _, [F5,2], _,     [F5,8], _, _, _, _, _, _, _,
+            // Bar 2 (Steps 32-47): C メインテーマ1「ソー・ソ・ソ・ファミドソ〜」
+            [G5,4], _, _, _, [G5,2], _, [G5,2], _,       [F5,1], [E5,1], [C5,1], [G4,5], _, _, _, _,
+            // Bar 3 (Steps 48-63): C 「ファミドソ〜 ミ・ソ・ド」
+            [F4,1], [E4,1], [C4,1], [G3,5], _, _, _, _,  [E4,3], _, _, [G4,3], _, _, [C5,2], _,
+            // Bar 4 (Steps 64-79): C7/Bb メインテーマ2「ソー・ソ・ソ・ファミドソ〜」
+            [G5,4], _, _, _, [G5,2], _, [G5,2], _,       [F5,1], [E5,1], [C5,1], [G4,5], _, _, _, _,
+            // Bar 5 (Steps 80-95): C7/Bb 「ファミドソ〜 ソ・ド・ミ」
+            [F4,1], [E4,1], [C4,1], [G3,5], _, _, _, _,  [G4,3], _, _, [C5,3], _, _, [E5,2], _,
+            // Bar 6 (Steps 96-111): FM7/A 「ソー・ソ・ソ・ファミドファ〜 レミ」
+            [G5,4], _, _, _, [G5,2], _, [G5,2], _,       [F5,1], [E5,1], [C5,1], [F4,3], _, _, [D4,1], [E4,1],
+            // Bar 7 (Steps 112-127): Dm7 -> Em7 「ファ・ミ・ファ・ソ・ファ・ソ」(32分音符シンコペーション付点装飾)
+            [F4,2.5], _, [E4,2.5,0.5], _, _, [F4,3], _, _, [G4,2.5], _, [F4,2.5,0.5], _, _, [G4,3], _, _,
+            // Bar 8 (Steps 128-143): Fm7 16分音符スケール駆け上がり＆駆け下がり
+            [Ab4,1], [Bb4,1], [C5,1], [D5,1], [Eb5,1], [D5,1], [C5,1], [Bb4,1],
+            [Ab4,1], [Bb4,1], [Ab4,1], [G4,1], [F4,1], [G4,1], [F4,1], [Eb4,1],
+            // Bar 9 (Steps 144-159): Gm7 -> G7(b13) 3連符風上昇アルペジオ「レ・ファ・シ♭・ミ♭・ラ♭〜」
+            [D4,3], _, _, [F4,3], _, _, [Bb4,3], _,      _, [Eb5,3], _, _, [Ab5,4], _, _, _,
+            // Bar 10 (Steps 160-175): C 再現部「ソー・ソ・ソ・ファミドソ・ソド」
+            [G5,4], _, _, _, [G5,2], _, [G5,2], _,       [F5,1], [E5,1], [C5,1], [G4,2], _, [G4,1], [C5,2], _,
+            // Bar 11 (Steps 176-191): EbM7 -> F7 クライマックス上昇「レミ♭・ミ♭〜・ミ♭ファ・ファ〜・ファ」
+            [D5,1], [Eb5,2], _, [Eb5,4], _, _, _, [Eb5,1], [F5,1], [F5,2], _, [F5,4], _, _, _, [F5,1],
+            // Bar 12 (Steps 192-207): Csus4 -> C ターンアラウンド「ソ・ソ・ソ・ファソ・ソ〜・ソ〜」
+            [G5,1], [G5,2], _, [G5,2], _, [F5,1], [G5,2], _, [G5,4], _, _, _, [G5,4], _, _, _
         ];
 
-        // === 5. ツインパルス3度・6度平行ハーモニー (12.5%パルス波) ===
-        const harmony = [
-            // 0-1: イントロ
-            A4,_,A4,_, G4,_,A4,_, _,C5,_,D5, F5,_,F5,_,
-            A5,_,G5,_, F5,_,E5,_, D5,_,E5,_, E5,_,F5,G5,
+        // 副旋律・1オクターブ下ダブリング (ch7: AY-3-8910 PSG矩形波, イントロのみ3度和音内声、本編は主旋律の1オクターブ下ユニゾン)
+        const psgLead = [
+            // Bar 0 (Steps 0-15)
+            [A4,3], _, _, [A4,2], _, [A4,1], [F4,2], _,  [B4,2], _, [B4,6], _, _, _, _, _,
+            // Bar 1 (Steps 16-31)
+            [C5,3], _, _, [C5,3], _, _, [D5,2], _,       [D5,8], _, _, _, _, _, _, _,
+            // Bar 2 (Steps 32-47)
+            [G4,4], _, _, _, [G4,2], _, [G4,2], _,       [F4,1], [E4,1], [C4,1], [G3,5], _, _, _, _,
+            // Bar 3 (Steps 48-63)
+            [F3,1], [E3,1], [C3,1], [G2,5], _, _, _, _,  [E3,3], _, _, [G3,3], _, _, [C4,2], _,
+            // Bar 4 (Steps 64-79)
+            [G4,4], _, _, _, [G4,2], _, [G4,2], _,       [F4,1], [E4,1], [C4,1], [G3,5], _, _, _, _,
+            // Bar 5 (Steps 80-95)
+            [F3,1], [E3,1], [C3,1], [G2,5], _, _, _, _,  [G3,3], _, _, [C4,3], _, _, [E4,2], _,
+            // Bar 6 (Steps 96-111)
+            [G4,4], _, _, _, [G4,2], _, [G4,2], _,       [F4,1], [E4,1], [C4,1], [F3,3], _, _, [D3,1], [E3,1],
+            // Bar 7 (Steps 112-127)
+            [F3,2.5], _, [E3,2.5,0.5], _, _, [F3,3], _, _, [G3,2.5], _, [F3,2.5,0.5], _, _, [G3,3], _, _,
+            // Bar 8 (Steps 128-143)
+            [Ab3,1], [Bb3,1], [C4,1], [D4,1], [Eb4,1], [D4,1], [C4,1], [Bb3,1],
+            [Ab3,1], [Bb3,1], [Ab3,1], [G3,1], [F3,1], [G3,1], [F3,1], [Eb3,1],
+            // Bar 9 (Steps 144-159)
+            [D3,3], _, _, [F3,3], _, _, [Bb3,3], _,      _, [Eb4,3], _, _, [Ab4,4], _, _, _,
+            // Bar 10 (Steps 160-175)
+            [G4,4], _, _, _, [G4,2], _, [G4,2], _,       [F4,1], [E4,1], [C4,1], [G3,2], _, [G3,1], [C4,2], _,
+            // Bar 11 (Steps 176-191)
+            [D4,1], [Eb4,2], _, [Eb4,4], _, _, _, [Eb4,1], [F4,1], [F4,2], _, [F4,4], _, _, _, [F4,1],
+            // Bar 12 (Steps 192-207)
+            [G4,1], [G4,2], _, [G4,2], _, [F4,1], [G4,2], _, [G4,4], _, _, _, [G4,4], _, _, _
+        ];
 
-            // 2-5: Aメロ1
-            A5,_,_,F5, _,C5,_,F5, E5,_,_,C5, _,G4,_,C5,
-            D5,_,E5,_, F5,_,A5,_, Bb5,_,_,A5, _,G5,F5,E5,
-            F5,_,_,C5, _,A4,_,C5, E5,_,_,C5, _,G4,_,E5,
-            D5,_,F5,_, E5,_,D5,_, E5,_,_,_,  _,A4,C5,F5,
+        // 3度・6度カウンターハーモニー＆高音オブリガート (ch4: Konami 005289 波形メモリ第2チャンネル)
+        const sccHarm = [
+            // Bar 0 (Steps 0-15)
+            [F4,3], _, _, [F4,2], _, [F4,1], [F4,2], _,  [G4,2], _, [G4,6], _, _, _, _, _,
+            // Bar 1 (Steps 16-31)
+            [Ab4,3], _, _, [Ab4,3], _, _, [Bb4,2], _,    [Bb4,8], _, _, _, _, _, _, _,
+            // Bar 2 (Steps 32-47): 1オクターブ高い「ファ・ミ・ド・ソ」キラメキ装飾！
+            [E5,4], _, _, _, [E5,2], _, [E5,2], _,       [F6,1], [E6,1], [C6,1], [G5,5], _, _, _, _,
+            // Bar 3 (Steps 48-63)
+            [F5,1], [E5,1], [C5,1], [G4,5], _, _, _, _,  [D4,3], _, _, [E4,3], _, _, [G4,2], _,
+            // Bar 4 (Steps 64-79)
+            [E5,4], _, _, _, [E5,2], _, [E5,2], _,       [F6,1], [E6,1], [C6,1], [G5,5], _, _, _, _,
+            // Bar 5 (Steps 80-95)
+            [F5,1], [E5,1], [C5,1], [G4,5], _, _, _, _,  [C4,3], _, _, [E4,3], _, _, [G4,2], _,
+            // Bar 6 (Steps 96-111)
+            [C5,4], _, _, _, [C5,2], _, [C5,2], _,       [F5,1], [E5,1], [C5,1], [F4,3], _, _, [D4,1], [E4,1],
+            // Bar 7 (Steps 112-127): 4分音符C4ペダル
+            [C4,4], _, _, _, [C4,4], _, _, _,            [C4,4], _, _, _, [C4,4], _, _, _,
+            // Bar 8 (Steps 128-143): 4分音符C4ペダル
+            [C4,4], _, _, _, [C4,4], _, _, _,            [C4,4], _, _, _, [C4,4], _, _, _,
+            // Bar 9 (Steps 144-159): 3連符風ハモリ上昇
+            [C4,3], _, _, [C4,3], _, _, [F4,3], _,       _, [Bb4,3], _, _, [Eb5,4], _, _, _,
+            // Bar 10 (Steps 160-175)
+            [E5,4], _, _, _, [E5,2], _, [E5,2], _,       [F6,1], [E6,1], [C6,1], [G5,2], _, [G5,1], [C6,2], _,
+            // Bar 11 (Steps 176-191)
+            [F4,1], [G4,2], _, [G4,4], _, _, _, [G4,1],  [A4,1], [A4,2], _, [A4,4], _, _, _, [D5,1],
+            // Bar 12 (Steps 192-207)
+            [E5,1], [E5,2], _, [E5,2], _, [D5,1], [E5,2], _, [E5,4], _, _, _, [E5,4], _, _, _
+        ];
 
-            // 6-9: Aメロ2
-            A5,_,_,Bb5, _,A5,_,F5, C6,_,_,B5, _,G5,_,E5,
-            F5,_,A5,_, Bb5,_,C6,_, D6,_,_,C6, _,Bb5,A5,G5,
-            Bb5,_,A5,_, G5,_,F5,_, E5,_,F5,_, G5,_,A5,Bb5,
-            A5,_,_,_,  E5,_,F5,_, G5,_,_,_,  _,_,F5,G5,
-
-            // 10-13: Bメロ
-            A5,_,E5,_, C6,_,A5,_, A5,_,_,F5, _,D5,E5,F5,
-            G5,_,D5,_, Bb5,_,G5,_, G5,_,_,E5, _,C5,D5,E5,
-            Bb5,_,_,A5, _,G5,_,F5, A5,_,_,Gs5, _,E5,_,C5,
-            D5,_,F5,_, G5,_,Bb5,_, G5,_,_,_,  _,A4,C5,E5,
-
-            // 14-15: ターンアラウンド
-            F5,_,F5,_, E5,_,C5,_, F5,_,E5,_, D5,_,C5,_,
-            Bb4,_,D5,_, F5,_,Bb5,_, G5,_,_,_, _,_,_,_
+        // オクターブ・バウンスベース (ch6 & ch8: 原作通り8分音符でルートと1オクターブ上を軽快に往復)
+        const bass = [
+            // Bar 0 (Steps 0-15): 後半からGペダル突入
+            _, _, _, _, _, _, _, _,                      _, _, _, _, [G1,2], _, [G1,10], _,
+            // Bar 1 (Steps 16-31): シンコペーションGペダル
+            _, _, _, _, _, _, _, _,                      _, _, [G1,2], _, [G1,1], [G1,2], _, [G1,1],
+            // Bar 2 (Steps 32-47): C オクターブバウンス
+            [C2,2], _, [C3,2], _, [C2,2], _, [C3,2], _,  [C2,2], _, [C3,2], _, [C2,2], _, [C3,2], _,
+            // Bar 3 (Steps 48-63): C オクターブバウンス
+            [C2,2], _, [C3,2], _, [C2,2], _, [C3,2], _,  [C2,2], _, [C3,2], _, [C2,2], _, [C3,2], _,
+            // Bar 4 (Steps 64-79): Bb オクターブバウンス
+            [Bb1,2], _, [Bb2,2], _, [Bb1,2], _, [Bb2,2], _, [Bb1,2], _, [Bb2,2], _, [Bb1,2], _, [Bb2,2], _,
+            // Bar 5 (Steps 80-95): Bb オクターブバウンス
+            [Bb1,2], _, [Bb2,2], _, [Bb1,2], _, [Bb2,2], _, [Bb1,2], _, [Bb2,2], _, [Bb1,2], _, [Bb2,2], _,
+            // Bar 6 (Steps 96-111): A オクターブバウンス
+            [A1,2], _, [A2,2], _, [A1,2], _, [A2,2], _,  [A1,2], _, [A2,2], _, [A1,2], _, [A2,2], _,
+            // Bar 7 (Steps 112-127): D -> E オクターブバウンス
+            [D2,2], _, [D3,2], _, [D2,2], _, [D3,2], _,  [E2,2], _, [E3,2], _, [E2,2], _, [E3,2], _,
+            // Bar 8 (Steps 128-143): F オクターブバウンス
+            [F2,2], _, [F3,2], _, [F2,2], _, [F3,2], _,  [F2,2], _, [F3,2], _, [F2,2], _, [F3,2], _,
+            // Bar 9 (Steps 144-159): G オクターブバウンス
+            [G2,2], _, [G3,2], _, [G2,2], _, [G3,2], _,  [G2,2], _, [G3,2], _, [G2,2], _, [G3,2], _,
+            // Bar 10 (Steps 160-175): C オクターブバウンス
+            [C2,2], _, [C3,2], _, [C2,2], _, [C3,2], _,  [C2,2], _, [C3,2], _, [C2,2], _, [C3,2], _,
+            // Bar 11 (Steps 176-191): Eb -> F シンコペーションオクターブ
+            [Eb2,2], _, [Eb3,2], _, [Eb2,2], _, [Eb3,1], [Eb3,1], [F2,2], _, [F3,2], _, [F2,2], _, [F3,1], [F3,1],
+            // Bar 12 (Steps 192-207): C キメのリズム「ドッ・ドー・ド・ドッ・ドー・ド・ドー」
+            [C2,1], [C2,2], _, [C2,2], _, [C2,1], [C2,2], _, [C2,2], _, [C2,2], _, [C2,2], _, _, _
         ];
 
         this.startScheduler(bpm, totalSteps, (step, time, stepDur) => {
-            // 1. パンチのある16ビート・ドラムセクション
-            const d = drums[step];
-            if (d === 1) {
-                this.triggerKick(time, 0.70);
-                this.triggerHiHat(time, false, 0.78);
-            } else if (d === 2) {
-                this.triggerSnare(time, 0.52);
-                this.triggerHiHat(time, false, 0.85);
-            } else if (d === 3) {
-                this.triggerHiHat(time, false, 1.0);
-            } else if (d === 4) {
-                this.triggerHiHat(time, true, 1.05);
-            } else if (d === 5) {
-                this.triggerKick(time, 0.76);
-                this.triggerCymbal(time, 0.44);
-            } else if (d === 6) {
-                this.triggerTom(C4, time, stepDur * 0.95, 0.56);
-            } else if (d === 7) {
-                this.triggerTom(A3, time, stepDur * 0.95, 0.56);
-            } else if (d === 8) {
-                this.triggerTom(F3, time, stepDur * 0.95, 0.60);
-            } else if (d === 9) {
-                this.triggerKick(time, 0.68);
-                this.triggerHiHat(time, true, 1.05);
-            }
-
-            // 2. 重低音オクターブ・フライングベース
-            const b = bass[step];
-            if (b > 0) {
-                let bLen = 1;
-                if (bass[(step + 1) % totalSteps] === 0) bLen = 1.35;
-                this.triggerBass(b, time, stepDur * bLen * 0.88, 0.58);
-            }
-
-            // 3. 16分音符クリスタル・パルスアルペジオ
-            const a = arpeggio[step];
-            if (a > 0) {
-                this.triggerArp(a, time, stepDur * 0.78, 0.14);
-            }
-
-            // 4. 『Free Flyer』飛翔メインリード
-            const l = lead[step];
-            if (l > 0) {
-                let lLen = 1;
-                for (let k = 1; k < 8; k++) {
-                    if (lead[(step + k) % totalSteps] === 0) lLen++;
-                    else break;
+            // 1. 実機PSGノイズ風の軽快なリズムパルス（主旋律を邪魔せずアーケードの疾走感を支える）
+            if (step < 32) {
+                // イントロ2小節のキメアクセント
+                if (step === 0 || step === 3 || step === 6 || step === 8 || step === 10 ||
+                    step === 16 || step === 19 || step === 22 || step === 24) {
+                    this.triggerKick(time, 0.42);
+                    this.triggerHiHat(time, true, 0.55);
+                } else if (step >= 26 && step % 2 === 0) {
+                    this.triggerSnare(time, 0.35);
                 }
-                const gate = (lLen === 1) ? 0.78 : 0.92;
-                const dur = stepDur * lLen * gate;
-                this.triggerLead(l, time, dur, 0.34);
-                this.triggerBrass(l, time, dur, 0.16);
+            } else if (step >= 192) {
+                // Bar 12: ターンアラウンドのキメ
+                if (step === 192 || step === 193 || step === 195 || step === 197 || step === 198 || step === 200 || step === 204) {
+                    this.triggerKick(time, 0.45);
+                    this.triggerHiHat(time, false, 0.55);
+                } else if (step === 206) {
+                    this.triggerSnare(time, 0.38);
+                }
+            } else {
+                // 本編 (Bars 2-11): 軽快な8ビートPSGハイハット＆控えめなパルスキック/スネア
+                if (step % 4 === 0) {
+                    this.triggerKick(time, 0.38);
+                    this.triggerHiHat(time, false, 0.50);
+                } else if (step % 4 === 2) {
+                    this.triggerHiHat(time, true, 0.52);
+                    if (step % 8 === 4) {
+                        this.triggerSnare(time, 0.30);
+                    }
+                } else if (step % 2 === 1) {
+                    this.triggerHiHat(time, false, 0.28);
+                }
             }
 
-            // 5. ツインパルス平行ハーモニー
-            const h = harmony[step];
-            if (h > 0) {
-                let hLen = 1;
-                for (let k = 1; k < 8; k++) {
-                    if (harmony[(step + k) % totalSteps] === 0) hLen++;
-                    else break;
-                }
-                const gate = (hLen === 1) ? 0.78 : 0.92;
-                const dur = stepDur * hLen * gate;
-                this.triggerHarmony(h, time, dur, 0.22);
+            // 2. オクターブ・バウンスベース (ch6 低音 + ch8 1オクターブ上)
+            const bEvt = bass[step];
+            if (Array.isArray(bEvt)) {
+                const bFreq = bEvt[0];
+                const bSteps = bEvt[1];
+                const gate = (bSteps <= 1) ? 0.80 : 0.86;
+                const dur = stepDur * bSteps * gate;
+                this.triggerBass(bFreq, time, dur, 0.52);
+                // 原作ch8の1オクターブ上PSGベースを重ねてアーケード独特の輪郭を再現
+                this.triggerHarmony(bFreq * 2, time, dur * 0.85, 0.14);
+            }
+
+            // 3. 主旋律 (ch5: Konami 005289 カスタム波形メモリリード)
+            const lEvt = sccLead[step];
+            if (Array.isArray(lEvt)) {
+                const freq = lEvt[0];
+                const lenSteps = lEvt[1];
+                const offsetSteps = lEvt[2] || 0;
+                const startTime = time + offsetSteps * stepDur;
+                const gate = (lenSteps <= 1) ? 0.84 : 0.92;
+                const dur = stepDur * lenSteps * gate;
+                this.triggerLead(freq, startTime, dur, 0.38);
+                this.triggerBrass(freq, startTime, dur, 0.16);
+            }
+
+            // 4. 副旋律 / 1オクターブ下ダブリング (ch7: AY-3-8910 PSG矩形波)
+            const pEvt = psgLead[step];
+            if (Array.isArray(pEvt)) {
+                const freq = pEvt[0];
+                const lenSteps = pEvt[1];
+                const offsetSteps = pEvt[2] || 0;
+                const startTime = time + offsetSteps * stepDur;
+                const gate = (lenSteps <= 1) ? 0.82 : 0.90;
+                const dur = stepDur * lenSteps * gate;
+                this.triggerHarmony(freq, startTime, dur, 0.22);
+            }
+
+            // 5. カウンターハーモニー＆高音キラキラ装飾 (ch4: Konami 005289 第2チャンネル)
+            const hEvt = sccHarm[step];
+            if (Array.isArray(hEvt)) {
+                const freq = hEvt[0];
+                const lenSteps = hEvt[1];
+                const offsetSteps = hEvt[2] || 0;
+                const startTime = time + offsetSteps * stepDur;
+                const gate = (lenSteps <= 1) ? 0.84 : 0.91;
+                const dur = stepDur * lenSteps * gate;
+                this.triggerHarmony(freq, startTime, dur, 0.25);
             }
         });
     }

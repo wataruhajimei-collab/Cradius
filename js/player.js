@@ -162,15 +162,16 @@ class Player {
             }
         }
 
-        // テスト用ショートカット: Vキーで即座に火山大噴火ゾーンへワープ（1面 / 4面）
+        // テスト用ショートカット: Vキーで即座に1面火山大噴火または4面クラゲロボット大巡回ゾーンへワープ
         if (Input.isDown('KeyV')) {
             if (typeof levelManager !== 'undefined') {
                 if (levelManager.stage === 1) {
                     levelManager.time = 65500;
                     if (!levelManager.terrain.active) levelManager.terrain.start();
                 } else if (levelManager.stage === 4 && window.stage4 && window.stage4.state === 'STAGE') {
-                    window.stage4.stageTime = 55500;
-                    if (!window.stage4.terrain.wallActive) window.stage4.terrain.startWalls();
+                    if (typeof window.stage4.startJellyfishRush === 'function') {
+                        window.stage4.startJellyfishRush();
+                    }
                 }
             }
         }
