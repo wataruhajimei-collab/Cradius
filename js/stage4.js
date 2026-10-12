@@ -1665,31 +1665,25 @@ class Stage4Boss {
     }
 
     shootTwinLasers() {
-        const startX = this.x - 134;
+        const cx = this.x;
         const cy = this.y;
         const spd = this.coreOpen ? -6.0 : -5.2;
         const LaserClass = (typeof EnemyLaser !== 'undefined') ? EnemyLaser : Bullet;
 
-        // 上下アーム先端の4門から水平4連レーザー
-        [-56, -34, 34, 56].forEach(oy => {
-            this.bullets.push(new LaserClass(startX, cy + oy, spd, 0, '#88eeff'));
+        // 1985年AC版ビッグコアの4門レーザー砲口座標（内側2門は先端x-147/y±28、外側2門は段差肩部x-75/y±70）
+        const muzzles = [
+            { dx: -75, dy: -70 },
+            { dx: -147, dy: -28 },
+            { dx: -147, dy: 28 },
+            { dx: -75, dy: 70 }
+        ];
+        muzzles.forEach(m => {
+            this.bullets.push(new LaserClass(cx + m.dx, cy + m.dy, spd, 0, '#88eeff'));
         });
 
         if (typeof Sound !== 'undefined' && typeof Sound.playLaser === 'function') {
             Sound.playLaser();
         }
-    }
-
-    shootMagmaRings() {
-        if (typeof RingBullet === 'undefined') return;
-        const cx = this.x - 30;
-        const cy = this.y;
-        const angles = this.coreOpen ? [-0.26, 0, 0.26] : [-0.20, 0.20];
-        angles.forEach((a, idx) => {
-            const spd = 3.5;
-            const col = (idx % 2 === 0) ? '#ff5500' : '#ffaa00';
-            this.bullets.push(new RingBullet(cx, cy, -Math.cos(a) * spd, Math.sin(a) * spd, col));
-        });
     }
 
     hitShield(damage = 1) {
@@ -1724,26 +1718,21 @@ class Stage4Boss {
 
     getShieldBounds() {
         if (this.shields <= 0) return null;
-        const coreX = this.x - 5;
-        const coreY = this.y;
-        const plateW = 7;
-        const plateH = 44;
-        const spacing = 14;
-        const startX = coreX - 36;
-        const frontX = startX - (this.shields - 1) * spacing;
-        const totalW = (this.shields - 1) * spacing + plateW;
+        const firstBarIdx = 4 - this.shields;
+        const frontX = this.x - 147 + (10 + firstBarIdx * 4) * 3;
+        const backX = this.x - 147 + 30 * 3;
         return {
             x: frontX,
-            y: coreY - plateH / 2,
-            width: totalW,
-            height: plateH
+            y: this.y - 18,
+            width: Math.max(12, backX - frontX),
+            height: 36
         };
     }
 
     getCoreBounds() {
-        const coreX = this.x - 5;
+        const coreX = this.x - 8;
         const coreY = this.y;
-        const r = 27;
+        const r = 22;
         return {
             x: coreX - r,
             y: coreY - r,
@@ -1754,19 +1743,19 @@ class Stage4Boss {
 
     getTopHullBounds() {
         return {
-            x: this.x - 125,
-            y: this.y - 100,
-            width: 245,
-            height: 74
+            x: this.x - 135,
+            y: this.y - 96,
+            width: 255,
+            height: 78
         };
     }
 
     getBottomHullBounds() {
         return {
-            x: this.x - 125,
-            y: this.y + 26,
-            width: 245,
-            height: 74
+            x: this.x - 135,
+            y: this.y + 18,
+            width: 255,
+            height: 78
         };
     }
 
@@ -1798,8 +1787,8 @@ class Stage4Boss {
             const destroyed = this.hitShield(shieldDamage);
             if (destroyed) {
                 if (typeof createExplosion === 'function') {
-                    createExplosion(hitX, bullet.y, '#ff8800');
-                    createExplosion(hitX, bullet.y, '#00ffff');
+                    createExplosion(hitX, bullet.y, '#c6ad7b');
+                    createExplosion(hitX, bullet.y, '#ffaa00');
                 }
                 if (typeof addScore === 'function') {
                     addScore(1000, hitX, bullet.y, '#ffea00');
@@ -1825,7 +1814,7 @@ class Stage4Boss {
             }
             this.hitCore(1);
             if (typeof createExplosion === 'function') {
-                createExplosion(bullet.x + bullet.width / 2, bullet.y, '#ff4400');
+                createExplosion(bullet.x + bullet.width / 2, bullet.y, '#52adef');
             }
             if (typeof Sound !== 'undefined' && typeof Sound.playBossHit === 'function') {
                 Sound.playBossHit();
@@ -1838,7 +1827,7 @@ class Stage4Boss {
             if (typeof Laser === 'undefined' || !(bullet instanceof Laser)) {
                 bullet.active = false;
                 if (typeof createExplosion === 'function') {
-                    createExplosion(bullet.x, bullet.y, '#94a3b8');
+                    createExplosion(bullet.x, bullet.y, '#8c948c');
                 }
                 if (typeof Sound !== 'undefined' && typeof Sound.playBossHit === 'function') {
                     Sound.playBossHit();
@@ -1861,21 +1850,12 @@ class Stage4Boss {
         const cx = this.x;
         const cy = this.y;
 
-        // 1. 1985年オリジナルAC版『ビッグコア』船体描画（1面・4面共通）
+        // 1985年AC版『グラディウス』ビッグコア完全再現描画（船体＋動的4枚遮蔽板＋ブルーコア）
         if (typeof drawOriginalBigCore === 'function') {
             drawOriginalBigCore(ctx, this);
         }
 
-        // 2. 中央のクリスタルコア（青白い発光、ダメージ蓄積で赤熱化）
-        const coreX = cx - 5;
-        const coreY = cy;
-        const coreR = 24;
-        this._drawMagmaCore(ctx, coreX, coreY, coreR);
-
-        // 3. 中央コア通路に並ぶ4枚の縦型遮蔽板（シャッター）
-        this._drawShieldPlates(ctx, coreX, coreY);
-
-        // 4. 撃破時の断末魔シャウト演出
+        // 撃破時の断末魔シャウト演出
         if (this.isDying || this.isScreaming) {
             ctx.save();
             const sx = cx + (Math.random() - 0.5) * 16;
@@ -1896,98 +1876,6 @@ class Stage4Boss {
         ctx.restore();
 
         this.bullets.forEach(b => b.draw(ctx));
-    }
-
-    _drawMagmaCore(ctx, coreX, coreY, r) {
-        ctx.save();
-        const pulse = Math.sin(Date.now() * 0.008) * 0.25 + 0.75;
-        const isFlash = this.hitFlashTimer > 0;
-        const isDanger = this.hp <= 2;
-
-        ctx.beginPath();
-        ctx.arc(coreX, coreY, r + 6, 0, Math.PI * 2);
-        ctx.fillStyle = '#081428';
-        ctx.fill();
-        ctx.strokeStyle = isDanger ? '#ff4400' : '#60a5fa';
-        ctx.lineWidth = 3;
-        ctx.stroke();
-
-        ctx.shadowColor = isFlash ? '#ffffff' : (isDanger ? '#ff3300' : '#00d8ff');
-        ctx.shadowBlur = (this.coreOpen ? 34 : 18) * pulse;
-
-        const sphereGrad = ctx.createRadialGradient(coreX - r * 0.3, coreY - r * 0.3, r * 0.1, coreX, coreY, r);
-        if (isFlash) {
-            sphereGrad.addColorStop(0, '#ffffff');
-            sphereGrad.addColorStop(1, '#ffffff');
-        } else if (isDanger) {
-            sphereGrad.addColorStop(0, '#ffffff');
-            sphereGrad.addColorStop(0.3, '#fde047');
-            sphereGrad.addColorStop(0.65, '#f97316');
-            sphereGrad.addColorStop(1, '#7f1d1d');
-        } else {
-            sphereGrad.addColorStop(0, '#ffffff');
-            sphereGrad.addColorStop(0.35, '#a5f3fc');
-            sphereGrad.addColorStop(0.7, '#0284c7');
-            sphereGrad.addColorStop(1, '#1e3a8a');
-        }
-        ctx.fillStyle = sphereGrad;
-        ctx.beginPath();
-        ctx.arc(coreX, coreY, r, 0, Math.PI * 2);
-        ctx.fill();
-
-        // 回転する六角形クリスタル格子
-        ctx.save();
-        ctx.translate(coreX, coreY);
-        ctx.rotate(this.rotationAngle);
-        ctx.strokeStyle = `rgba(255, 255, 255, ${0.55 * pulse})`;
-        ctx.lineWidth = 2;
-        ctx.beginPath();
-        for (let i = 0; i < 6; i++) {
-            const a = (Math.PI / 3) * i;
-            const px = Math.cos(a) * (r * 0.65);
-            const py = Math.sin(a) * (r * 0.65);
-            if (i === 0) ctx.moveTo(px, py);
-            else ctx.lineTo(px, py);
-        }
-        ctx.closePath();
-        ctx.stroke();
-        ctx.restore();
-
-        ctx.restore();
-    }
-
-    _drawShieldPlates(ctx, coreX, coreY) {
-        if (this.shields <= 0) return;
-
-        const plateW = 7;
-        const plateH = 44;
-        const spacing = 14;
-        const startX = coreX - 36;
-
-        for (let i = 0; i < this.shields; i++) {
-            const px = startX - (this.shields - 1 - i) * spacing;
-            const py = coreY - plateH / 2;
-            const isFront = (i === 0);
-            const isFlashing = isFront && (this.shieldFlashTimer > 0);
-
-            ctx.save();
-            const grad = ctx.createLinearGradient(px, py, px + plateW, py);
-            if (isFlashing) {
-                grad.addColorStop(0, '#ffffff');
-                grad.addColorStop(0.5, '#ffffaa');
-                grad.addColorStop(1, '#ff8800');
-            } else {
-                grad.addColorStop(0, '#b8dcff');
-                grad.addColorStop(0.45, '#4b7ec4');
-                grad.addColorStop(1, '#163264');
-            }
-            ctx.fillStyle = grad;
-            ctx.fillRect(px, py, plateW, plateH);
-            ctx.strokeStyle = isFlashing ? '#ffffff' : '#dff2ff';
-            ctx.lineWidth = 1;
-            ctx.strokeRect(px, py, plateW, plateH);
-            ctx.restore();
-        }
     }
 }
 
