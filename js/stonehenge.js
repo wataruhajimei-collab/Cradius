@@ -277,20 +277,23 @@ class StonehengeStage {
         // ステート別進行管理
         // ==========================================
         if (this.state === 'OPENING') {
-            // --- フェーズ1: 開幕・宇宙空中戦（0〜12秒） ---
+            // --- フェーズ1: 開幕・宇宙空中戦（0〜20秒） ---
             this.updateOpeningAirEnemies(dt);
 
-            // 12秒経過でストーンヘンジ巨石地帯へ突入！
-            if (this.stageTime >= 12000) {
+            // 20秒経過でストーンヘンジ巨石地帯へ突入＆2面メインBGM（Beat Back）開始！
+            if (this.stageTime >= 20000) {
                 this.state = 'STONEHENGE';
                 this.generating = true;
                 this.spawnColumnX = this.width + 20;
+                if (typeof Sound !== 'undefined' && typeof Sound.playStage2Bgm === 'function') {
+                    Sound.playStage2Bgm();
+                }
             }
 
         } else if (this.state === 'STONEHENGE') {
-            // --- フェーズ2: ストーンヘンジ石掘削地帯（12秒〜55秒） ---
-            // 52秒経過で石地帯の生成を終了（約40秒間の掘削体験）
-            if (this.stageTime >= 52000 && this.generating) {
+            // --- フェーズ2: ストーンヘンジ石掘削地帯（20秒〜64秒） ---
+            // 60秒経過で石地帯の生成を終了（約40秒間の掘削体験）
+            if (this.stageTime >= 60000 && this.generating) {
                 this.generating = false;
             }
 
@@ -306,7 +309,7 @@ class StonehengeStage {
             this.updateStonehengeEnemies(dt);
 
             // 石ブロックが完全に画面左へ抜けたら「ザブ地帯」へ突入！
-            if (this.stageTime >= 56000 && this.blocks.length < 5) {
+            if (this.stageTime >= 64000 && this.blocks.length < 5) {
                 this.state = 'ZAB_RUSH';
                 this.blocks = [];
                 this.zabTimer = 0;
@@ -351,8 +354,8 @@ class StonehengeStage {
                     this.state = 'STAGE_CLEAR';
                     this.stageClearTimer = 0;
                     setTimeout(() => {
-                        if (this.active && typeof Sound !== 'undefined' && typeof Sound.playStageBgm === 'function') {
-                            Sound.playStageBgm();
+                        if (this.active && typeof Sound !== 'undefined' && typeof Sound.playStage2Bgm === 'function') {
+                            Sound.playStage2Bgm();
                         }
                     }, 650);
                 }
@@ -381,20 +384,31 @@ class StonehengeStage {
         }
     }
 
-    // 開幕・宇宙空中戦（ファン／ガルン編隊によるカプセル補給）
+    // 開幕・宇宙空中戦（1面同様、ファン／ガルン／ザブ／ルグラ編隊が次々と襲来してカプセル補給）
     updateOpeningAirEnemies(dt) {
         this.flyingEnemyTimer += dt;
-        if (this.flyingEnemyTimer < 1400) return;
+        if (this.flyingEnemyTimer < 850) return;
         this.flyingEnemyTimer = 0;
 
-        const startY = 140 + Math.random() * (this.height - 280);
-        if (Math.random() < 0.6) {
+        const roll = Math.random();
+        const startY = 120 + Math.random() * (this.height - 240);
+        if (roll < 0.45) {
             if (typeof Formation !== 'undefined') {
-                new Formation(startY, 4); // 赤編隊（全滅でカプセル！）
+                new Formation(startY, 4); // ファン編隊（全滅でカプセル確定）
+            }
+        } else if (roll < 0.75) {
+            if (typeof GarunFormation !== 'undefined') {
+                new GarunFormation(startY, Math.random() < 0.5, 4); // ガルン編隊
+            }
+        } else if (roll < 0.90) {
+            if (typeof ZabSquad !== 'undefined') {
+                const sides = ['TOP', 'BOTTOM', 'BACK', 'FRONT'];
+                const side = sides[Math.floor(Math.random() * sides.length)];
+                new ZabSquad(side, startY, 3); // ザブ小隊
             }
         } else {
-            if (typeof GarunFormation !== 'undefined') {
-                new GarunFormation(startY, Math.random() < 0.5, 4);
+            if (typeof RugraEnemy !== 'undefined' && typeof enemies !== 'undefined') {
+                enemies.push(new RugraEnemy(this.width, startY)); // ルグラ高速突進
             }
         }
     }
@@ -660,8 +674,8 @@ class StonehengeStage {
             ctx.restore();
         }
 
-        // 6. 巨石地帯突入警告（10〜12秒）
-        if (this.state === 'OPENING' && this.stageTime >= 10000 && this.stageTime < 12000) {
+        // 6. 巨石地帯突入警告（18〜20秒）
+        if (this.state === 'OPENING' && this.stageTime >= 18000 && this.stageTime < 20000) {
             const pulse = (Math.floor(Date.now() / 200) % 2 === 0);
             if (pulse) {
                 ctx.save();

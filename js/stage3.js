@@ -1094,26 +1094,29 @@ class Stage3 {
             this.stageTime += dt;
             this.terrain.update(dt);
 
-            // 1. 開幕10秒経過でモアイ洞窟（岩山地形）出現＆スクロール開始！
-            if (this.stageTime >= 10000 && !this.terrain.wallActive) {
+            // 1. 開幕20秒間の宇宙空中戦ののち、モアイ洞窟（岩山地形）出現＆3面BGM（Blank Mask）開始！
+            if (this.stageTime >= 20000 && !this.terrain.wallActive) {
                 this.terrain.startWalls();
+                if (typeof Sound !== 'undefined' && typeof Sound.playStage3Bgm === 'function') {
+                    Sound.playStage3Bgm();
+                }
             }
 
-            // 2. 空中敵編隊（カプセル補給と牽制）
+            // 2. 空中敵編隊（開幕20秒は850ms間隔で激しい宇宙空中戦、地形突入後は1100ms間隔）
             this.updateFlyingEnemies(dt);
 
-            // 3. 原作グラディウス式 モアイ＆地形ウェーブ生成（11秒〜78秒）
-            if (this.stageTime >= 11000 && this.stageTime < 78000) {
+            // 3. 原作グラディウス式 モアイ＆地形ウェーブ生成（21秒〜88秒）
+            if (this.stageTime >= 21000 && this.stageTime < 88000) {
                 this.updateMoaiWaves(dt);
             }
 
             // 4. 地形を這うダッカー歩行砲台の生成
-            if (this.stageTime >= 22000 && this.stageTime < 76000) {
+            if (this.stageTime >= 32000 && this.stageTime < 86000) {
                 this.updateDuckers(dt);
             }
 
-            // 5. 80秒経過で洞窟を抜け、静寂のボス前（PRE_BOSS）へ！
-            if (this.stageTime >= 80000) {
+            // 5. 90秒経過で洞窟を抜け、静寂のボス前（PRE_BOSS）へ！
+            if (this.stageTime >= 90000) {
                 this.state = 'PRE_BOSS';
                 this.preBossTimer = 0;
             }
@@ -1149,8 +1152,8 @@ class Stage3 {
                         addScore(100000, this.width / 2, this.height / 2 - 40, '#ffdd00');
                     }
                     setTimeout(() => {
-                        if (this.active && typeof Sound !== 'undefined' && typeof Sound.playStageBgm === 'function') {
-                            Sound.playStageBgm();
+                        if (this.active && typeof Sound !== 'undefined' && typeof Sound.playStage3Bgm === 'function') {
+                            Sound.playStage3Bgm();
                         }
                     }, 650);
                 }
@@ -1181,7 +1184,7 @@ class Stage3 {
 
         // 難易度と進行度に応じた出現インターバル
         let interval = 2300;
-        if (this.stageTime > 52000) interval = 1650;
+        if (this.stageTime > 62000) interval = 1650;
 
         if (this.moaiWaveTimer >= interval) {
             this.moaiWaveTimer = 0;
@@ -1189,7 +1192,7 @@ class Stage3 {
             const roll = Math.random();
 
             // 立ちモアイ(standing)・横たわりモアイ(lying)、前向き(left)・後ろ向き(right)を多彩に配置！
-            if (this.stageTime < 30000) {
+            if (this.stageTime < 40000) {
                 // 前半：立ち前向き＆横たわりモアイの登場
                 if (roll < 0.35) {
                     this.terrain.spawnMoai('bottom', 'left', 0, 'standing');
@@ -1200,7 +1203,7 @@ class Stage3 {
                 } else {
                     this.terrain.spawnMoai('top', 'right', 0, 'lying');
                 }
-            } else if (this.stageTime < 52000) {
+            } else if (this.stageTime < 62000) {
                 // 中盤：前向き＋後ろ向き、立ち＋横たわり、浮島との複合配置
                 if (roll < 0.28) {
                     this.terrain.spawnMoai('bottom', 'left', 0, 'standing');
@@ -1248,8 +1251,8 @@ class Stage3 {
 
     updateFlyingEnemies(dt) {
         this.flyingTimer += dt;
-        // 飛ぶ敵をドンドン出現させてカプセル獲得と難易度を高める
-        if (this.flyingTimer < 1100) return;
+        const spawnInterval = this.terrain.wallActive ? 1100 : 850;
+        if (this.flyingTimer < spawnInterval) return;
         this.flyingTimer = 0;
 
         const roll = Math.random();
@@ -1257,12 +1260,12 @@ class Stage3 {
             ? Math.random() * (this.terrain.baseBottomY - this.terrain.baseTopY - 140) + this.terrain.baseTopY + 70
             : Math.random() * (this.height - 240) + 120;
 
-        if (roll < 0.40) {
-            // ペング編隊（全滅でカプセル！）
+        if (roll < 0.45) {
+            // ファン編隊（全滅でカプセル！）
             if (typeof Formation !== 'undefined') {
                 new Formation(safeY, 4);
             }
-        } else if (roll < 0.70) {
+        } else if (roll < 0.75) {
             // ガルン編隊
             if (typeof GarunFormation !== 'undefined') {
                 new GarunFormation(safeY, Math.random() < 0.5, 4);
@@ -1320,8 +1323,8 @@ class Stage3 {
             ctx.restore();
         }
 
-        // 洞窟接近警告（11〜13秒）
-        if (this.state === 'STAGE' && this.stageTime >= 11000 && this.stageTime < 13000) {
+        // 洞窟接近警告（18〜20秒）
+        if (this.state === 'STAGE' && this.stageTime >= 18000 && this.stageTime < 20000) {
             const pulse = (Math.floor(Date.now() / 200) % 2 === 0);
             if (pulse) {
                 ctx.save();

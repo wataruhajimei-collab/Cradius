@@ -1636,21 +1636,12 @@ class Stage4Boss {
         }
         this.isEntering = false;
 
-        // 本家4面ビッグコア特有の機敏な上下移動（自機のY座標を意識しつつ上下に反復スイープ）
-        this.y += this.vy;
-        if (this.y < 145) {
-            this.y = 145;
-            this.vy = Math.abs(this.vy);
-        } else if (this.y > 435) {
-            this.y = 435;
-            this.vy = -Math.abs(this.vy);
-        }
-
-        // 自機と高さが合った瞬間に少しフェイントを入れる本家風の動き
-        if (typeof player !== 'undefined' && player && Math.random() < 0.018) {
-            const py = player.y + player.height / 2;
-            this.vy = (py > this.y) ? 3.0 : -3.0;
-        }
+        // 原作ビッグコア準拠：自機のY座標へ機敏に追尾し（4面は1面より高速）、正面から4連レーザー
+        const py = (typeof player !== 'undefined' && player) ? (player.y + player.height / 2) : this.baseY;
+        const targetY = Math.max(150, Math.min(450, py));
+        const dy = targetY - this.y;
+        const trackSpeed = 2.6;
+        this.y += Math.max(-trackSpeed, Math.min(trackSpeed, dy));
 
         this.rotationAngle += 0.05;
         this.maidenOrbAngle += 0.06;
@@ -1661,7 +1652,7 @@ class Stage4Boss {
 
         this.coreOpen = (this.shields <= 0);
 
-        // 攻撃1: ビッグコア伝統の4連平行レーザー斉射！
+        // ビッグコア伝統の4連平行レーザー斉射
         this.laserTimer++;
         const laserInterval = this.coreOpen ? 72 : 92;
         if (this.laserTimer >= laserInterval) {
@@ -1669,29 +1660,20 @@ class Stage4Boss {
             this.shootTwinLasers();
         }
 
-        // 攻撃2: 逆火山マグマ・イオンリング弾（撃ち落とし可能）
-        this.magmaRingTimer++;
-        const ringInterval = this.coreOpen ? 105 : 135;
-        if (this.magmaRingTimer >= ringInterval) {
-            this.magmaRingTimer = 0;
-            this.shootMagmaRings();
-        }
-
         this.bullets.forEach(b => b.update(600));
         this.bullets = this.bullets.filter(b => b.active);
     }
 
     shootTwinLasers() {
-        const startX = this.x - 112;
+        const startX = this.x - 134;
         const cy = this.y;
         const spd = this.coreOpen ? -6.0 : -5.2;
         const LaserClass = (typeof EnemyLaser !== 'undefined') ? EnemyLaser : Bullet;
 
-        // 上下4門のアーム砲門から4連レーザー発射！
-        this.bullets.push(new LaserClass(startX, cy - 52, spd, 0, '#00ffff'));
-        this.bullets.push(new LaserClass(startX, cy - 18, spd, 0, '#ffaa00'));
-        this.bullets.push(new LaserClass(startX, cy + 18, spd, 0, '#ffaa00'));
-        this.bullets.push(new LaserClass(startX, cy + 52, spd, 0, '#00ffff'));
+        // 上下アーム先端の4門から水平4連レーザー
+        [-56, -34, 34, 56].forEach(oy => {
+            this.bullets.push(new LaserClass(startX, cy + oy, spd, 0, '#88eeff'));
+        });
 
         if (typeof Sound !== 'undefined' && typeof Sound.playLaser === 'function') {
             Sound.playLaser();
@@ -1744,10 +1726,10 @@ class Stage4Boss {
         if (this.shields <= 0) return null;
         const coreX = this.x - 5;
         const coreY = this.y;
-        const plateW = 6;
-        const plateH = 30;
-        const spacing = 8;
-        const startX = coreX - 22;
+        const plateW = 7;
+        const plateH = 44;
+        const spacing = 14;
+        const startX = coreX - 36;
         const frontX = startX - (this.shields - 1) * spacing;
         const totalW = (this.shields - 1) * spacing + plateW;
         return {
@@ -1772,19 +1754,19 @@ class Stage4Boss {
 
     getTopHullBounds() {
         return {
-            x: this.x - 120,
-            y: this.y - 105,
-            width: 230,
-            height: 68
+            x: this.x - 125,
+            y: this.y - 100,
+            width: 245,
+            height: 74
         };
     }
 
     getBottomHullBounds() {
         return {
-            x: this.x - 120,
-            y: this.y + 37,
-            width: 230,
-            height: 68
+            x: this.x - 125,
+            y: this.y + 26,
+            width: 245,
+            height: 74
         };
     }
 
@@ -1879,55 +1861,21 @@ class Stage4Boss {
         const cx = this.x;
         const cy = this.y;
 
-        // 1. ビッグコア本体ハル（boss.pngがある場合は灼熱マグマティントを纏わせて描画、なければ重装メカニカル描画）
-        if (typeof images !== 'undefined' && images.boss && images.boss.complete && images.boss.naturalWidth > 0) {
-            ctx.save();
-            ctx.translate(cx, cy);
-            ctx.scale(-1, 1);
-            ctx.shadowColor = 'rgba(255, 68, 0, 0.7)';
-            ctx.shadowBlur = 18;
-            ctx.drawImage(images.boss, -this.drawW / 2, -this.drawH / 2, this.drawW, this.drawH);
-            ctx.restore();
-        } else {
-            this._drawVolcanicBigCoreHull(ctx, cx, cy);
+        // 1. 1985年オリジナルAC版『ビッグコア』船体描画（1面・4面共通）
+        if (typeof drawOriginalBigCore === 'function') {
+            drawOriginalBigCore(ctx, this);
         }
 
-        // 2. 上下ウイングに搭載された回転アイアンメイデン・サブポッド（4面ボス固有の重装ディテール）
-        [-78, 78].forEach((oy, idx) => {
-            ctx.save();
-            ctx.translate(cx - 25, cy + oy);
-            ctx.rotate(this.maidenOrbAngle * (idx === 0 ? 1 : -1));
-            ctx.fillStyle = '#cbd5e1';
-            for (let s = 0; s < 6; s++) {
-                ctx.rotate(Math.PI / 3);
-                ctx.beginPath();
-                ctx.moveTo(10, -3);
-                ctx.lineTo(17, 0);
-                ctx.lineTo(10, 3);
-                ctx.closePath();
-                ctx.fill();
-            }
-            const podGrad = ctx.createRadialGradient(-2, -2, 1, 0, 0, 11);
-            podGrad.addColorStop(0, '#ffffff');
-            podGrad.addColorStop(0.45, '#f97316');
-            podGrad.addColorStop(1, '#7c2d12');
-            ctx.fillStyle = podGrad;
-            ctx.beginPath();
-            ctx.arc(0, 0, 11, 0, Math.PI * 2);
-            ctx.fill();
-            ctx.restore();
-        });
-
-        // 3. 中央の灼熱マグマ・クリスタルコア
+        // 2. 中央のクリスタルコア（青白い発光、ダメージ蓄積で赤熱化）
         const coreX = cx - 5;
         const coreY = cy;
-        const coreR = 27;
+        const coreR = 24;
         this._drawMagmaCore(ctx, coreX, coreY, coreR);
 
-        // 4. 前面4枚の超耐熱タングステン遮蔽板
+        // 3. 中央コア通路に並ぶ4枚の縦型遮蔽板（シャッター）
         this._drawShieldPlates(ctx, coreX, coreY);
 
-        // 5. 撃破時の大声断末魔シャウト演出（「ウワーーーー！」）
+        // 4. 撃破時の断末魔シャウト演出
         if (this.isDying || this.isScreaming) {
             ctx.save();
             const sx = cx + (Math.random() - 0.5) * 16;
@@ -1950,68 +1898,49 @@ class Stage4Boss {
         this.bullets.forEach(b => b.draw(ctx));
     }
 
-    _drawVolcanicBigCoreHull(ctx, cx, cy) {
-        ctx.save();
-        const hullGrad = ctx.createLinearGradient(cx - 120, cy - 95, cx + 110, cy + 95);
-        hullGrad.addColorStop(0, '#94a3b8');
-        hullGrad.addColorStop(0.45, '#475569');
-        hullGrad.addColorStop(1, '#0f172a');
-        ctx.fillStyle = hullGrad;
-
-        // 上下レーザーアーム＆中央リアクター船体
-        [-1, 1].forEach(sign => {
-            ctx.beginPath();
-            ctx.moveTo(cx - 118, cy + sign * 48);
-            ctx.lineTo(cx - 30, cy + sign * 96);
-            ctx.lineTo(cx + 95, cy + sign * 62);
-            ctx.lineTo(cx + 115, cy + sign * 18);
-            ctx.lineTo(cx - 85, cy + sign * 24);
-            ctx.closePath();
-            ctx.fill();
-            ctx.strokeStyle = '#f97316';
-            ctx.lineWidth = 2;
-            ctx.stroke();
-        });
-        ctx.restore();
-    }
-
     _drawMagmaCore(ctx, coreX, coreY, r) {
         ctx.save();
         const pulse = Math.sin(Date.now() * 0.008) * 0.25 + 0.75;
         const isFlash = this.hitFlashTimer > 0;
+        const isDanger = this.hp <= 2;
 
         ctx.beginPath();
-        ctx.arc(coreX, coreY, r + 7, 0, Math.PI * 2);
-        ctx.fillStyle = '#1c1917';
+        ctx.arc(coreX, coreY, r + 6, 0, Math.PI * 2);
+        ctx.fillStyle = '#081428';
         ctx.fill();
-        ctx.strokeStyle = '#f97316';
-        ctx.lineWidth = 3.5;
+        ctx.strokeStyle = isDanger ? '#ff4400' : '#60a5fa';
+        ctx.lineWidth = 3;
         ctx.stroke();
 
-        ctx.shadowColor = isFlash ? '#ffffff' : '#ff4400';
-        ctx.shadowBlur = (this.coreOpen ? 36 : 18) * pulse;
+        ctx.shadowColor = isFlash ? '#ffffff' : (isDanger ? '#ff3300' : '#00d8ff');
+        ctx.shadowBlur = (this.coreOpen ? 34 : 18) * pulse;
 
         const sphereGrad = ctx.createRadialGradient(coreX - r * 0.3, coreY - r * 0.3, r * 0.1, coreX, coreY, r);
         if (isFlash) {
             sphereGrad.addColorStop(0, '#ffffff');
             sphereGrad.addColorStop(1, '#ffffff');
-        } else {
+        } else if (isDanger) {
             sphereGrad.addColorStop(0, '#ffffff');
-            sphereGrad.addColorStop(0.28, '#fde047');
+            sphereGrad.addColorStop(0.3, '#fde047');
             sphereGrad.addColorStop(0.65, '#f97316');
             sphereGrad.addColorStop(1, '#7f1d1d');
+        } else {
+            sphereGrad.addColorStop(0, '#ffffff');
+            sphereGrad.addColorStop(0.35, '#a5f3fc');
+            sphereGrad.addColorStop(0.7, '#0284c7');
+            sphereGrad.addColorStop(1, '#1e3a8a');
         }
         ctx.fillStyle = sphereGrad;
         ctx.beginPath();
         ctx.arc(coreX, coreY, r, 0, Math.PI * 2);
         ctx.fill();
 
-        // 回転する六角形マグマ・クリスタル格子
+        // 回転する六角形クリスタル格子
         ctx.save();
         ctx.translate(coreX, coreY);
         ctx.rotate(this.rotationAngle);
         ctx.strokeStyle = `rgba(255, 255, 255, ${0.55 * pulse})`;
-        ctx.lineWidth = 2.2;
+        ctx.lineWidth = 2;
         ctx.beginPath();
         for (let i = 0; i < 6; i++) {
             const a = (Math.PI / 3) * i;
@@ -2030,10 +1959,10 @@ class Stage4Boss {
     _drawShieldPlates(ctx, coreX, coreY) {
         if (this.shields <= 0) return;
 
-        const plateW = 6;
-        const plateH = 30;
-        const spacing = 8;
-        const startX = coreX - 22;
+        const plateW = 7;
+        const plateH = 44;
+        const spacing = 14;
+        const startX = coreX - 36;
 
         for (let i = 0; i < this.shields; i++) {
             const px = startX - (this.shields - 1 - i) * spacing;
@@ -2045,15 +1974,16 @@ class Stage4Boss {
             const grad = ctx.createLinearGradient(px, py, px + plateW, py);
             if (isFlashing) {
                 grad.addColorStop(0, '#ffffff');
-                grad.addColorStop(1, '#fde047');
+                grad.addColorStop(0.5, '#ffffaa');
+                grad.addColorStop(1, '#ff8800');
             } else {
-                grad.addColorStop(0, '#fed7aa');
-                grad.addColorStop(0.4, '#ea580c');
-                grad.addColorStop(1, '#431407');
+                grad.addColorStop(0, '#b8dcff');
+                grad.addColorStop(0.45, '#4b7ec4');
+                grad.addColorStop(1, '#163264');
             }
             ctx.fillStyle = grad;
             ctx.fillRect(px, py, plateW, plateH);
-            ctx.strokeStyle = isFlashing ? '#ffffff' : '#fb923c';
+            ctx.strokeStyle = isFlashing ? '#ffffff' : '#dff2ff';
             ctx.lineWidth = 1;
             ctx.strokeRect(px, py, plateW, plateH);
             ctx.restore();

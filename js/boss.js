@@ -1,3 +1,130 @@
+// ==========================================
+// 1985年AC版『グラディウス』ビッグコア準拠の船体描画（1面・4面共通）
+// 青い装甲の上下傾斜ハル＋前方ガンポッド（4門レーザー）＋中央コア通路（遮蔽板）＋後部4連ノズル
+// ==========================================
+function drawOriginalBigCore(ctx, boss) {
+    const cx = boss.x;
+    const cy = boss.y;
+    const t = Date.now();
+    ctx.save();
+
+    // 後部4連エンジン噴射炎
+    const flame = 18 + Math.sin(t * 0.03) * 6;
+    [-58, -22, 22, 58].forEach(oy => {
+        const fg = ctx.createLinearGradient(cx + 128, 0, cx + 128 + flame, 0);
+        fg.addColorStop(0, '#ffffff');
+        fg.addColorStop(0.4, '#66ccff');
+        fg.addColorStop(1, 'rgba(0, 120, 255, 0)');
+        ctx.fillStyle = fg;
+        ctx.beginPath();
+        ctx.moveTo(cx + 128, cy + oy - 7);
+        ctx.lineTo(cx + 128 + flame, cy + oy);
+        ctx.lineTo(cx + 128, cy + oy + 7);
+        ctx.closePath();
+        ctx.fill();
+    });
+
+    [-1, 1].forEach(s => {
+        // 上下の大型傾斜ハル（ビッグコアの象徴的な翼状装甲）
+        const hg = ctx.createLinearGradient(0, cy + s * 100, 0, cy + s * 26);
+        hg.addColorStop(0, '#9cc8ff');
+        hg.addColorStop(0.35, '#4f7fc4');
+        hg.addColorStop(0.8, '#24467f');
+        hg.addColorStop(1, '#0f2247');
+        ctx.fillStyle = hg;
+        ctx.beginPath();
+        ctx.moveTo(cx - 60, cy + s * 26);
+        ctx.lineTo(cx - 18, cy + s * 100);
+        ctx.lineTo(cx + 92, cy + s * 100);
+        ctx.lineTo(cx + 128, cy + s * 66);
+        ctx.lineTo(cx + 128, cy + s * 26);
+        ctx.closePath();
+        ctx.fill();
+        ctx.strokeStyle = '#dff2ff';
+        ctx.lineWidth = 2;
+        ctx.stroke();
+
+        // 装甲パネルライン
+        ctx.strokeStyle = 'rgba(8, 20, 50, 0.85)';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        [10, 50, 90].forEach(px => {
+            ctx.moveTo(cx + px, cy + s * 30);
+            ctx.lineTo(cx + px, cy + s * 96);
+        });
+        ctx.moveTo(cx - 40, cy + s * 62);
+        ctx.lineTo(cx + 120, cy + s * 62);
+        ctx.stroke();
+
+        // 傾斜エッジのハイライト
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.7)';
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.moveTo(cx - 54, cy + s * 30);
+        ctx.lineTo(cx - 16, cy + s * 96);
+        ctx.lineTo(cx + 90, cy + s * 96);
+        ctx.stroke();
+
+        // 前方ガンポッド（アーム）
+        const ag = ctx.createLinearGradient(0, cy + s * 66, 0, cy + s * 26);
+        ag.addColorStop(0, '#7fb0f0');
+        ag.addColorStop(0.5, '#33609f');
+        ag.addColorStop(1, '#132a55');
+        ctx.fillStyle = ag;
+        ctx.beginPath();
+        ctx.moveTo(cx - 124, cy + s * 40);
+        ctx.lineTo(cx - 112, cy + s * 66);
+        ctx.lineTo(cx - 40, cy + s * 66);
+        ctx.lineTo(cx - 40, cy + s * 26);
+        ctx.lineTo(cx - 112, cy + s * 26);
+        ctx.closePath();
+        ctx.fill();
+        ctx.strokeStyle = '#dff2ff';
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
+
+        // レーザー砲門（上下各2門＝計4門）
+        [56, 34].forEach(gy => {
+            ctx.fillStyle = '#0a1426';
+            ctx.fillRect(cx - 132, cy + s * gy - 4, 14, 8);
+            ctx.fillStyle = '#88eeff';
+            ctx.shadowColor = '#00ccff';
+            ctx.shadowBlur = 8;
+            ctx.fillRect(cx - 134, cy + s * gy - 2, 4, 4);
+            ctx.shadowBlur = 0;
+        });
+    });
+
+    // 中央胴体
+    const bg = ctx.createLinearGradient(0, cy - 30, 0, cy + 30);
+    bg.addColorStop(0, '#5a8ad0');
+    bg.addColorStop(0.5, '#1d3a6e');
+    bg.addColorStop(1, '#5a8ad0');
+    ctx.fillStyle = bg;
+    ctx.fillRect(cx + 10, cy - 30, 118, 60);
+    ctx.strokeStyle = '#dff2ff';
+    ctx.lineWidth = 1.5;
+    ctx.strokeRect(cx + 10, cy - 30, 118, 60);
+
+    // 後部ノズル基部
+    ctx.fillStyle = '#0f2247';
+    [-58, -22, 22, 58].forEach(oy => ctx.fillRect(cx + 120, cy + oy - 8, 10, 16));
+
+    // コア通路（前方に開いた暗い溝。ここに遮蔽板が並ぶ）
+    ctx.fillStyle = '#040a18';
+    ctx.fillRect(cx - 112, cy - 24, 126, 48);
+    ctx.strokeStyle = '#7fb0f0';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(cx - 112, cy - 24);
+    ctx.lineTo(cx + 14, cy - 24);
+    ctx.moveTo(cx - 112, cy + 24);
+    ctx.lineTo(cx + 14, cy + 24);
+    ctx.stroke();
+
+    ctx.restore();
+}
+
 class Boss {
     constructor(x, y) {
         this.scale = 2; // 2倍スケール
@@ -43,9 +170,12 @@ class Boss {
         }
         this.isEntering = false; // 定位置に到着して戦闘開始
 
-        this.moveTimer += 0.02; // スムーズな上下浮動
-        // 振幅 ±80px（中心Y: 300、範囲: 220〜380）。画面上下に絶対に干渉しない安全領域
-        this.y = this.baseY + Math.sin(this.moveTimer) * 80;
+        // 原作ビッグコア準拠：自機のY座標へ向かって上下に追尾移動し、正面から4連レーザーを浴びせる
+        const trackSpeed = this.trackSpeed || 1.6;
+        const py = (typeof player !== 'undefined' && player) ? (player.y + player.height / 2) : this.baseY;
+        const targetY = Math.max(150, Math.min(450, py));
+        const dy = targetY - this.y;
+        this.y += Math.max(-trackSpeed, Math.min(trackSpeed, dy));
         this.rotationAngle += 0.04; // コア内部の回転
 
         if (this.shieldHitCooldown > 0) this.shieldHitCooldown--;
@@ -76,16 +206,13 @@ class Boss {
     }
 
     shoot() {
-        // 艦首アーム先端（左向き）から自機方向へ4連レーザー発射（適度な速度で回避可能）
-        const startX = this.x - 110;
-        const coreCenterY = this.y;
+        // 原作ビッグコア：上下アーム先端の4門から水平4連レーザーを斉射
+        const startX = this.x - 134;
+        const cy = this.y;
         const laserSpeed = -4.8;
-        
-        // 上下アーム砲台から2門ずつ、計4連ビーム
-        this.bullets.push(new Bullet(startX, coreCenterY - 48, laserSpeed, 0, '#00ffff', true));
-        this.bullets.push(new Bullet(startX, coreCenterY - 16, laserSpeed, 0, '#ffaa00', true));
-        this.bullets.push(new Bullet(startX, coreCenterY + 16, laserSpeed, 0, '#ffaa00', true));
-        this.bullets.push(new Bullet(startX, coreCenterY + 48, laserSpeed, 0, '#00ffff', true));
+        [-56, -34, 34, 56].forEach(oy => {
+            this.bullets.push(new Bullet(startX, cy + oy, laserSpeed, 0, '#88eeff', true));
+        });
     }
 
     // 遮蔽板ダメージ処理（ダブル弾ボーナス対応＆クールダウン短縮）
@@ -221,24 +348,8 @@ class Boss {
             }
         }
 
-        // 1. ボス本体の描画 (水平反転！艦首が自機・左側を向き、炎が右・後方を向く！)
-        if (typeof images !== 'undefined' && images.boss && images.boss.complete && images.boss.naturalWidth > 0) {
-            ctx.save();
-            ctx.translate(this.x, this.y);
-            ctx.scale(-1, 1); // ★★★ 水平反転！自機（画面左）に艦首を向ける！ ★★★
-
-            ctx.shadowColor = 'rgba(0, 0, 0, 0.75)';
-            ctx.shadowBlur = 16;
-            ctx.shadowOffsetX = 8;
-            ctx.shadowOffsetY = 8;
-
-            // 270px × 270px の適正2倍スケールで中心に綺麗に描画
-            ctx.drawImage(images.boss, -this.drawW / 2, -this.drawH / 2, this.drawW, this.drawH);
-            ctx.restore();
-        } else {
-            // 代替メカニカル描画
-            this.drawMechanicalHull(ctx);
-        }
+        // 1. 原作準拠ビッグコア船体（青い傾斜装甲＋4門ガンポッド＋コア通路）
+        drawOriginalBigCore(ctx, this);
 
         // 2倍スケールのコア中心と半径（リアクター中心に完全一致）
         const coreX = this.x - 5;
@@ -398,14 +509,14 @@ class Boss {
         ctx.restore();
     }
 
-    // 2倍サイズの5枚の金属風遮蔽板（シールドプレート: 元の1/3の上下幅24pxに超スリム化し機体構造を全面露出）
+    // 原作ビッグコア準拠：コア通路内に等間隔で立つ4枚の青い遮蔽壁（前から順に削られる）
     drawShieldPlates(ctx, coreX, coreY) {
         if (this.shields <= 0) return;
 
-        const plateW = 5;
-        const plateH = 24; // 元(72px)の1/3！中央ラインのみをカバーし機体やアームを贅沢に見せる
-        const spacing = 8;
-        const startX = coreX - 22;
+        const plateW = 7;
+        const plateH = 44;
+        const spacing = 14;
+        const startX = coreX - 36;
 
         for (let i = 0; i < this.shields; i++) {
             const px = startX - (this.shields - 1 - i) * spacing;
@@ -415,57 +526,39 @@ class Boss {
             const isFlashing = isFrontPlate && (this.shieldFlashTimer > 0);
 
             ctx.save();
-
-            ctx.shadowColor = 'rgba(0, 0, 0, 0.65)';
-            ctx.shadowBlur = 4;
-            ctx.shadowOffsetX = -2;
-            ctx.shadowOffsetY = 2;
-
-            // チタングラデーション
-            const metalGrad = ctx.createLinearGradient(px, py, px + plateW, py);
+            const wallGrad = ctx.createLinearGradient(px, py, px + plateW, py);
             if (isFlashing) {
-                metalGrad.addColorStop(0, '#ffffff');
-                metalGrad.addColorStop(0.5, '#ffeeaa');
-                metalGrad.addColorStop(1, '#ffffff');
+                wallGrad.addColorStop(0, '#ffffff');
+                wallGrad.addColorStop(1, '#ffeeaa');
             } else {
-                metalGrad.addColorStop(0, '#e2ecf5');
-                metalGrad.addColorStop(0.35, '#8da0b3');
-                metalGrad.addColorStop(0.85, '#3b4958');
-                metalGrad.addColorStop(1, '#1b232c');
+                wallGrad.addColorStop(0, '#d8f0ff');
+                wallGrad.addColorStop(0.4, '#5aa8ff');
+                wallGrad.addColorStop(1, '#1a4a9a');
             }
-
-            ctx.fillStyle = metalGrad;
+            ctx.fillStyle = wallGrad;
             ctx.fillRect(px, py, plateW, plateH);
-
-            // 金属ベベル枠
-            ctx.strokeStyle = isFlashing ? '#ffffff' : '#99b3cc';
+            ctx.strokeStyle = isFlashing ? '#ffffff' : '#e6f6ff';
             ctx.lineWidth = 1;
             ctx.strokeRect(px, py, plateW, plateH);
 
-            // 上下リベットボルト
-            ctx.fillStyle = isFlashing ? '#ffffff' : '#222d38';
-            ctx.fillRect(px + 1, py + 2, 3, 2);
-            ctx.fillRect(px + 1, py + plateH - 4, 3, 2);
-
-            // 冷却エナジーライン
-            ctx.fillStyle = isFlashing ? '#ffaa00' : '#00ffee';
-            ctx.shadowColor = ctx.fillStyle;
-            ctx.shadowBlur = 4;
-            ctx.fillRect(px + 1.5, py + 6, 2, plateH - 12);
-
+            // 壁面の横スリット
+            ctx.fillStyle = isFlashing ? '#ffaa00' : 'rgba(10, 30, 70, 0.8)';
+            for (let sy = py + 6; sy < py + plateH - 4; sy += 8) {
+                ctx.fillRect(px + 1, sy, plateW - 2, 2);
+            }
             ctx.restore();
         }
     }
 
-    // 遮蔽板の当たり判定バウンディングボックス (2倍スケール: 高さ24px)
+    // 遮蔽壁の当たり判定
     getShieldBounds() {
         if (this.shields <= 0) return null;
         const coreX = this.x - 5;
         const coreY = this.y;
-        const plateW = 5;
-        const plateH = 24;
-        const spacing = 8;
-        const startX = coreX - 22;
+        const plateW = 7;
+        const plateH = 44;
+        const spacing = 14;
+        const startX = coreX - 36;
         const frontX = startX - (this.shields - 1) * spacing;
         const totalW = (this.shields - 1) * spacing + plateW;
 
@@ -490,23 +583,23 @@ class Boss {
         };
     }
 
-    // 上部ハル（無敵装甲アーム）の当たり判定 (2倍スケール)
+    // 上部ハル（無敵装甲：傾斜ハル＋ガンポッド）の当たり判定
     getTopHullBounds() {
         return {
-            x: this.x - 120,
-            y: this.y - 105,
-            width: 230,
-            height: 68
+            x: this.x - 124,
+            y: this.y - 100,
+            width: 252,
+            height: 74
         };
     }
 
-    // 下部ハル（無敵装甲アーム）の当たり判定 (2倍スケール)
+    // 下部ハル（無敵装甲：傾斜ハル＋ガンポッド）の当たり判定
     getBottomHullBounds() {
         return {
-            x: this.x - 120,
-            y: this.y + 37,
-            width: 230,
-            height: 68
+            x: this.x - 124,
+            y: this.y + 26,
+            width: 252,
+            height: 74
         };
     }
 }
@@ -2459,4 +2552,5 @@ class BigCoreBoss {
 
 window.GolemBoss = GolemBoss;
 window.BigCoreBoss = BigCoreBoss;
+window.drawOriginalBigCore = drawOriginalBigCore;
 

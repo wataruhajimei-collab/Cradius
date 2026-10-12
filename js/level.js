@@ -448,13 +448,13 @@ class LevelManager {
                 }
 
                 // 超巨大火山が定位置（画面中央やや右 x <= 500）に到達したら、
-                // 画面スクロール完全停止＆30秒サバイバル大噴火イベント突入！
+                // 画面スクロール完全停止＆20秒サバイバル大噴火イベント突入！
                 if (this.superVolcano && this.superVolcano.positioned && this.state === 'WAVES') {
                     this.state = 'VOLCANO_SURVIVAL';
-                    this.volcanoSurvivalTimer = 30000; // 30秒間耐える！
+                    this.volcanoSurvivalTimer = 20000; // 20秒間耐える！
                     this.terrain.scrollSpeed = 0; // 地形スクロールをピタリと停止！
                     this.superVolcano.startMajorEruption(); // 大噴火開始！
-                    // ソワソワする超アップテンポ緊迫サバイバルBGMを爆音で再生！
+                    // 原作準拠の緊迫BGM『Aircraft Carrier』を再生開始！
                     if (typeof Sound !== 'undefined') {
                         Sound.playVolcanoSurvivalBgm();
                     }
@@ -462,7 +462,7 @@ class LevelManager {
             } else if (this.state === 'VOLCANO_SURVIVAL') {
                 this.volcanoSurvivalTimer -= dt;
 
-                // 30秒耐え抜いたら火山沈静化、スクロール再開してボス戦へ！
+                // 20秒耐え抜いたら火山沈静化、スクロール再開してボス戦へ！
                 if (this.volcanoSurvivalTimer <= 0) {
                     this.volcanoSurvivalTimer = 0;
                     if (this.superVolcano) {
@@ -624,8 +624,8 @@ class LevelManager {
             window.stonehengeStage = stonehengeStage;
             stonehengeStage.start();
         }
-        if (typeof Sound !== 'undefined') {
-            Sound.playStage2Bgm(); // ステージ2専用の完全オリジナル古代テクノBGMへ！
+        if (typeof Sound !== 'undefined' && typeof Sound.playAirBgm === 'function') {
+            Sound.playAirBgm(); // 2面開幕も原作通り宇宙空中戦BGM（Beginning of the History）からスタート！
         }
     }
 
@@ -661,11 +661,11 @@ class LevelManager {
                 console.error('Stage3 initialization error:', err);
             }
         }
-        if (typeof Sound !== 'undefined' && typeof Sound.playStage3Bgm === 'function') {
+        if (typeof Sound !== 'undefined' && typeof Sound.playAirBgm === 'function') {
             try {
-                Sound.playStage3Bgm();
+                Sound.playAirBgm(); // 3面開幕も原作通り宇宙空中戦BGM（Beginning of the History）からスタート！
             } catch (serr) {
-                console.warn('Sound playStage3Bgm error:', serr);
+                console.warn('Sound playAirBgm error:', serr);
             }
         }
     }
