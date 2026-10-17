@@ -80,7 +80,9 @@ function startOrJumpStage(stageNum = 1, mode = 'STAGE', autoEquipPower = null) {
             if (mode === 'VOLCANO') {
                 levelManager.state = 'TERRAIN';
                 levelManager.terrain.start();
-                levelManager.terrain.currentSegIndex = 28;
+                levelManager.terrain.currentSegIndex = 82;
+                levelManager.terrain.spawnIndex = levelManager.terrain.spawns.findIndex(s => s.seg >= 82);
+                if (levelManager.terrain.spawnIndex < 0) levelManager.terrain.spawnIndex = levelManager.terrain.spawns.length;
                 levelManager.time = 18000;
                 if (typeof Sound !== 'undefined' && typeof Sound.playStageBgm === 'function') {
                     Sound.playStageBgm();
@@ -590,11 +592,21 @@ function handleCollisions() {
                             enemy.hp -= 2;
                         }
                     }
+                } else if (typeof Volcano !== 'undefined' && enemy instanceof Volcano) {
+                    if (!(bullet instanceof Laser)) {
+                        bullet.active = false;
+                    }
+                    return;
                 } else {
                     if (!(bullet instanceof Laser)) {
                         bullet.active = false;
                     }
-                    enemy.hp--;
+                    // 1985年アーケード版仕様：ハッチ（ダグム）は通常ショットには耐久力を持つが、ミサイルなら一撃で破壊可能！
+                    if (typeof HatcherEnemy !== 'undefined' && enemy instanceof HatcherEnemy && typeof Missile !== 'undefined' && bullet instanceof Missile) {
+                        enemy.hp = 0;
+                    } else {
+                        enemy.hp--;
+                    }
                 }
                 if (enemy.hp <= 0) {
                     enemy.active = false;
@@ -628,9 +640,12 @@ function handleCollisions() {
     // プレイヤーと敵の当たり判定
     enemies.forEach(enemy => {
         if (enemy instanceof FanEnemy && !enemy.visible) return;
+        if (typeof RugraEnemy !== 'undefined' && enemy instanceof RugraEnemy && !enemy.visible) return;
+        if (typeof GarunEnemy !== 'undefined' && enemy instanceof GarunEnemy && !enemy.visible) return;
         if (typeof IronMaidenEnemy !== 'undefined' && enemy instanceof IronMaidenEnemy && !enemy.visible) return;
         if (typeof ZabEnemy !== 'undefined' && enemy instanceof ZabEnemy && (enemy.delay > 0 || enemy.state === 'WARP_IN')) return;
         if (typeof WarpSphereEnemy !== 'undefined' && enemy instanceof WarpSphereEnemy && enemy.state === 'WARPING') return;
+        if (typeof Volcano !== 'undefined' && enemy instanceof Volcano) return;
         if (typeof SuperVolcano !== 'undefined' && enemy instanceof SuperVolcano) return; // 火山山体はシールドで消滅させない
         if (typeof InvertedVolcano !== 'undefined' && enemy instanceof InvertedVolcano) return;
         if (typeof InvertedSuperVolcano !== 'undefined' && enemy instanceof InvertedSuperVolcano) return;

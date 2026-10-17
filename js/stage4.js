@@ -16,13 +16,13 @@
 class JumperEnemy extends Enemy {
     constructor(x, y, isCeiling = false, isRed = false) {
         super(x, y, isRed);
-        this.width = 40;
-        this.height = 42;
+        this.width = 36;
+        this.height = 38;
         this.isCeiling = isCeiling;
         this.hp = 1;
-        this.vx = -1.65;
-        this.vy = isCeiling ? 7.2 : -7.8;
-        this.gravity = isCeiling ? -0.22 : 0.24;
+        this.vx = -1.5;
+        this.vy = isCeiling ? 7.0 : -7.6;
+        this.gravity = isCeiling ? -0.22 : 0.23;
         this.groundY = y;
         this.springCompress = 0; // 着地時のバネ脚収縮量 (0〜1)
         this.hasShotInJump = false;
@@ -30,9 +30,14 @@ class JumperEnemy extends Enemy {
     }
 
     update() {
-        const st4 = window.stage4 || (typeof stage4 !== 'undefined' ? stage4 : null);
-        const terrain = (st4 && st4.terrain && st4.terrain.wallActive) ? st4.terrain : null;
-        const scrollSpeed = terrain ? terrain.scrollSpeed : 1.8;
+        let terrain = null;
+        if (typeof levelManager !== 'undefined' && levelManager.stage === 4) {
+            const st4 = window.stage4 || (typeof stage4 !== 'undefined' ? stage4 : null);
+            if (st4 && st4.terrain && st4.terrain.wallActive) terrain = st4.terrain;
+        } else if (typeof levelManager !== 'undefined' && levelManager.terrain && levelManager.terrain.active) {
+            terrain = levelManager.terrain;
+        }
+        const scrollSpeed = terrain ? terrain.scrollSpeed : 2.0;
 
         this.legAnim += 0.2;
 
@@ -43,8 +48,8 @@ class JumperEnemy extends Enemy {
             if (this.springCompress <= 0) {
                 this.springCompress = 0;
                 // 再び大ジャンプ！
-                this.vy = this.isCeiling ? (6.8 + Math.random() * 1.8) : -(7.2 + Math.random() * 1.8);
-                this.vx = (Math.random() < 0.28) ? 0.9 : -(1.3 + Math.random() * 0.9);
+                this.vy = this.isCeiling ? (6.6 + Math.random() * 1.6) : -(7.0 + Math.random() * 1.8);
+                this.vx = (Math.random() < 0.28) ? 0.8 : -(1.2 + Math.random() * 0.8);
                 this.hasShotInJump = false;
             }
         } else {
@@ -53,7 +58,7 @@ class JumperEnemy extends Enemy {
             this.y += this.vy;
             this.vy += this.gravity;
 
-            // ジャンプの頂点付近で3WAY弾（または自機狙い拡散弾）を発射！
+            // ジャンプの頂点付近で3WAY弾（自機方向拡散弾）を発射！
             if (!this.hasShotInJump && Math.abs(this.vy) < 1.6 && this.x > 30 && this.x < 770) {
                 this.hasShotInJump = true;
                 this.shoot();
@@ -71,8 +76,7 @@ class JumperEnemy extends Enemy {
                     this.y = topY;
                     this.vy = 0;
                     this.springCompress = 1.0;
-                } else if (this.y + this.height > botY - 10) {
-                    // 下の地面にぶつかる前に折り返す
+                } else if (botY < 600 && this.y + this.height > botY - 10) {
                     this.vy = -Math.abs(this.vy) * 0.7;
                 }
             } else {
@@ -81,8 +85,7 @@ class JumperEnemy extends Enemy {
                     this.y = botY - this.height;
                     this.vy = 0;
                     this.springCompress = 1.0;
-                } else if (this.y < topY + 10) {
-                    // 天井にぶつかる前に折り返す
+                } else if (topY > 0 && this.y < topY + 10) {
                     this.vy = Math.abs(this.vy) * 0.7;
                 }
             }
@@ -103,89 +106,63 @@ class JumperEnemy extends Enemy {
             baseAngle = Math.atan2((player.y + player.height / 2) - cy, (player.x + player.width / 2) - cx);
         }
 
-        // 本家4面ジャンパー特有の頂点ばら撒きショット（3方向）
+        // 本家ジャンパー特有のジャンプ頂点ばら撒きショット（3WAY弾）
         const spread = [-0.32, 0, 0.32];
-        const spd = 3.5;
+        const spd = 3.3;
         spread.forEach(offset => {
             const ang = baseAngle + offset;
             enemyBullets.push(new EnemyBullet(cx, cy, Math.cos(ang) * spd, Math.sin(ang) * spd));
         });
-
-        if (typeof particles !== 'undefined' && typeof Particle !== 'undefined') {
-            for (let i = 0; i < 4; i++) {
-                particles.push(new Particle(cx, cy, '#ffaa00'));
-            }
-        }
     }
 
     draw(ctx) {
         if (!this.active) return;
         ctx.save();
 
-        const cx = this.x + this.width / 2;
-        const cy = this.isCeiling ? this.y : (this.y + this.height);
+        const cx = Math.round(this.x + this.width / 2);
+        const cy = Math.round(this.isCeiling ? this.y : (this.y + this.height));
         ctx.translate(cx, cy);
         if (this.isCeiling) ctx.scale(1, -1);
 
-        // バネ脚の伸縮高さ
-        const legHeight = Math.max(6, 18 * (1 - this.springCompress * 0.55));
-        const bodyCenterY = -legHeight - 12;
+        const S = 2;
+        // バネ脚の伸縮高さ（着地時は縮み、ジャンプ中は伸びる）
+        const legH = Math.round(Math.max(3, 8 * (1 - this.springCompress * 0.55)));
+        const bodyY = (-legH - 6) * S;
 
-        // 1. 左右の油圧スプリング脚（コイルばね造形）
-        ctx.strokeStyle = '#94a3b8';
-        ctx.lineWidth = 3;
-        [-9, 9].forEach(lx => {
-            ctx.beginPath();
-            ctx.moveTo(lx, bodyCenterY + 8);
-            ctx.lineTo(lx + (lx < 0 ? -5 : 5), -legHeight * 0.6);
-            ctx.lineTo(lx - (lx < 0 ? -3 : 3), -legHeight * 0.3);
-            ctx.lineTo(lx, 0);
-            ctx.stroke();
+        const cLight = this.isRed ? '#fecdd3' : '#e0f2fe';
+        const cMain  = this.isRed ? '#ef4444' : '#38bdf8';
+        const cDark  = this.isRed ? '#991b1b' : '#0369a1';
+        const cLeg   = this.isRed ? '#fde047' : '#fb923c';
 
-            // 足先の接地クローパッド
-            ctx.fillStyle = '#334155';
-            ctx.fillRect(lx - 6, -4, 12, 4);
-            ctx.strokeStyle = '#cbd5e1';
-            ctx.lineWidth = 1;
-            ctx.strokeRect(lx - 6, -4, 12, 4);
-            ctx.lineWidth = 3;
-            ctx.strokeStyle = '#94a3b8';
-        });
+        // 1. 左右のバネ関節脚（ドット絵ジグザグ脚）
+        ctx.fillStyle = cLeg;
+        const kneeOut = (this.springCompress > 0.2) ? 6 * S : 4 * S;
+        // 左脚
+        ctx.fillRect(-4 * S, bodyY + 4 * S, 2 * S, Math.round(legH * 0.5) * S);
+        ctx.fillRect(-kneeOut, -Math.round(legH * 0.6) * S, 3 * S, 2 * S);
+        ctx.fillRect(-5 * S, -Math.round(legH * 0.4) * S, 2 * S, Math.round(legH * 0.4) * S);
+        ctx.fillRect(-7 * S, -2 * S, 5 * S, 2 * S);
+        // 右脚
+        ctx.fillRect(2 * S, bodyY + 4 * S, 2 * S, Math.round(legH * 0.5) * S);
+        ctx.fillRect(kneeOut - 3 * S, -Math.round(legH * 0.6) * S, 3 * S, 2 * S);
+        ctx.fillRect(3 * S, -Math.round(legH * 0.4) * S, 2 * S, Math.round(legH * 0.4) * S);
+        ctx.fillRect(2 * S, -2 * S, 5 * S, 2 * S);
 
-        // 2. 3D球面装甲ポッドボディ
-        const domeGrad = ctx.createRadialGradient(-5, bodyCenterY - 5, 2, 0, bodyCenterY, 17);
-        if (this.isRed) {
-            domeGrad.addColorStop(0.0, '#ffffff');
-            domeGrad.addColorStop(0.28, '#ff6b81');
-            domeGrad.addColorStop(0.68, '#e11d48');
-            domeGrad.addColorStop(1.0, '#4c0519');
-        } else {
-            domeGrad.addColorStop(0.0, '#ffffff');
-            domeGrad.addColorStop(0.28, '#bae6fd');
-            domeGrad.addColorStop(0.65, '#0284c7');
-            domeGrad.addColorStop(1.0, '#0f172a');
-        }
-        ctx.fillStyle = domeGrad;
-        ctx.beginPath();
-        ctx.ellipse(0, bodyCenterY, 17, 13, 0, 0, Math.PI * 2);
-        ctx.fill();
+        // 2. ドーム型ジャンパー本体（1985年アーケード版ドット絵造形）
+        ctx.fillStyle = cDark;
+        ctx.fillRect(-7 * S, bodyY - 3 * S, 14 * S, 8 * S);
+        ctx.fillRect(-5 * S, bodyY - 5 * S, 10 * S, 10 * S);
+        ctx.fillStyle = cMain;
+        ctx.fillRect(-6 * S, bodyY - 2 * S, 12 * S, 6 * S);
+        ctx.fillRect(-4 * S, bodyY - 4 * S, 8 * S, 8 * S);
+        ctx.fillStyle = cLight;
+        ctx.fillRect(-4 * S, bodyY - 3 * S, 5 * S, 2 * S);
 
-        ctx.strokeStyle = '#0f172a';
-        ctx.lineWidth = 1.5;
-        ctx.stroke();
-
-        // 3. 中央の発光カメラアイ（発射時は黄金フラッシュ）
-        ctx.fillStyle = '#020617';
-        ctx.fillRect(-11, bodyCenterY - 4, 22, 7);
-
-        const eyeColor = this.hasShotInJump ? '#ffea00' : (this.isRed ? '#ff0044' : '#00ffcc');
-        ctx.fillStyle = eyeColor;
-        ctx.shadowColor = eyeColor;
-        ctx.shadowBlur = 8;
-        ctx.beginPath();
-        ctx.arc(0, bodyCenterY - 0.5, 4.5, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.shadowBlur = 0;
+        // 3. 中央バイザー＆カメラアイ
+        ctx.fillStyle = '#0f172a';
+        ctx.fillRect(-5 * S, bodyY - 1 * S, 10 * S, 3 * S);
+        ctx.fillStyle = this.hasShotInJump ? '#fde047' : '#f97316';
+        ctx.fillRect(-2 * S, bodyY - 1 * S, 4 * S, 2 * S);
 
         ctx.restore();
     }

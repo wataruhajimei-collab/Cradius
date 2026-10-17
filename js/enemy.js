@@ -170,15 +170,17 @@ class FormationBase {
 }
 
 // ------------------------------------------
-// ファン編隊 (波打つ編隊: 大きく優雅な動き)
+// ファン編隊 (Fan: 1985年アーケード版完全準拠)
+// 右端から直進飛来 → 自機のY座標方向へ斜めに「カックン」と折れ曲がり反転・交差離脱！
+// 4枚羽根の風車（ピンホイール）回転スプライト（銀青 / 赤カプセル機は朱赤）
 // ------------------------------------------
 class Formation extends FormationBase {
-    constructor(startY, count = 4, isRed = true) {
+    constructor(startY, count = 5, isRed = false) {
         super(count);
         this.enemies = [];
 
         for (let i = 0; i < count; i++) {
-            const enemy = new FanEnemy(820, startY, i * 18, this, isRed);
+            const enemy = new FanEnemy(820, startY, i * 14, this, isRed);
             this.enemies.push(enemy);
             enemies.push(enemy);
         }
@@ -191,11 +193,16 @@ class FanEnemy extends Enemy {
         this.startY = y;
         this.delay = delay;
         this.formation = formation;
-        this.width = 42;
-        this.height = 36;
+        this.width = 34;
+        this.height = 34;
         this.time = 0;
         this.visible = (delay <= 0);
-        this.tilt = 0;
+        this.phase = 'STRAIGHT'; // 'STRAIGHT' -> 'DIAG' -> 'RETURN'
+        this.turnX = 250; // 画面左寄りまで直進してから折れ曲がる
+        this.diagTimer = 0;
+        this.vx = -3.4;
+        this.vy = 0;
+        this.spinAngle = 0;
     }
 
     update() {
@@ -204,174 +211,107 @@ class FanEnemy extends Enemy {
             if (this.delay <= 0) {
                 this.visible = true;
                 this.x = 820;
+                this.y = this.startY;
             }
             return;
         }
 
-        this.time += 0.035; // ゆったり波打つ
-        this.animTimer += 0.15;
-        this.x -= 2.0; // 見やすいゆったり速度
-        
-        const prevY = this.y;
-        this.y = this.startY + Math.sin(this.time * 0.7) * 45;
-        this.tilt = (this.y - prevY) * 0.05;
+        this.time++;
+        this.animTimer += 0.22;
+        this.spinAngle += 0.28; // くるくる高速回転する4枚羽根ファン
+
+        if (this.phase === 'STRAIGHT') {
+            this.x += this.vx;
+            if (this.x <= this.turnX) {
+                this.phase = 'DIAG';
+                this.diagTimer = 0;
+                // 自機のY座標側（または画面中央側）へ向かってカックンと斜めに折れ曲がる！
+                let dirY = (this.y < 300) ? 1 : -1;
+                if (typeof player !== 'undefined' && player) {
+                    dirY = (player.y > this.y) ? 1 : -1;
+                }
+                this.vx = 2.2;  // 右斜め方向へ切り返す本家特有のクランク軌道
+                this.vy = dirY * 2.6;
+            }
+        } else if (this.phase === 'DIAG') {
+            this.x += this.vx;
+            this.y += this.vy;
+            this.diagTimer++;
+            if (this.diagTimer >= 28) {
+                this.phase = 'RETURN';
+                this.vx = 3.6; // 右方向へ高速離脱（または水平飛行）
+                this.vy = 0;
+            }
+        } else {
+            this.x += this.vx;
+            this.y += this.vy;
+            if (this.x > 860 || this.x < -80 || this.y < -60 || this.y > 660) {
+                this.active = false;
+            }
+        }
     }
 
     draw(ctx) {
         if (!this.visible) return;
         ctx.save();
-        ctx.translate(this.x + this.width / 2, this.y + this.height / 2);
-        ctx.rotate(this.tilt);
+        const cx = Math.round(this.x + this.width / 2);
+        const cy = Math.round(this.y + this.height / 2);
+        ctx.translate(cx, cy);
 
-        if (this.isRed) {
-            // 本家アーケード完全準拠：鮮やかな深紅＆朱色のファン機体（全滅で赤カプセル）
-            const outerGrad = ctx.createRadialGradient(-5, -5, 2, 0, 0, 19);
-            outerGrad.addColorStop(0.0, '#ffffff'); // 先端ハイライト
-            outerGrad.addColorStop(0.2, '#ff8da1'); // 明るい朱色
-            outerGrad.addColorStop(0.55, '#e11d48'); // 鮮やかな深紅
-            outerGrad.addColorStop(0.85, '#9f1239'); // 陰影
-            outerGrad.addColorStop(1.0, '#4c0519');  // 輪郭リム
-            ctx.fillStyle = outerGrad;
-            ctx.beginPath();
-            ctx.arc(0, 0, 19, 0, Math.PI * 2);
-            ctx.fill();
+        // 1985年アーケード版「ファン」のドット絵構造を忠実再現：
+        // 4枚の風車ブレードが回転フレームに応じて切り替わるピクセルアート造形
+        const frame = Math.floor(this.spinAngle * 2) % 4;
+        const S = 2; // 16x16ドット×2倍 = 32x32px
 
-            // ベベルエッジハイライト
-            ctx.strokeStyle = 'rgba(255, 220, 230, 0.85)';
-            ctx.lineWidth = 1;
-            ctx.beginPath();
-            ctx.arc(-1, -1, 18, Math.PI * 0.7, Math.PI * 1.8);
-            ctx.stroke();
+        const cMain = this.isRed ? '#ef4444' : '#7dd3fc';
+        const cLight = this.isRed ? '#fecdd3' : '#f0f9ff';
+        const cDark = this.isRed ? '#991b1b' : '#0369a1';
+        const cCore = this.isRed ? '#fde047' : '#f97316';
 
-            // 中層ローター・タービンリング（赤熱・アンバー）
-            const midGrad = ctx.createRadialGradient(0, 0, 4, 0, 0, 12);
-            midGrad.addColorStop(0.0, '#f97316');
-            midGrad.addColorStop(0.6, '#7c1020');
-            midGrad.addColorStop(1.0, '#450a0a');
-            ctx.fillStyle = midGrad;
-            ctx.beginPath();
-            ctx.arc(0, 0, 12, 0, Math.PI * 2);
-            ctx.fill();
+        ctx.rotate(frame * (Math.PI / 8));
 
-            // 回転スリット（高熱ゴールド）
-            ctx.strokeStyle = 'rgba(253, 224, 71, 0.85)';
-            ctx.lineWidth = 1.2;
-            const fanRot = this.animTimer * 1.5;
-            for (let a = 0; a < 4; a++) {
-                const angle = fanRot + (a * Math.PI / 2);
-                ctx.beginPath();
-                ctx.moveTo(Math.cos(angle) * 5, Math.sin(angle) * 5);
-                ctx.lineTo(Math.cos(angle) * 11, Math.sin(angle) * 11);
-                ctx.stroke();
-            }
-
-            // 中心高輝度エネルギープラズマコア（灼熱レッド）
-            const coreGrad = ctx.createRadialGradient(2, 0, 1, 2, 0, 5);
-            coreGrad.addColorStop(0.0, '#ffffff');
-            coreGrad.addColorStop(0.4, '#fbbf24');
-            coreGrad.addColorStop(1.0, '#dc2626');
-            ctx.fillStyle = coreGrad;
-            ctx.beginPath();
-            ctx.arc(2, 0, 5, 0, Math.PI * 2);
-            ctx.fill();
-
-            // バーニア噴射炎（オレンジ＆イエロー）
-            const flame = 8 + Math.sin(this.animTimer * 2) * 4;
-            ctx.fillStyle = 'rgba(255, 120, 0, 0.85)';
-            ctx.beginPath();
-            ctx.moveTo(-16, -4);
-            ctx.lineTo(-16 - flame, 0);
-            ctx.lineTo(-16, 4);
-            ctx.closePath();
-            ctx.fill();
-
-            ctx.fillStyle = '#fffae0';
-            ctx.beginPath();
-            ctx.moveTo(-16, -2);
-            ctx.lineTo(-16 - flame * 0.5, 0);
-            ctx.lineTo(-16, 2);
-            ctx.closePath();
-            ctx.fill();
-        } else {
-            // 通常青銀バージョン
-            const outerGrad = ctx.createRadialGradient(-5, -5, 2, 0, 0, 19);
-            outerGrad.addColorStop(0.0, '#ffffff');
-            outerGrad.addColorStop(0.2, '#e2e8f0');
-            outerGrad.addColorStop(0.55, '#64748b');
-            outerGrad.addColorStop(0.85, '#334155');
-            outerGrad.addColorStop(1.0, '#0f172a');
-            ctx.fillStyle = outerGrad;
-            ctx.beginPath();
-            ctx.arc(0, 0, 19, 0, Math.PI * 2);
-            ctx.fill();
-
-            ctx.strokeStyle = 'rgba(255, 255, 255, 0.65)';
-            ctx.lineWidth = 1;
-            ctx.beginPath();
-            ctx.arc(-1, -1, 18, Math.PI * 0.7, Math.PI * 1.8);
-            ctx.stroke();
-
-            const midGrad = ctx.createRadialGradient(0, 0, 4, 0, 0, 12);
-            midGrad.addColorStop(0.0, '#0284c7');
-            midGrad.addColorStop(0.6, '#0f172a');
-            midGrad.addColorStop(1.0, '#475569');
-            ctx.fillStyle = midGrad;
-            ctx.beginPath();
-            ctx.arc(0, 0, 12, 0, Math.PI * 2);
-            ctx.fill();
-
-            ctx.strokeStyle = 'rgba(56, 189, 248, 0.75)';
-            ctx.lineWidth = 1.2;
-            const fanRot = this.animTimer * 1.5;
-            for (let a = 0; a < 4; a++) {
-                const angle = fanRot + (a * Math.PI / 2);
-                ctx.beginPath();
-                ctx.moveTo(Math.cos(angle) * 5, Math.sin(angle) * 5);
-                ctx.lineTo(Math.cos(angle) * 11, Math.sin(angle) * 11);
-                ctx.stroke();
-            }
-
-            const coreGrad = ctx.createRadialGradient(2, 0, 1, 2, 0, 5);
-            coreGrad.addColorStop(0.0, '#ffffff');
-            coreGrad.addColorStop(0.4, '#38bdf8');
-            coreGrad.addColorStop(1.0, '#0369a1');
-            ctx.fillStyle = coreGrad;
-            ctx.beginPath();
-            ctx.arc(2, 0, 5, 0, Math.PI * 2);
-            ctx.fill();
-
-            const flame = 8 + Math.sin(this.animTimer * 2) * 4;
-            ctx.fillStyle = 'rgba(0, 220, 255, 0.85)';
-            ctx.beginPath();
-            ctx.moveTo(-16, -4);
-            ctx.lineTo(-16 - flame, 0);
-            ctx.lineTo(-16, 4);
-            ctx.closePath();
-            ctx.fill();
-
-            ctx.fillStyle = '#ffffff';
-            ctx.beginPath();
-            ctx.moveTo(-16, -2);
-            ctx.lineTo(-16 - flame * 0.5, 0);
-            ctx.lineTo(-16, 2);
-            ctx.closePath();
-            ctx.fill();
+        // 4枚の風車羽根（ピンホイールブレード）
+        for (let b = 0; b < 4; b++) {
+            ctx.save();
+            ctx.rotate(b * (Math.PI / 2));
+            // ブレード暗部ベース
+            ctx.fillStyle = cDark;
+            ctx.fillRect(1 * S, -7 * S, 4 * S, 5 * S);
+            ctx.fillRect(2 * S, -8 * S, 3 * S, 1 * S);
+            // ブレード明部
+            ctx.fillStyle = cMain;
+            ctx.fillRect(0 * S, -7 * S, 3 * S, 5 * S);
+            // ブレード先端ハイライト
+            ctx.fillStyle = cLight;
+            ctx.fillRect(0 * S, -7 * S, 2 * S, 2 * S);
+            ctx.restore();
         }
+
+        // 中央の八角形リング＆コア
+        ctx.fillStyle = cDark;
+        ctx.fillRect(-3 * S, -3 * S, 6 * S, 6 * S);
+        ctx.fillStyle = cLight;
+        ctx.fillRect(-2 * S, -2 * S, 4 * S, 4 * S);
+        ctx.fillStyle = cCore;
+        ctx.fillRect(-1 * S, -1 * S, 2 * S, 2 * S);
 
         ctx.restore();
     }
 }
 
 // ------------------------------------------
-// ガルン編隊 (Uターン旋回: 大きく優雅な軌道)
+// ガルン編隊 (Garun: 1985年アーケード版完全準拠)
+// 上下にサイン波（正弦波）を描いてくるくるロール回転しながら飛来する円盤型戦闘機！
 // ------------------------------------------
 class GarunFormation extends FormationBase {
-    constructor(startY, isUpward, count = 4) {
+    constructor(startY, isUpward = false, count = 4, hasRed = true) {
         super(count);
         this.enemies = [];
 
         for (let i = 0; i < count; i++) {
-            const enemy = new GarunEnemy(820, startY, i * 18, isUpward, this);
+            // 編隊のうち先頭または最後尾を赤いカプセルキャリアにする
+            const isRed = hasRed && (i === 0 || i === count - 1);
+            const enemy = new GarunEnemy(820, startY, i * 18, isUpward ? -1 : 1, this, isRed);
             this.enemies.push(enemy);
             enemies.push(enemy);
         }
@@ -379,18 +319,18 @@ class GarunFormation extends FormationBase {
 }
 
 class GarunEnemy extends Enemy {
-    constructor(x, y, delay, isUpward, formation) {
-        super(x, y);
+    constructor(x, y, delay, phaseDir = 1, formation = null, isRed = false) {
+        super(x, y, isRed);
         this.startY = y;
         this.delay = delay;
-        this.isUpward = isUpward;
+        this.phaseDir = phaseDir || 1;
         this.formation = formation;
-        this.width = 46;
+        this.width = 36;
         this.height = 32;
         this.time = 0;
         this.visible = (delay <= 0);
-        this.speedX = -2.4; // ゆったり
-        this.speedY = 0;
+        this.speedX = -2.8;
+        this.amplitude = 52;
     }
 
     update() {
@@ -403,118 +343,64 @@ class GarunEnemy extends Enemy {
             return;
         }
 
-        this.time += 0.025;
+        this.time += 0.085;
+        this.animTimer += 0.2;
         this.x += this.speedX;
+        this.y = this.startY + Math.sin(this.time) * this.amplitude * this.phaseDir;
 
-        // ゆったりUターン
-        if (this.time > 1.5 && this.time < 3.4) {
-            this.speedY = (this.isUpward ? -2.2 : 2.2);
-            this.speedX += 0.04;
-        } else if (this.time >= 3.4) {
-            this.speedX = 2.8;
-            this.speedY *= 0.96;
+        if (this.x < -80) {
+            this.active = false;
         }
-        this.y += this.speedY;
     }
 
     draw(ctx) {
         if (!this.visible) return;
         ctx.save();
-        ctx.translate(this.x + this.width / 2, this.y + this.height / 2);
-        ctx.rotate(Math.atan2(this.speedY, this.speedX) + Math.PI);
+        const cx = Math.round(this.x + this.width / 2);
+        const cy = Math.round(this.y + this.height / 2);
+        ctx.translate(cx, cy);
 
-        // 立体シャドウ
-        // Fast draw
+        // 1985年アーケード版「ガルン」：上下蛇行に合わせて機体が縦方向にロール回転（厚みが変化）するスプライト表現！
+        const roll = Math.cos(this.time); // -1.0 〜 +1.0
+        const scaleY = Math.max(0.32, Math.abs(roll));
+        const S = 2;
 
-        // 上部主翼 (光面デルタ: シルバー〜スレート)
-        const wingTopGrad = ctx.createLinearGradient(0, -11, 0, 0);
-        wingTopGrad.addColorStop(0.0, '#f8fafc'); // 先端ハイライト
-        wingTopGrad.addColorStop(0.3, '#cbd5e1'); // シルバー
-        wingTopGrad.addColorStop(0.8, '#64748b'); // スレート
-        wingTopGrad.addColorStop(1.0, '#475569');
-        ctx.fillStyle = wingTopGrad;
-        ctx.beginPath();
-        ctx.moveTo(19, 0);
-        ctx.lineTo(-15, -12);
-        ctx.lineTo(-9, 0);
-        ctx.closePath();
-        ctx.fill();
+        const cLight = this.isRed ? '#fde047' : '#e0f2fe';
+        const cMain  = this.isRed ? '#ef4444' : '#38bdf8';
+        const cDark  = this.isRed ? '#991b1b' : '#1e3a8a';
+        const cCore  = this.isRed ? '#ffffff' : '#f97316';
 
-        // 下部主翼 (影面デルタ: ガンメタル)
-        const wingBtmGrad = ctx.createLinearGradient(0, 0, 0, 11);
-        wingBtmGrad.addColorStop(0.0, '#334155');
-        wingBtmGrad.addColorStop(0.6, '#1e293b');
-        wingBtmGrad.addColorStop(1.0, '#0f172a');
-        ctx.fillStyle = wingBtmGrad;
-        ctx.beginPath();
-        ctx.moveTo(19, 0);
-        ctx.lineTo(-9, 0);
-        ctx.lineTo(-15, 12);
-        ctx.closePath();
-        ctx.fill();
+        // 上下ウイングポッド（ロール回転で上下に開閉する立体構造）
+        ctx.save();
+        ctx.scale(1, scaleY);
 
-        ctx.shadowColor = 'transparent';
+        // 外殻ウイング（ドット階段状のアーケードフォルム）
+        ctx.fillStyle = cDark;
+        ctx.fillRect(-7 * S, -7 * S, 14 * S, 14 * S);
+        ctx.fillStyle = cMain;
+        ctx.fillRect(-8 * S, -5 * S, 16 * S, 10 * S);
+        ctx.fillRect(-5 * S, -8 * S, 10 * S, 16 * S);
 
-        // 前縁ベベルエッジハイライト
-        ctx.strokeStyle = 'rgba(255, 255, 255, 0.75)';
-        ctx.lineWidth = 1;
-        ctx.beginPath();
-        ctx.moveTo(19, 0);
-        ctx.lineTo(-15, -12);
-        ctx.stroke();
+        // 上下ブレードのリブハイライト
+        ctx.fillStyle = cLight;
+        ctx.fillRect(-6 * S, -6 * S, 10 * S, 2 * S);
+        ctx.fillRect(-6 * S, 4 * S, 10 * S, 2 * S);
+        ctx.restore();
 
-        // 中央胴体メタリックカウル
-        const cowlGrad = ctx.createLinearGradient(-4, -4, 12, 4);
-        cowlGrad.addColorStop(0.0, '#e2e8f0');
-        cowlGrad.addColorStop(0.5, '#94a3b8');
-        cowlGrad.addColorStop(1.0, '#1e293b');
-        ctx.fillStyle = cowlGrad;
-        ctx.beginPath();
-        ctx.moveTo(14, 0);
-        ctx.lineTo(2, -4);
-        ctx.lineTo(-8, -2);
-        ctx.lineTo(-8, 2);
-        ctx.lineTo(2, 4);
-        ctx.closePath();
-        ctx.fill();
-
-        // センサーアイ・キャノピー (シアン反射ガラス)
-        const sensorGrad = ctx.createLinearGradient(-3, -2, 6, 2);
-        sensorGrad.addColorStop(0.0, '#ffffff');
-        sensorGrad.addColorStop(0.3, '#38bdf8');
-        sensorGrad.addColorStop(1.0, '#0284c7');
-        ctx.fillStyle = sensorGrad;
-        ctx.beginPath();
-        ctx.fillRect(-3, -2.5, 9, 5);
-
-        // キャノピーハイライト
+        // 中央コア軸（常に厚みを持つセンタースリット＆赤熱コア）
+        ctx.fillStyle = '#090d16';
+        ctx.fillRect(-8 * S, -2 * S, 16 * S, 4 * S);
+        ctx.fillStyle = cCore;
+        ctx.fillRect(-5 * S, -1 * S, 8 * S, 2 * S);
         ctx.fillStyle = '#ffffff';
-        ctx.fillRect(-1, -1.5, 3, 1.2);
-
-        // アフターバーナー (旋回中の推力炎)
-        const flame = 10 + Math.sin(this.animTimer * 2.5) * 4;
-        ctx.fillStyle = 'rgba(0, 220, 255, 0.85)';
-        ctx.beginPath();
-        ctx.moveTo(-9, -3);
-        ctx.lineTo(-9 - flame, 0);
-        ctx.lineTo(-9, 3);
-        ctx.closePath();
-        ctx.fill();
-
-        ctx.fillStyle = '#ffffff';
-        ctx.beginPath();
-        ctx.moveTo(-9, -1.5);
-        ctx.lineTo(-9 - flame * 0.5, 0);
-        ctx.lineTo(-9, 1.5);
-        ctx.closePath();
-        ctx.fill();
+        ctx.fillRect(-4 * S, -1 * S, 3 * S, 1 * S);
 
         ctx.restore();
     }
 }
 
 // ------------------------------------------
-// ザブ小隊 (奇襲機: 見切りやすいサイズとスピード)
+// ザブ小隊 (奇襲機: 2面ストーンヘンジ・ボス前ラッシュ用)
 // ------------------------------------------
 class ZabSquad extends FormationBase {
     constructor(spawnSide = 'ANYWHERE', targetY = 300, count = 3) {
@@ -532,7 +418,6 @@ class ZabSquad extends FormationBase {
 
 class ZabEnemy extends Enemy {
     constructor(spawnSide = 'ANYWHERE', targetY = null, formation = null, delay = 0, isRed = false) {
-        // 画面の外ではなく、画面内のどこからでもランダムにワープアウトさせる (x: 45〜740, y: 45〜525)
         let sx, sy;
         if (typeof spawnSide === 'number' && typeof targetY === 'number') {
             sx = Math.max(40, Math.min(750, spawnSide));
@@ -542,7 +427,6 @@ class ZabEnemy extends Enemy {
             const pY = (typeof player !== 'undefined' && player) ? (player.y + player.height / 2) : -999;
             sx = 45 + Math.random() * 695;
             sy = 45 + Math.random() * 480;
-            // 自機の真上にいきなり重なって出現しないよう安全距離(115px)を確保しつつ画面全域どこからでも出現
             for (let attempt = 0; attempt < 10; attempt++) {
                 const candX = 45 + Math.random() * 695;
                 const candY = 45 + Math.random() * 480;
@@ -579,7 +463,6 @@ class ZabEnemy extends Enemy {
             this.warpTimer++;
             if (this.warpTimer >= this.warpDuration) {
                 this.state = 'RUSH';
-                // ワープアウト完了時の空間スパーク粒子
                 if (typeof particles !== 'undefined' && typeof Particle !== 'undefined') {
                     const pColor = this.isRed ? '#ff6688' : '#00ffff';
                     for (let i = 0; i < 6; i++) {
@@ -590,7 +473,7 @@ class ZabEnemy extends Enemy {
                     const dx = (player.x + player.width / 2) - (this.x + this.width / 2);
                     const dy = (player.y + player.height / 2) - (this.y + this.height / 2);
                     const dist = Math.sqrt(dx * dx + dy * dy) || 1;
-                    const speed = 3.6; // 見切りやすいマイルドな突進速度
+                    const speed = 3.6;
                     this.vx = (dx / dist) * speed;
                     this.vy = (dy / dist) * speed;
                 } else {
@@ -600,7 +483,6 @@ class ZabEnemy extends Enemy {
         } else {
             this.x += this.vx;
             this.y += this.vy;
-            // 画面外へ抜けたら消去
             if (this.x < -80 || this.x > 880 || this.y < -80 || this.y > 680) {
                 this.active = false;
             }
@@ -613,7 +495,6 @@ class ZabEnemy extends Enemy {
         ctx.translate(this.x + this.width / 2, this.y + this.height / 2);
 
         if (this.state === 'WARP_IN') {
-            // 画面内のどこからでも空間が歪んでワープアウトしてくる実体化エフェクト
             const progress = Math.min(1, this.warpTimer / this.warpDuration);
             const ringColor = this.isRed ? '#ff3366' : '#00ffff';
             const radius = Math.max(4, (1 - progress) * 40 + 6);
@@ -632,7 +513,6 @@ class ZabEnemy extends Enemy {
             ctx.arc(0, 0, radius * 0.55, 0, Math.PI * 2);
             ctx.stroke();
 
-            // ワープ中に徐々に実体化するザブのホログラムシルエット
             ctx.globalAlpha = progress * 0.85;
             const scale = 0.25 + progress * 0.75;
             ctx.scale(scale, scale);
@@ -649,14 +529,11 @@ class ZabEnemy extends Enemy {
             ctx.stroke();
         } else {
             ctx.rotate(this.rot);
-
-            // 立体シャドウ
             ctx.shadowColor = 'rgba(0, 0, 0, 0.7)';
             ctx.shadowBlur = 7;
             ctx.shadowOffsetX = 3;
             ctx.shadowOffsetY = 3;
 
-            // 3D多面体メタリック結晶 (通常:シルバーブルー / 赤カプセル機:ルビーレッド)
             const facetTop = ctx.createLinearGradient(0, -15, 0, 0);
             if (this.isRed) {
                 facetTop.addColorStop(0.0, '#ffffff');
@@ -730,8 +607,6 @@ class ZabEnemy extends Enemy {
             ctx.fill();
 
             ctx.shadowColor = 'transparent';
-
-            // 金属ファセット稜線 (シャープなベベルライン)
             ctx.strokeStyle = 'rgba(255, 255, 255, 0.8)';
             ctx.lineWidth = 1;
             ctx.beginPath();
@@ -744,7 +619,6 @@ class ZabEnemy extends Enemy {
             ctx.strokeStyle = 'rgba(255, 255, 255, 0.6)';
             ctx.strokeRect(-10, -10, 20, 20);
 
-            // 中心エネルギーコア (高輝度プラズマジェム)
             const gemGrad = ctx.createRadialGradient(0, 0, 1, 0, 0, 5);
             gemGrad.addColorStop(0.0, '#ffffff');
             gemGrad.addColorStop(0.4, this.isRed ? '#fb7185' : '#38bdf8');
@@ -754,7 +628,6 @@ class ZabEnemy extends Enemy {
             ctx.arc(0, 0, 4.5, 0, Math.PI * 2);
             ctx.fill();
 
-            // 頂点の光彩スパークル
             ctx.fillStyle = '#ffffff';
             ctx.fillRect(-1, -16, 2, 2);
             ctx.fillRect(15, -1, 2, 2);
@@ -764,20 +637,22 @@ class ZabEnemy extends Enemy {
 }
 
 // ------------------------------------------
-// ダッカー (DuckerEnemy: 大きくカタカタ歩行)
+// ダッカー (DuckerEnemy: 1985年アーケード版完全準拠)
+// 水色（シアン）の装甲ポッド胴体＋オレンジ色の逆関節2本脚で斜面に沿ってトコトコ走り、
+// 立ち止まって自機に狙いを定めて弾を発射し、また走り出す！
 // ------------------------------------------
 class DuckerEnemy extends Enemy {
-    constructor(x, y, isCeiling, isRed = false) {
+    constructor(x, y, isCeiling, isRed = false, moveDir = -1) {
         super(x, y, isRed);
-        this.width = 38;
+        this.width = 36;
         this.height = 34;
         this.isCeiling = isCeiling;
         this.walkCycle = 0;
         this.slopeAngle = 0;
         this.groundY = y;
-        this.moveDir = -1;
-        this.stopTimer = 0;
-        this.hp = 1; // 軽快に撃破してカプセル獲得
+        this.moveDir = moveDir; // -1: 左走行, +1: 左端から右へ追いかけてくる後方出現
+        this.stopTimer = Math.floor(Math.random() * 40);
+        this.hp = 1;
         this.shootCooldown = 0;
     }
 
@@ -795,25 +670,31 @@ class DuckerEnemy extends Enemy {
 
         if (activeTerrain) {
             const terrainScroll = activeTerrain.scrollSpeed;
-            
+
             this.stopTimer++;
-            if (this.stopTimer > 180 && this.stopTimer < 250) {
+            if (this.stopTimer > 75 && this.stopTimer < 120) {
+                // 立ち止まって照準＆射撃！
                 this.x -= terrainScroll;
                 this.shootCooldown++;
-                if (this.shootCooldown === 25 || this.shootCooldown === 50) {
+                if (this.shootCooldown === 18) {
                     this.shoot();
                 }
             } else {
-                if (this.stopTimer >= 250) {
+                if (this.stopTimer >= 120) {
                     this.stopTimer = 0;
                     this.shootCooldown = 0;
+                    // 自機を追い越したら反転して自機側へ向き直す本家AI
+                    if (typeof player !== 'undefined' && player) {
+                        if (this.x < player.x - 90) this.moveDir = 1;
+                        else if (this.x > player.x + 220) this.moveDir = -1;
+                    }
                 }
-                this.walkCycle += 0.2;
-                this.x += (this.moveDir * 1.1) - terrainScroll; // ゆっくり歩行
+                this.walkCycle += 0.32;
+                this.x += (this.moveDir * 1.8) - terrainScroll;
             }
 
             const centerX = this.x + this.width / 2;
-            const sampleDist = 16;
+            const sampleDist = 14;
 
             if (this.isCeiling) {
                 const yL = activeTerrain.getTopY(centerX - sampleDist);
@@ -838,14 +719,14 @@ class DuckerEnemy extends Enemy {
     shoot() {
         if (typeof player === 'undefined' || typeof enemyBullets === 'undefined') return;
         const centerX = this.x + this.width / 2;
-        const centerY = this.isCeiling ? this.groundY + 12 : this.groundY - 12;
+        const centerY = this.isCeiling ? this.groundY + 14 : this.groundY - 14;
 
         const dx = (player.x + player.width / 2) - centerX;
         const dy = (player.y + player.height / 2) - centerY;
         const dist = Math.sqrt(dx * dx + dy * dy) || 1;
 
-        if (dist < 600) {
-            const spd = 3.6;
+        if (dist < 680) {
+            const spd = 3.8;
             const bullet = new EnemyBullet(centerX, centerY, (dx / dist) * spd, (dy / dist) * spd);
             enemyBullets.push(bullet);
         }
@@ -853,133 +734,90 @@ class DuckerEnemy extends Enemy {
 
     draw(ctx) {
         ctx.save();
-        const centerX = this.x + this.width / 2;
-        ctx.translate(centerX, this.groundY);
+        const centerX = Math.round(this.x + this.width / 2);
+        ctx.translate(centerX, Math.round(this.groundY));
         ctx.rotate(this.slopeAngle);
         if (this.isCeiling) ctx.scale(1, -1);
+        if (this.moveDir > 0) ctx.scale(-1, 1);
 
-        const leg1 = Math.sin(this.walkCycle) * 8;
-        const leg2 = -leg1;
+        const stride = Math.sin(this.walkCycle) * 7;
+        const S = 2;
 
-        // --- メタリック油圧シリンダー脚部 ---
-        // 後ろ脚 (影側)
-        ctx.strokeStyle = '#1e293b';
+        // 1985年アーケード版「ダッカー」伝統のカラーリング：
+        // 通常機＝水色（シアン）ボディ＋オレンジ脚 / 赤カプセル機＝深紅ボディ＋イエロー脚
+        const cBodyLight = this.isRed ? '#fecdd3' : '#e0f2fe';
+        const cBodyMain  = this.isRed ? '#ef4444' : '#38bdf8';
+        const cBodyDark  = this.isRed ? '#991b1b' : '#0369a1';
+        const cLegMain   = this.isRed ? '#facc15' : '#f97316';
+        const cLegDark   = this.isRed ? '#ca8a04' : '#c2410c';
+
+        // 1. 奥側の逆関節脚（オレンジ暗色）
+        ctx.strokeStyle = cLegDark;
+        ctx.lineWidth = 3.5;
+        ctx.beginPath();
+        ctx.moveTo(2, -16);
+        ctx.lineTo(7 - stride * 0.6, -9);
+        ctx.lineTo(3 - stride, -1);
+        ctx.stroke();
+        ctx.fillStyle = cLegDark;
+        ctx.fillRect(-2 - stride, -3, 9, 3);
+
+        // 2. 砲身付き装甲ポッド胴体（前傾姿勢のドット絵フォルム）
+        // 下部シャドウ
+        ctx.fillStyle = cBodyDark;
+        ctx.fillRect(-7 * S, -13 * S, 14 * S, 6 * S);
+        // メイン水色（または赤）ボディ
+        ctx.fillStyle = cBodyMain;
+        ctx.fillRect(-6 * S, -15 * S, 12 * S, 6 * S);
+        ctx.fillRect(-8 * S, -12 * S, 4 * S, 3 * S); // 前方砲口ノーズ
+        // 上面ハイライト
+        ctx.fillStyle = cBodyLight;
+        ctx.fillRect(-5 * S, -15 * S, 9 * S, 2 * S);
+
+        // 3. 中央のオレンジ色キャノピーアイ＆砲身ディテール
+        ctx.fillStyle = '#090d16';
+        ctx.fillRect(-5 * S, -13 * S, 6 * S, 3 * S);
+        ctx.fillStyle = cLegMain;
+        ctx.fillRect(-4 * S, -12.5 * S, 4 * S, 2 * S);
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(-3.5 * S, -12.5 * S, 1.5 * S, 1 * S);
+
+        // 4. 手前側の逆関節脚（鮮やかなオレンジ色）
+        ctx.strokeStyle = cLegMain;
         ctx.lineWidth = 4;
         ctx.beginPath();
-        ctx.moveTo(8, -12);
-        ctx.lineTo(11 + leg2, -2);
-        ctx.lineTo(13 + leg2, 0);
+        ctx.moveTo(0, -15);
+        ctx.lineTo(5 + stride * 0.6, -8);
+        ctx.lineTo(1 + stride, -1);
         ctx.stroke();
-        // 後ろ足パッド
-        ctx.fillStyle = '#0f172a';
-        ctx.fillRect(8 + leg2, -3, 9, 3);
-
-        // 前脚 (光側・クロームシリンダー)
-        ctx.strokeStyle = '#334155';
-        ctx.lineWidth = 4.5;
-        ctx.beginPath();
-        ctx.moveTo(-8, -12);
-        ctx.lineTo(-10 + leg1, -2);
-        ctx.lineTo(-12 + leg1, 0);
-        ctx.stroke();
-        // 油圧ピストンハイライト
-        ctx.strokeStyle = '#cbd5e1';
-        ctx.lineWidth = 1.5;
-        ctx.beginPath();
-        ctx.moveTo(-8, -10);
-        ctx.lineTo(-10 + leg1, -3);
-        ctx.stroke();
-        // 前足パッド
-        ctx.fillStyle = '#1e293b';
-        ctx.fillRect(-16 + leg1, -3, 9, 3);
-
-        // 脚部ピボット関節
-        ctx.fillStyle = '#64748b';
-        ctx.beginPath();
-        ctx.arc(-8, -12, 3, 0, Math.PI * 2);
-        ctx.arc(8, -12, 3, 0, Math.PI * 2);
-        ctx.fill();
-
-        // --- 3D球面装甲ポッド胴体 ---
-        // Fast draw
-
-        const bodyGrad = ctx.createRadialGradient(-4, -23, 2, 0, -18, 14);
-        if (this.isRed) {
-            bodyGrad.addColorStop(0.0, '#ffffff');
-            bodyGrad.addColorStop(0.25, '#ff6b81');
-            bodyGrad.addColorStop(0.65, '#ee0033');
-            bodyGrad.addColorStop(0.92, '#88001b');
-            bodyGrad.addColorStop(1.0, '#3a000c');
-        } else {
-            bodyGrad.addColorStop(0.0, '#ffffff'); // 球面ハイライト
-            bodyGrad.addColorStop(0.25, '#cbd5e1'); // シルバー装甲
-            bodyGrad.addColorStop(0.65, '#64748b'); // スレート
-            bodyGrad.addColorStop(0.92, '#334155'); // 影
-            bodyGrad.addColorStop(1.0, '#0f172a');  // エッジリム
-        }
-        ctx.fillStyle = bodyGrad;
-        ctx.beginPath();
-        ctx.arc(0, -18, 14, 0, Math.PI * 2);
-        ctx.fill();
-
-        ctx.shadowColor = 'transparent';
-
-        // 装甲分割シーム＆リベット
-        ctx.strokeStyle = 'rgba(15, 23, 42, 0.85)';
-        ctx.lineWidth = 1;
-        ctx.beginPath();
-        ctx.arc(0, -18, 14, Math.PI * 0.15, Math.PI * 0.85);
-        ctx.stroke();
-
-        ctx.fillStyle = '#f1f5f9';
-        ctx.fillRect(-10, -14, 1.5, 1.5);
-        ctx.fillRect(8, -14, 1.5, 1.5);
-
-        // 頭頂部小型アンテナ
-        ctx.strokeStyle = '#64748b';
-        ctx.lineWidth = 1.5;
-        ctx.beginPath();
-        ctx.moveTo(0, -32);
-        ctx.lineTo(0, -37);
-        ctx.stroke();
-        ctx.fillStyle = '#00ffff';
-        ctx.fillRect(-1, -38, 2, 2);
-
-        // --- グラディウス伝統の深紅スキャナーバイザーアイ ---
-        // バイザーフレーム (暗色ベゼル)
-        ctx.fillStyle = '#05070e';
-        ctx.fillRect(-10, -22, 20, 7);
-
-        // 発光ルビースキャナー
-        const eyeGrad = ctx.createLinearGradient(-9, -21, 9, -21);
-        eyeGrad.addColorStop(0.0, '#990022');
-        eyeGrad.addColorStop(0.4, '#ff1155');
-        eyeGrad.addColorStop(0.7, '#ff4477');
-        eyeGrad.addColorStop(1.0, '#990022');
-        ctx.fillStyle = eyeGrad;
-        ctx.fillRect(-9, -21, 18, 5);
-
-        // 水平レーザーフレアスリット
-        ctx.fillStyle = '#ffffff';
-        ctx.fillRect(-4, -19.5, 9, 1.5);
+        // 関節リベット
+        ctx.fillStyle = cBodyLight;
+        ctx.fillRect(3 + stride * 0.6, -10, 3, 3);
+        // 足先の爪パッド
+        ctx.fillStyle = cLegMain;
+        ctx.fillRect(-4 + stride, -3, 10, 3);
 
         ctx.restore();
     }
 }
 
 // ------------------------------------------
-// ハッチャー (HatcherEnemy: 大きな母艦)
+// ダグム / スクランブルハッチ (HatcherEnemy: 1985年アーケード版完全準拠)
+// 地形に埋め込まれたドーム型スクランブルハッチ。
+// 左右のシャッターが観音開きに展開し、中から「ラッシュ（Rusha）」編隊が垂直発進→自機Y座標で水平突撃！
+// ※ミサイルが直撃すると本家同様一撃で破壊可能！
 // ------------------------------------------
 class HatcherEnemy extends Enemy {
-    constructor(x, y, isCeiling) {
-        super(x, y);
-        this.width = 54;
-        this.height = 38;
+    constructor(x, y, isCeiling, isRed = false) {
+        super(x, y, isRed);
+        this.width = 56;
+        this.height = 30;
         this.isCeiling = isCeiling;
-        this.hp = 7;
-        this.spawnTimer = 0;
+        this.hp = 6;
+        this.spawnTimer = 30;
         this.groundY = y;
         this.hatchOpen = false;
+        this.openRatio = 0; // 0.0(閉) 〜 1.0(全開)
     }
 
     update() {
@@ -1010,17 +848,20 @@ class HatcherEnemy extends Enemy {
         }
 
         this.spawnTimer++;
-        if (this.spawnTimer > 130 && this.spawnTimer < 180) {
+        if (this.spawnTimer >= 70 && this.spawnTimer <= 155) {
             this.hatchOpen = true;
-            if (this.spawnTimer % 20 === 0) {
+            this.openRatio = Math.min(1, this.openRatio + 0.12);
+            // 16フレームおきに4〜5機のラッシュ（スクランブル戦闘機）を垂直発進！
+            if (this.spawnTimer % 16 === 0 && this.x > 20 && this.x < 780) {
                 if (typeof enemies !== 'undefined') {
-                    const by = this.isCeiling ? this.groundY + 24 : this.groundY - 24;
-                    enemies.push(new BlasterEnemy(this.x + this.width / 2, by, this.isCeiling));
+                    const by = this.isCeiling ? this.groundY + 14 : this.groundY - 24;
+                    enemies.push(new BlasterEnemy(this.x + this.width / 2 - 14, by, this.isCeiling));
                 }
             }
         } else {
             this.hatchOpen = false;
-            if (this.spawnTimer >= 200) {
+            this.openRatio = Math.max(0, this.openRatio - 0.10);
+            if (this.spawnTimer >= 210) {
                 this.spawnTimer = 0;
             }
         }
@@ -1028,316 +869,280 @@ class HatcherEnemy extends Enemy {
 
     draw(ctx) {
         ctx.save();
-        ctx.translate(this.x + this.width / 2, this.groundY);
+        ctx.translate(Math.round(this.x + this.width / 2), Math.round(this.groundY));
         if (this.isCeiling) ctx.scale(1, -1);
 
-        // 重装甲バンカー外郭シャドウ
-        ctx.shadowColor = 'rgba(0, 0, 0, 0.7)';
-        ctx.shadowBlur = 8;
-        ctx.shadowOffsetX = 0;
-        ctx.shadowOffsetY = -2;
+        // 1985年アーケード版「ダグム（ハッチ）」のドーム型金属格納庫＆赤熱コア内部
+        // 1. 格納庫内部の暗黒ピット＆オレンジ赤熱発進カタパルト
+        ctx.fillStyle = '#090d16';
+        ctx.fillRect(-20, -24, 40, 24);
 
-        // メイン装甲傾斜プレート (メタリックグラデーション)
-        const bunkerGrad = ctx.createLinearGradient(0, -32, 0, 0);
-        bunkerGrad.addColorStop(0.0, '#94a3b8'); // 天面エッジ
-        bunkerGrad.addColorStop(0.2, '#64748b'); // 上部装甲
-        bunkerGrad.addColorStop(0.65, '#334155'); // 中間スレート
-        bunkerGrad.addColorStop(1.0, '#1e293b');  // 基礎部
-        ctx.fillStyle = bunkerGrad;
-        ctx.beginPath();
-        ctx.moveTo(-27, 0);
-        ctx.lineTo(-19, -32);
-        ctx.lineTo(19, -32);
-        ctx.lineTo(27, 0);
-        ctx.closePath();
-        ctx.fill();
+        if (this.openRatio > 0.05) {
+            const glowGrad = ctx.createLinearGradient(0, -22, 0, -2);
+            glowGrad.addColorStop(0.0, '#fde047');
+            glowGrad.addColorStop(0.5, '#ef4444');
+            glowGrad.addColorStop(1.0, '#7f1d1d');
+            ctx.fillStyle = glowGrad;
+            const innerW = Math.round(28 * this.openRatio);
+            ctx.fillRect(-innerW / 2, -20, innerW, 18);
 
-        ctx.shadowColor = 'transparent';
-
-        // 傾斜装甲のハイライトエッジ
-        ctx.strokeStyle = 'rgba(255, 255, 255, 0.7)';
-        ctx.lineWidth = 1;
-        ctx.beginPath();
-        ctx.moveTo(-27, 0);
-        ctx.lineTo(-19, -32);
-        ctx.lineTo(19, -32);
-        ctx.stroke();
-
-        ctx.strokeStyle = '#0f172a';
-        ctx.lineWidth = 1;
-        ctx.beginPath();
-        ctx.moveTo(19, -32);
-        ctx.lineTo(27, 0);
-        ctx.stroke();
-
-        // 左右の強化リブ・スリット
-        ctx.fillStyle = '#1e293b';
-        ctx.fillRect(-22, -18, 4, 12);
-        ctx.fillRect(18, -18, 4, 12);
-
-        // 基部インダストリアル・ハザードライン (黄＆黒の警告帯)
-        ctx.fillStyle = '#0f172a';
-        ctx.fillRect(-25, -4, 50, 4);
-        ctx.fillStyle = '#eab308';
-        ctx.fillRect(-21, -4, 6, 4);
-        ctx.fillRect(-9, -4, 6, 4);
-        ctx.fillRect(3, -4, 6, 4);
-        ctx.fillRect(15, -4, 6, 4);
-
-        // --- 中央ハッチ（格納庫・開閉ゲート） ---
-        // ハッチ開口部ピット (暗黒内部)
-        ctx.fillStyle = '#020617';
-        ctx.fillRect(-13, -30, 26, 14);
-
-        if (this.hatchOpen) {
-            // 格納庫内部の高輝度プラズマサージ (敵生成のシアン発光)
-            const plasmaGrad = ctx.createRadialGradient(0, -22, 1, 0, -22, 12);
-            plasmaGrad.addColorStop(0.0, '#ffffff');
-            plasmaGrad.addColorStop(0.4, '#38bdf8');
-            plasmaGrad.addColorStop(0.85, '#0284c7');
-            plasmaGrad.addColorStop(1.0, 'transparent');
-            ctx.fillStyle = plasmaGrad;
-            ctx.fillRect(-13, -30, 26, 14);
-
-            // 左右にスライド展開したブラストシールド扉
-            ctx.fillStyle = '#475569';
-            ctx.fillRect(-16, -31, 5, 15);
-            ctx.fillRect(11, -31, 5, 15);
-        } else {
-            // 閉鎖時の重金属ブラスト扉 (中央シール＆油圧シリンダー)
-            const doorGrad = ctx.createLinearGradient(-12, 0, 12, 0);
-            doorGrad.addColorStop(0.0, '#334155');
-            doorGrad.addColorStop(0.48, '#64748b');
-            doorGrad.addColorStop(0.5, '#0f172a');
-            doorGrad.addColorStop(0.52, '#64748b');
-            doorGrad.addColorStop(1.0, '#334155');
-            ctx.fillStyle = doorGrad;
-            ctx.fillRect(-12, -29, 24, 12);
-
-            // ロックバー
-            ctx.strokeStyle = '#94a3b8';
-            ctx.lineWidth = 1.2;
-            ctx.strokeRect(-12, -29, 24, 12);
+            // 内部メカスリット格子
+            ctx.fillStyle = '#450a0a';
+            for (let gy = -17; gy <= -6; gy += 5) {
+                ctx.fillRect(-innerW / 2, gy, innerW, 2);
+            }
         }
 
-        // 左右タクティカルセンサー・ビーコン (エメラルド・レッド)
-        ctx.fillStyle = '#00ffcc';
-        ctx.fillRect(-15, -12, 6, 4);
-        ctx.fillStyle = '#ff2244';
-        ctx.fillRect(9, -12, 6, 4);
+        // 2. 左右の台形ベースブロック（地形に密着する金属フレーム）
+        const cFrameMain = this.isRed ? '#ef4444' : '#94a3b8';
+        const cFrameDark = this.isRed ? '#7f1d1d' : '#334155';
+        const cFrameLight = this.isRed ? '#fecdd3' : '#e2e8f0';
 
-        // 天面ボルトリベット
-        ctx.fillStyle = '#cbd5e1';
-        ctx.fillRect(-17, -31, 1.5, 1.5);
-        ctx.fillRect(15, -31, 1.5, 1.5);
+        // 左ベース
+        ctx.fillStyle = cFrameDark;
+        ctx.beginPath();
+        ctx.moveTo(-28, 0);
+        ctx.lineTo(-22, -16);
+        ctx.lineTo(-14, -16);
+        ctx.lineTo(-14, 0);
+        ctx.closePath();
+        ctx.fill();
+        ctx.fillStyle = cFrameMain;
+        ctx.fillRect(-24, -12, 8, 10);
+
+        // 右ベース
+        ctx.fillStyle = cFrameDark;
+        ctx.beginPath();
+        ctx.moveTo(28, 0);
+        ctx.lineTo(22, -16);
+        ctx.lineTo(14, -16);
+        ctx.lineTo(14, 0);
+        ctx.closePath();
+        ctx.fill();
+        ctx.fillStyle = cFrameMain;
+        ctx.fillRect(16, -12, 8, 10);
+
+        // 3. 左右に観音開きするドームシャッター扉
+        const slideX = this.openRatio * 12;
+        const tiltAng = this.openRatio * 0.45;
+
+        // 左シャッター扉
+        ctx.save();
+        ctx.translate(-14 - slideX * 0.4, -14);
+        ctx.rotate(-tiltAng);
+        ctx.fillStyle = cFrameMain;
+        ctx.beginPath();
+        ctx.moveTo(-6, 12);
+        ctx.lineTo(-4, -10);
+        ctx.lineTo(14, -12);
+        ctx.lineTo(14, 12);
+        ctx.closePath();
+        ctx.fill();
+        ctx.fillStyle = cFrameLight;
+        ctx.fillRect(-2, -10, 14, 3);
+        ctx.strokeStyle = '#0f172a';
+        ctx.lineWidth = 1.5;
+        ctx.strokeRect(-4, -10, 18, 22);
+        ctx.restore();
+
+        // 右シャッター扉
+        ctx.save();
+        ctx.translate(14 + slideX * 0.4, -14);
+        ctx.rotate(tiltAng);
+        ctx.fillStyle = cFrameMain;
+        ctx.beginPath();
+        ctx.moveTo(6, 12);
+        ctx.lineTo(4, -10);
+        ctx.lineTo(-14, -12);
+        ctx.lineTo(-14, 12);
+        ctx.closePath();
+        ctx.fill();
+        ctx.fillStyle = cFrameLight;
+        ctx.fillRect(-12, -10, 14, 3);
+        ctx.strokeStyle = '#0f172a';
+        ctx.lineWidth = 1.5;
+        ctx.strokeRect(-14, -10, 18, 22);
+        ctx.restore();
+
+        // 接地ベースライン
+        ctx.fillStyle = '#1e293b';
+        ctx.fillRect(-28, -3, 56, 3);
 
         ctx.restore();
     }
 }
 
 // ------------------------------------------
-// ブラスター (BlasterEnemy: ポコポコゆっくり飛ぶドローン)
+// ラッシュ / スクランブル戦闘機 (BlasterEnemy / Rusha: 1985年アーケード版完全準拠)
+// ハッチ（ダグム）から真上（天井ハッチなら真下）へ垂直に飛び出し、
+// 自機（ビックバイパー）のY座標と同じ高さに到達すると直角に折れ曲がって左へ高速水平突撃する！
 // ------------------------------------------
 class BlasterEnemy extends Enemy {
     constructor(x, y, isCeiling) {
         super(x, y);
-        this.width = 24;
-        this.height = 24;
+        this.width = 28;
+        this.height = 22;
         this.hp = 1;
-        this.speedX = -2.0; // ゆっくり
-        this.speedY = isCeiling ? 1.0 : -1.0;
+        this.isCeiling = isCeiling;
+        this.phase = 'LAUNCH'; // 'LAUNCH' (垂直発進) -> 'RUSH' (水平突撃)
+        this.speedX = -0.8;
+        this.speedY = isCeiling ? 3.2 : -3.2;
+        this.launchTimer = 0;
     }
 
     update() {
-        this.x += this.speedX;
-        this.y += this.speedY;
-        this.speedY *= 0.97;
+        this.animTimer += 0.25;
+        if (this.phase === 'LAUNCH') {
+            this.launchTimer++;
+            this.x += this.speedX;
+            this.y += this.speedY;
+
+            // 自機のY座標と一致するか、一定高度に達したら水平突撃へ移行！
+            let shouldTurn = (this.launchTimer >= 42);
+            if (typeof player !== 'undefined' && player) {
+                const py = player.y + player.height / 2;
+                const cy = this.y + this.height / 2;
+                if (this.isCeiling && cy >= py - 8) shouldTurn = true;
+                if (!this.isCeiling && cy <= py + 8) shouldTurn = true;
+            }
+            if (this.launchTimer > 10 && shouldTurn) {
+                this.phase = 'RUSH';
+                this.speedX = -4.6;
+                this.speedY = 0;
+            }
+        } else {
+            this.x += this.speedX;
+            this.y += this.speedY;
+        }
     }
 
     draw(ctx) {
         ctx.save();
-        ctx.translate(this.x + this.width / 2, this.y + this.height / 2);
+        const cx = Math.round(this.x + this.width / 2);
+        const cy = Math.round(this.y + this.height / 2);
+        ctx.translate(cx, cy);
 
-        // 立体シャドウ
-        ctx.shadowColor = 'rgba(0, 0, 0, 0.6)';
-        ctx.shadowBlur = 5;
-        ctx.shadowOffsetX = -1;
-        ctx.shadowOffsetY = 2;
+        // 垂直発進中は上（または下）を向き、水平突撃時は左を向く本家「ラッシュ」スプライト！
+        if (this.phase === 'LAUNCH') {
+            ctx.rotate(this.isCeiling ? -Math.PI / 2 : Math.PI / 2);
+        }
 
-        // 3D球面メタリックドローン本体
-        const sphereGrad = ctx.createRadialGradient(-3, -3, 1, 0, 0, 11);
-        sphereGrad.addColorStop(0.0, '#ffffff'); // 球面ハイライト
-        sphereGrad.addColorStop(0.25, '#cbd5e1'); // シルバー
-        sphereGrad.addColorStop(0.65, '#64748b'); // 金属スレート
-        sphereGrad.addColorStop(0.9, '#334155');  // 影
-        sphereGrad.addColorStop(1.0, '#0f172a');  // エッジリム
-        ctx.fillStyle = sphereGrad;
-        ctx.beginPath();
-        ctx.arc(0, 0, 11, 0, Math.PI * 2);
-        ctx.fill();
+        const S = 2;
+        // 1985年アーケード版「ラッシュ」：シャープな小型デルタ迎撃機（青白＆オレンジバーニア）
+        ctx.fillStyle = '#0369a1';
+        ctx.fillRect(-4 * S, -5 * S, 9 * S, 10 * S);
+        ctx.fillStyle = '#7dd3fc';
+        ctx.fillRect(-6 * S, -3 * S, 11 * S, 6 * S);
+        ctx.fillStyle = '#f0f9ff';
+        ctx.fillRect(-7 * S, -1.5 * S, 9 * S, 3 * S);
 
-        ctx.shadowColor = 'transparent';
+        // レーザーキャノピー（オレンジ発光）
+        ctx.fillStyle = '#f97316';
+        ctx.fillRect(-2 * S, -1.5 * S, 3 * S, 3 * S);
 
-        // 赤道メカニカルグルーブ (スリット溝)
-        ctx.strokeStyle = '#0f172a';
-        ctx.lineWidth = 1;
-        ctx.beginPath();
-        ctx.ellipse(0, 0, 11, 3, 0, 0, Math.PI * 2);
-        ctx.stroke();
-
-        // 中央高精度光学カメラアイ (シアンレンズ)
-        const eyeGrad = ctx.createRadialGradient(1, -1, 0.5, 0, 0, 5);
-        eyeGrad.addColorStop(0.0, '#ffffff');
-        eyeGrad.addColorStop(0.3, '#38bdf8');
-        eyeGrad.addColorStop(0.75, '#0284c7');
-        eyeGrad.addColorStop(1.0, '#0c4a6e');
-        ctx.fillStyle = eyeGrad;
-        ctx.beginPath();
-        ctx.arc(0, 0, 4.5, 0, Math.PI * 2);
-        ctx.fill();
-
-        // レンズ反射ハイライト
-        ctx.fillStyle = '#ffffff';
-        ctx.fillRect(-1, -2, 1.8, 1.8);
+        // 後部ツインバーニア噴射
+        const flame = (Math.floor(this.animTimer * 2) % 2 === 0) ? 4 : 2;
+        ctx.fillStyle = '#fde047';
+        ctx.fillRect(5 * S, -2 * S, flame, 4 * S);
 
         ctx.restore();
     }
 }
 
 // ------------------------------------------
-// ルグラ (RugraEnemy: 大きめの迎撃戦闘機)
+// ルグル (RugraEnemy / Ruguru: 1985年アーケード版完全準拠)
+// 前方から編隊で飛来し、自機のY座標をしつこく上下にホーミング追尾してくる標準戦闘機！
+// 赤いルグルは撃破すると確実にパワーアップカプセルをドロップ！
 // ------------------------------------------
 class RugraEnemy extends Enemy {
-    constructor(x, y) {
-        super(x, y);
-        this.width = 50;
-        this.height = 28;
-        this.rushing = false;
-        this.waitTimer = 0;
+    constructor(x, y, isRed = false, delay = 0) {
+        super(x, y, isRed);
+        this.width = 38;
+        this.height = 26;
+        this.delay = delay;
+        this.visible = (delay <= 0);
+        this.vx = -3.1;
+        this.vy = 0;
     }
 
     update() {
-        if (!this.rushing) {
-            this.x -= 1.0;
-            this.waitTimer++;
-            if (typeof player !== 'undefined') {
-                if (Math.abs(player.y - this.y) < 50 || this.waitTimer > 90) {
-                    this.rushing = true;
-                }
+        if (this.delay > 0) {
+            this.delay--;
+            if (this.delay <= 0) {
+                this.visible = true;
+                this.x = 820;
             }
-        } else {
-            this.x -= 4.8; // 見応えのある適正なジェット突撃
-            this.animTimer += 0.25;
+            return;
+        }
+
+        this.animTimer += 0.22;
+        this.x += this.vx;
+
+        // 自機のY座標を滑らかに追尾する本家「ルグル」のホーミング挙動
+        if (typeof player !== 'undefined' && player && this.x > player.x - 40) {
+            const targetY = player.y + player.height / 2 - this.height / 2;
+            const dy = targetY - this.y;
+            if (Math.abs(dy) > 4) {
+                this.vy += (dy > 0 ? 0.14 : -0.14);
+                this.vy = Math.max(-2.1, Math.min(2.1, this.vy));
+            } else {
+                this.vy *= 0.9;
+            }
+        }
+        this.y += this.vy;
+
+        // 地形との干渉回避
+        if (typeof levelManager !== 'undefined' && levelManager.terrain && levelManager.terrain.active) {
+            const cx = this.x + this.width / 2;
+            const topY = levelManager.terrain.getTopY(cx);
+            const botY = levelManager.terrain.getBottomY(cx);
+            if (topY > 0 && this.y < topY + 8) {
+                this.y = topY + 8;
+                this.vy = Math.max(0, this.vy);
+            }
+            if (botY < 600 && this.y + this.height > botY - 8) {
+                this.y = botY - 8 - this.height;
+                this.vy = Math.min(0, this.vy);
+            }
         }
     }
 
     draw(ctx) {
+        if (!this.visible) return;
         ctx.save();
-        ctx.translate(this.x + this.width / 2, this.y + this.height / 2);
+        const cx = Math.round(this.x + this.width / 2);
+        const cy = Math.round(this.y + this.height / 2);
+        ctx.translate(cx, cy);
 
-        // 立体シャドウ
-        ctx.shadowColor = 'rgba(0, 0, 0, 0.65)';
-        ctx.shadowBlur = 6;
-        ctx.shadowOffsetX = -2;
-        ctx.shadowOffsetY = 2;
+        const S = 2;
+        // 1985年アーケード版「ルグル」：二股に分かれた鋭いノーズと前進翼を持つゼロス軍主力戦闘機！
+        const cLight = this.isRed ? '#fecdd3' : '#e0f2fe';
+        const cMain  = this.isRed ? '#ef4444' : '#60a5fa';
+        const cDark  = this.isRed ? '#991b1b' : '#1d4ed8';
+        const cCore  = this.isRed ? '#fde047' : '#f97316';
 
-        // 上半面 (光を受けるシルバー主翼)
-        const topGrad = ctx.createLinearGradient(0, -12, 0, 0);
-        topGrad.addColorStop(0.0, '#ffffff');
-        topGrad.addColorStop(0.3, '#cbd5e1');
-        topGrad.addColorStop(0.75, '#64748b');
-        topGrad.addColorStop(1.0, '#475569');
-        ctx.fillStyle = topGrad;
-        ctx.beginPath();
-        ctx.moveTo(24, 0);
-        ctx.lineTo(-18, -12);
-        ctx.lineTo(-10, 0);
-        ctx.closePath();
-        ctx.fill();
+        // 上下ウイング暗部
+        ctx.fillStyle = cDark;
+        ctx.fillRect(-5 * S, -6 * S, 11 * S, 12 * S);
+        // 前方に突き出たツインノーズ＆主翼
+        ctx.fillStyle = cMain;
+        ctx.fillRect(-9 * S, -4 * S, 15 * S, 3 * S);
+        ctx.fillRect(-9 * S, 1 * S, 15 * S, 3 * S);
+        ctx.fillRect(-4 * S, -2 * S, 11 * S, 4 * S);
+        // ハイライトライン
+        ctx.fillStyle = cLight;
+        ctx.fillRect(-8 * S, -3 * S, 10 * S, 1 * S);
+        ctx.fillRect(-8 * S, 1 * S, 10 * S, 1 * S);
 
-        // 下半面 (深い影のガンメタル主翼)
-        const btmGrad = ctx.createLinearGradient(0, 0, 0, 12);
-        btmGrad.addColorStop(0.0, '#334155');
-        btmGrad.addColorStop(0.65, '#1e293b');
-        btmGrad.addColorStop(1.0, '#0f172a');
-        ctx.fillStyle = btmGrad;
-        ctx.beginPath();
-        ctx.moveTo(24, 0);
-        ctx.lineTo(-10, 0);
-        ctx.lineTo(-18, 12);
-        ctx.closePath();
-        ctx.fill();
+        // 中央コックピットコア
+        ctx.fillStyle = cCore;
+        ctx.fillRect(-2 * S, -1.5 * S, 4 * S, 3 * S);
 
-        ctx.shadowColor = 'transparent';
+        // 後部スラスター炎
+        const flame = (Math.floor(this.animTimer * 2) % 2 === 0) ? 6 : 3;
+        ctx.fillStyle = '#fde047';
+        ctx.fillRect(6 * S, -2 * S, flame, 4 * S);
 
-        // 前縁ベベルエッジハイライト
-        ctx.strokeStyle = 'rgba(255, 255, 255, 0.75)';
-        ctx.lineWidth = 1;
-        ctx.beginPath();
-        ctx.moveTo(24, 0);
-        ctx.lineTo(-18, -12);
-        ctx.stroke();
-
-        ctx.strokeStyle = '#0f172a';
-        ctx.beginPath();
-        ctx.moveTo(24, 0);
-        ctx.lineTo(-18, 12);
-        ctx.stroke();
-
-        // 中央胴体装甲ブロック
-        const bodyGrad = ctx.createLinearGradient(-4, -4, 10, 4);
-        bodyGrad.addColorStop(0.0, '#e2e8f0');
-        bodyGrad.addColorStop(0.5, '#94a3b8');
-        bodyGrad.addColorStop(1.0, '#334155');
-        ctx.fillStyle = bodyGrad;
-        ctx.beginPath();
-        ctx.moveTo(14, 0);
-        ctx.lineTo(2, -4);
-        ctx.lineTo(-8, 0);
-        ctx.lineTo(2, 4);
-        ctx.closePath();
-        ctx.fill();
-
-        // キャノピー (シアン反射ガラス)
-        const canopyGrad = ctx.createLinearGradient(0, -2, 6, 2);
-        canopyGrad.addColorStop(0.0, '#ffffff');
-        canopyGrad.addColorStop(0.3, '#38bdf8');
-        canopyGrad.addColorStop(1.0, '#0284c7');
-        ctx.fillStyle = canopyGrad;
-        ctx.beginPath();
-        ctx.ellipse(3, 0, 5, 2, 0, 0, Math.PI * 2);
-        ctx.fill();
-
-        // アフターバーナー (突撃時は巨大超音速プラズマ噴射)
-        if (this.rushing) {
-            const flame = 18 + Math.sin(this.animTimer * 2) * 6;
-            // 外層オーラ
-            ctx.fillStyle = 'rgba(0, 220, 255, 0.85)';
-            ctx.beginPath();
-            ctx.moveTo(-10, -5);
-            ctx.lineTo(-10 - flame, 0);
-            ctx.lineTo(-10, 5);
-            ctx.closePath();
-            ctx.fill();
-            // 内層超高温コア
-            ctx.fillStyle = '#ffffff';
-            ctx.beginPath();
-            ctx.moveTo(-10, -2);
-            ctx.lineTo(-10 - flame * 0.6, 0);
-            ctx.lineTo(-10, 2);
-            ctx.closePath();
-            ctx.fill();
-        } else {
-            // 待機時の小型バーニア
-            const flame = 6 + Math.sin(this.animTimer * 1.5) * 3;
-            ctx.fillStyle = 'rgba(0, 220, 255, 0.7)';
-            ctx.beginPath();
-            ctx.moveTo(-10, -3);
-            ctx.lineTo(-10 - flame, 0);
-            ctx.lineTo(-10, 3);
-            ctx.closePath();
-            ctx.fill();
-        }
         ctx.restore();
     }
 }
@@ -1348,13 +1153,13 @@ class RugraEnemy extends Enemy {
 class Volcano extends Enemy {
     constructor(x, y, isErupting = true) {
         super(x, y);
-        this.width = 110;
-        this.height = 75;
+        this.width = 128;
+        this.height = 84;
         this.groundY = y;
         this.burstTimer = 0;
         this.isErupting = isErupting;
         this.magmaAnim = Math.random() * 10;
-        this.hp = 9999; // 破壊不能ギミック
+        this.hp = 99999; // 破壊不能な火山地形ギミック
     }
 
     update() {
@@ -1367,24 +1172,32 @@ class Volcano extends Enemy {
         }
 
         this.magmaAnim += 0.14;
-        this.burstTimer++;
 
-        // 画面内に火山が存在する間、本家同様にポコポコと岩石（火山弾）を連続噴射！
-        if (this.x > -80 && this.x < 850) {
-            // 約13フレーム（約0.22秒）ごとに1〜2個の火山弾を上空へ噴出！
-            if (this.burstTimer >= 13) {
+        // 1985年アーケード版：クライマックスの火山大噴火フェーズ（VOLCANO_ERUPTION）または噴火有効時に火山弾を噴出！
+        const isEruptPhase = (typeof levelManager !== 'undefined' && levelManager.state === 'VOLCANO_ERUPTION');
+        if ((this.isErupting || isEruptPhase) && this.x > -40 && this.x < 780) {
+            this.burstTimer++;
+            const interval = isEruptPhase ? 16 : 24;
+            if (this.burstTimer >= interval) {
                 this.burstTimer = 0;
                 if (typeof enemies !== 'undefined') {
-                    const count = Math.random() < 0.6 ? 1 : 2;
+                    const count = isEruptPhase ? (Math.random() < 0.65 ? 2 : 1) : 1;
                     for (let i = 0; i < count; i++) {
-                        const vx = (Math.random() - 0.58) * 3.8 - 0.9;
-                        const vy = -(Math.random() * 3.6 + 6.8); // 豪快に上空へ舞い上がる
-                        const size = Math.floor(Math.random() * 14) + 24; // 直径 24〜38px
-                        enemies.push(new VolcanoRock(this.x + this.width / 2 + (Math.random() - 0.5) * 22, this.groundY - this.height + 6, vx, vy, size));
+                        // 火口から左右（特に左側の自機方向）へ豪快な放物線を描いて降り注ぐ火山弾！
+                        const vx = (Math.random() - 0.64) * 5.2 - 0.8;
+                        const vy = -(Math.random() * 4.2 + 6.4);
+                        const size = Math.floor(Math.random() * 10) + 22; // 22〜32px
+                        enemies.push(new VolcanoRock(
+                            this.x + this.width / 2 + (Math.random() - 0.5) * 20 - size / 2,
+                            this.groundY - this.height + 4,
+                            vx,
+                            vy,
+                            size
+                        ));
                     }
                     if (typeof particles !== 'undefined') {
                         for (let p = 0; p < 3; p++) {
-                            particles.push(new Particle(this.x + this.width / 2, this.groundY - this.height + 4, Math.random() < 0.5 ? '#ff4400' : '#885533'));
+                            particles.push(new Particle(this.x + this.width / 2, this.groundY - this.height + 4, Math.random() < 0.5 ? '#ff4400' : '#b45309'));
                         }
                     }
                 }
@@ -1392,62 +1205,77 @@ class Volcano extends Enemy {
         }
     }
 
+    checkCollision(rect) {
+        if (!this.active) return false;
+        if (rect.x + rect.width < this.x + 12 || rect.x > this.x + this.width - 12) return false;
+        if (rect.y + rect.height < this.y + 6) return false;
+        const midX = this.x + this.width / 2;
+        const relX = Math.abs((rect.x + rect.width / 2) - midX);
+        const topHalf = 22;
+        const baseHalf = this.width / 2 - 8;
+        const ratio = Math.max(0, Math.min(1, (relX - topHalf) / (baseHalf - topHalf)));
+        const slopeY = (this.groundY - this.height + 6) + ratio * (this.height - 6);
+        return (rect.y + rect.height >= slopeY);
+    }
+
     draw(ctx) {
         ctx.save();
-        ctx.translate(this.x + this.width / 2, this.groundY);
+        const cx = Math.round(this.x + this.width / 2);
+        const gy = Math.round(this.groundY);
+        ctx.translate(cx, gy);
 
-        // 巨大火山の山体（重厚な溶岩岩盤グラデーション）
-        const mountainGrad = ctx.createLinearGradient(0, -this.height, 0, 0);
-        mountainGrad.addColorStop(0.0, '#3d1c06');
-        mountainGrad.addColorStop(0.4, '#54280b');
-        mountainGrad.addColorStop(0.8, '#2d1405');
-        mountainGrad.addColorStop(1.0, '#150902');
-        ctx.fillStyle = mountainGrad;
+        const h = this.height;
+        const w2 = this.width / 2;
+        const isEruptPhase = (typeof levelManager !== 'undefined' && levelManager.state === 'VOLCANO_ERUPTION');
 
+        // 1985年アーケード版1面クライマックスの「二連火山」：
+        // 茶褐色〜黄土色の階段状ドット絵の稜線と縦スジの岩肌を持つ火山コーン！
+        ctx.fillStyle = '#381800';
         ctx.beginPath();
-        ctx.moveTo(-this.width / 2, 0);
-        ctx.lineTo(-28, -this.height);
-        ctx.lineTo(28, -this.height);
-        ctx.lineTo(this.width / 2, 0);
+        ctx.moveTo(-w2, 4);
+        ctx.lineTo(-24, -h);
+        ctx.lineTo(24, -h);
+        ctx.lineTo(w2, 4);
         ctx.closePath();
         ctx.fill();
 
-        ctx.strokeStyle = '#150902';
-        ctx.lineWidth = 2.5;
-        ctx.stroke();
+        // 段々になったピクセル山肌レイヤー
+        const steps = 10;
+        for (let i = 0; i < steps; i++) {
+            const t0 = i / steps;
+            const t1 = (i + 1) / steps;
+            const y0 = Math.round(-h + t0 * h);
+            const y1 = Math.round(-h + t1 * h) + 2;
+            const hw0 = Math.round(22 + t0 * (w2 - 22));
+            // 外枠の暗褐色
+            ctx.fillStyle = '#5c2804';
+            ctx.fillRect(-hw0, y0, hw0 * 2, y1 - y0);
+            // 内側の中間茶色
+            ctx.fillStyle = '#9c4c14';
+            ctx.fillRect(-hw0 + 6, y0, (hw0 - 6) * 2, y1 - y0);
+            // 中央ハイライト（黄土色〜オレンジブラウンの縦畝）
+            ctx.fillStyle = '#d07828';
+            ctx.fillRect(-hw0 + 14, y0, Math.max(8, (hw0 - 18) * 1.2), y1 - y0);
+            // 縦の岩盤溝（黒褐色のストライプ）
+            ctx.fillStyle = '#381800';
+            for (let sx = -hw0 + 10; sx < hw0 - 8; sx += 12) {
+                ctx.fillRect(sx, y0, 3, y1 - y0);
+            }
+        }
 
-        // 山肌の溶岩亀裂（赤く脈動するマグマライン）
-        ctx.strokeStyle = `rgba(255, 68, 0, ${0.6 + Math.sin(this.magmaAnim) * 0.3})`;
-        ctx.lineWidth = 2;
-        ctx.beginPath();
-        ctx.moveTo(-12, -this.height + 8);
-        ctx.lineTo(-18, -this.height * 0.4);
-        ctx.lineTo(-30, 0);
-        ctx.moveTo(10, -this.height + 6);
-        ctx.lineTo(16, -this.height * 0.5);
-        ctx.lineTo(28, 0);
-        ctx.stroke();
-
-        // 火口の白熱マグマ溜まり（激しく煮え滾る溶岩）
-        const glow = Math.sin(this.magmaAnim * 2) * 0.25 + 0.75;
-        ctx.shadowColor = '#ff3300';
-        ctx.shadowBlur = 16 * glow;
-
-        const magmaGrad = ctx.createLinearGradient(0, -this.height, 0, -this.height + 14);
-        magmaGrad.addColorStop(0.0, '#ffffff');
-        magmaGrad.addColorStop(0.3, '#ffaa00');
-        magmaGrad.addColorStop(0.8, '#ff2200');
-        magmaGrad.addColorStop(1.0, '#660000');
-        ctx.fillStyle = magmaGrad;
-
-        ctx.beginPath();
-        ctx.ellipse(0, -this.height + 4, 27, 8, 0, 0, Math.PI * 2);
-        ctx.fill();
+        // 火口リム（噴火中は赤〜黄色に明滅）
+        const flash = (isEruptPhase || this.isErupting) && (Math.floor(this.magmaAnim * 2) % 2 === 0);
+        ctx.fillStyle = flash ? '#f8b830' : '#d86818';
+        ctx.fillRect(-24, -h, 48, 6);
+        ctx.fillStyle = flash ? '#ff3300' : '#7c2400';
+        ctx.fillRect(-18, -h + 2, 36, 6);
+        ctx.fillStyle = '#240800';
+        ctx.fillRect(-12, -h + 5, 24, 5);
 
         ctx.restore();
     }
 }
-// 超巨大火山 (SuperVolcano: 1面ボスクライマックス用・画面停止30秒サバイバル)
+// 超巨大火山 (SuperVolcano: 互換維持用)
 // ------------------------------------------
 class SuperVolcano extends Enemy {
     constructor(x, y) {
@@ -1490,7 +1318,6 @@ class SuperVolcano extends Enemy {
                 this.positioned = true;
             }
         } else if (!this.erupting) {
-            // サバイバル終了後・退場フェーズ: 地形停止やボス戦に関わらず確実に左へ流して退場
             let exitSpeed = Math.max(scrollSpeed, 4.5);
             if (typeof levelManager !== 'undefined' && (levelManager.state === 'BOSS' || levelManager.state === 'STAGE_CLEAR')) {
                 exitSpeed = Math.max(exitSpeed, 6.0);
@@ -1512,24 +1339,18 @@ class SuperVolcano extends Enemy {
 
         if (this.erupting) {
             this.burstTimer++;
-            // 毎11フレーム（約0.18秒）ごとに豪快な火砕流・大量火山弾を噴射！
             if (this.burstTimer > 11) {
                 this.burstTimer = 0;
                 if (typeof enemies !== 'undefined') {
-                    const count = Math.floor(Math.random() * 4) + 3; // 3〜6個
+                    const count = Math.floor(Math.random() * 4) + 3;
                     const craterY = this.groundY - this.height + 6;
                     for (let i = 0; i < count; i++) {
-                        const sizes = [18, 28, 40];
+                        const sizes = [18, 24, 30];
                         const s = sizes[Math.floor(Math.random() * sizes.length)];
-                        const vx = (Math.random() - 0.72) * 6.5 - 1.2; // 画面左〜中央へ広く降り注ぐ
-                        const vy = - (Math.random() * 6.2 + 6.8); // 画面上端をはるかに超える大噴煙弾
+                        const vx = (Math.random() - 0.72) * 6.5 - 1.2;
+                        const vy = - (Math.random() * 6.2 + 6.8);
                         const spawnX = this.x + this.width / 2 + (Math.random() - 0.5) * 45;
                         enemies.push(new VolcanoRock(spawnX, craterY, vx, vy, s));
-                    }
-                    if (typeof particles !== 'undefined') {
-                        for (let p = 0; p < 8; p++) {
-                            particles.push(new Particle(this.x + this.width / 2, craterY, Math.random() < 0.6 ? '#ff3300' : '#333333'));
-                        }
                     }
                 }
             }
@@ -1537,87 +1358,32 @@ class SuperVolcano extends Enemy {
     }
 
     checkCollision(rect) {
-        // 山体との大まかな台形衝突判定
         if (!this.active) return false;
         if (rect.x + rect.width < this.x || rect.x > this.x + this.width) return false;
         if (rect.y + rect.height < this.y) return false;
-
-        // 火山台形の内側判定
         const midX = this.x + this.width / 2;
         const relX = Math.abs((rect.x + rect.width / 2) - midX);
-        const topRatio = 40 / (this.width / 2);
         const slopeY = this.groundY - this.height * (1 - Math.max(0, (relX - 40) / (this.width / 2 - 40)));
         return (rect.y + rect.height >= slopeY);
     }
 
     draw(ctx) {
-        ctx.save();
-        ctx.translate(this.x + this.width / 2, this.groundY);
-
-        // 1. 超巨大な火山山体（重厚な黒褐色の火山岩盤）
-        const mountainGrad = ctx.createLinearGradient(0, -this.height, 0, 0);
-        mountainGrad.addColorStop(0.0, '#421f06');
-        mountainGrad.addColorStop(0.35, '#5c2a08');
-        mountainGrad.addColorStop(0.7, '#331705');
-        mountainGrad.addColorStop(1.0, '#1a0b02');
-        ctx.fillStyle = mountainGrad;
-
-        ctx.beginPath();
-        ctx.moveTo(-this.width / 2, 0);
-        ctx.lineTo(-40, -this.height);
-        ctx.lineTo(40, -this.height);
-        ctx.lineTo(this.width / 2, 0);
-        ctx.closePath();
-        ctx.fill();
-
-        ctx.strokeStyle = '#1a0b02';
-        ctx.lineWidth = 3;
-        ctx.stroke();
-
-        // 2. 山肌を走る赤熱マグマの亀裂
-        ctx.strokeStyle = `rgba(255, 68, 0, ${0.7 + Math.sin(this.magmaAnim) * 0.3})`;
-        ctx.lineWidth = 2.5;
-        ctx.beginPath();
-        ctx.moveTo(-20, -this.height + 12);
-        ctx.lineTo(-30, -this.height * 0.45);
-        ctx.lineTo(-55, 0);
-        ctx.moveTo(15, -this.height + 10);
-        ctx.lineTo(28, -this.height * 0.55);
-        ctx.lineTo(50, 0);
-        ctx.stroke();
-
-        // 3. 巨大火口の超高温マグマ湖（白熱・黄金・深紅）
-        const glow = Math.sin(this.magmaAnim * 2) * 0.3 + 0.7;
-        ctx.shadowColor = '#ff2200';
-        ctx.shadowBlur = 24 * glow;
-
-        const magmaGrad = ctx.createLinearGradient(0, -this.height - 4, 0, -this.height + 22);
-        magmaGrad.addColorStop(0.0, '#ffffff');
-        magmaGrad.addColorStop(0.25, '#ffe500');
-        magmaGrad.addColorStop(0.65, '#ff4400');
-        magmaGrad.addColorStop(1.0, '#880000');
-        ctx.fillStyle = magmaGrad;
-
-        ctx.beginPath();
-        ctx.ellipse(0, -this.height + 6, 38, 12, 0, 0, Math.PI * 2);
-        ctx.fill();
-
-        ctx.restore();
+        Volcano.prototype.draw.call(this, ctx);
     }
 }
 
 class VolcanoRock extends Enemy {
-    constructor(x, y, vx, vy, size = 30) {
+    constructor(x, y, vx, vy, size = 24) {
         super(x, y);
         this.size = size;
         this.width = size;
         this.height = size;
         this.vx = vx;
         this.vy = vy;
-        this.gravity = 0.14; // 放物線を描く重力
-        this.hp = size > 35 ? 2 : 1;
+        this.gravity = 0.13; // 本家アーケード版のゆったりとした放物線軌道
+        this.hp = 1; // ショット・レーザー・オプションで小気味よく破壊可能！
         this.rot = 0;
-        this.rotSpd = (Math.random() - 0.5) * 0.2;
+        this.rotSpd = (Math.random() < 0.5 ? 1 : -1) * 0.12;
     }
 
     update() {
@@ -1626,15 +1392,19 @@ class VolcanoRock extends Enemy {
         this.vy += this.gravity;
         this.rot += this.rotSpd;
 
-        // 画面外または地面接触で消滅
+        // 画面外または上下地形接触で消滅
         if (this.y > 620 || this.x < -120 || this.x > 950) {
             this.active = false;
             return;
         }
 
         if (typeof levelManager !== 'undefined' && levelManager.terrain && levelManager.terrain.active) {
-            const ground = levelManager.terrain.getBottomY(this.x);
-            if (this.y + this.height >= ground) {
+            const cx = this.x + this.width / 2;
+            const ground = levelManager.terrain.getBottomY(cx);
+            const ceiling = levelManager.terrain.getTopY(cx);
+            if (this.vy > 0 && this.y + this.height >= ground) {
+                this.active = false;
+            } else if (this.vy < 0 && ceiling > 0 && this.y <= ceiling) {
                 this.active = false;
             }
         }
@@ -1642,121 +1412,112 @@ class VolcanoRock extends Enemy {
 
     draw(ctx) {
         ctx.save();
-        ctx.translate(this.x + this.width / 2, this.y + this.height / 2);
-        ctx.rotate(this.rot);
+        const cx = Math.round(this.x + this.width / 2);
+        const cy = Math.round(this.y + this.height / 2);
+        ctx.translate(cx, cy);
 
-        const rBase = this.size / 2;
+        // 1985年アーケード版のドット絵「火山弾（岩塊）」：
+        // 茶褐色〜オレンジ黄土色のゴツゴツしたピクセル岩塊が90度単位で回転しながら飛来する！
+        const stepRot = Math.floor(this.rot * 2) * (Math.PI / 2);
+        ctx.rotate(stepRot);
 
-        // 火山弾の外郭グロー
-        ctx.shadowColor = 'rgba(255, 80, 0, 0.75)';
-        ctx.shadowBlur = Math.max(6, rBase * 0.6);
+        const s = Math.max(2, Math.round(this.size / 12));
+        // 暗褐色の外郭シルエット
+        ctx.fillStyle = '#481c04';
+        ctx.fillRect(-5 * s, -4 * s, 10 * s, 8 * s);
+        ctx.fillRect(-4 * s, -5 * s, 8 * s, 10 * s);
 
-        // 白熱溶岩ボール (中心の超高温コアから外側の冷却玄武岩まで)
-        const magmaGrad = ctx.createRadialGradient(rBase * 0.15, -rBase * 0.15, 1, 0, 0, rBase);
-        magmaGrad.addColorStop(0.0, '#ffffff'); // 超高温白熱コア
-        magmaGrad.addColorStop(0.25, '#ffe555'); // 灼熱イエロー
-        magmaGrad.addColorStop(0.55, '#ea580c'); // 溶融オレンジ
-        magmaGrad.addColorStop(0.85, '#991b1b'); // 深紅マグマ
-        magmaGrad.addColorStop(1.0, '#1c1917');  // 冷却黒玄武岩
+        // 中間茶色の岩肌
+        ctx.fillStyle = '#9c4c14';
+        ctx.fillRect(-4 * s, -4 * s, 8 * s, 7 * s);
+        ctx.fillRect(-3 * s, -4 * s, 7 * s, 8 * s);
 
-        ctx.fillStyle = magmaGrad;
-        ctx.beginPath();
-        const points = 8;
-        for (let i = 0; i < points; i++) {
-            const angle = (i / points) * Math.PI * 2;
-            const r = rBase * (0.85 + ((i % 2 === 0) ? 0.2 : -0.1));
-            const px = Math.cos(angle) * r;
-            const py = Math.sin(angle) * r;
-            if (i === 0) ctx.moveTo(px, py);
-            else ctx.lineTo(px, py);
-        }
-        ctx.closePath();
-        ctx.fill();
+        // 明部（オレンジ黄土色の細胞状ハイライト）
+        ctx.fillStyle = '#df8428';
+        ctx.fillRect(-3 * s, -3 * s, 3 * s, 3 * s);
+        ctx.fillRect(1 * s, -2 * s, 2 * s, 3 * s);
+        ctx.fillRect(-2 * s, 1 * s, 3 * s, 2 * s);
 
-        ctx.moveTo(-4, -6);
-        ctx.lineTo(2, -2);
-        ctx.lineTo(7, 3);
-        ctx.moveTo(1, -2);
-        ctx.lineTo(-3, 6);
-        ctx.stroke();
+        // 最も明るい黄色のハイライトドット
+        ctx.fillStyle = '#f8c850';
+        ctx.fillRect(-2 * s, -3 * s, 2 * s, 1 * s);
+        ctx.fillRect(1 * s, -1 * s, 1 * s, 1 * s);
+
+        // 岩の亀裂（黒ドット）
+        ctx.fillStyle = '#240c00';
+        ctx.fillRect(0, -1 * s, 1 * s, 2 * s);
+        ctx.fillRect(-2 * s, 0, 2 * s, 1 * s);
 
         ctx.restore();
     }
 }
 
 // ------------------------------------------
-// 砲台 (TurretEnemy: 大きく堂々とした重砲台)
+// 砲台 (TurretEnemy / ディー01: 1985年アーケード版完全準拠)
+// 地形や浮き岩に設置された固定砲台。自機の方向に応じて段階的に砲身の角度を変え、白い敵弾を発射！
 // ------------------------------------------
 class TurretEnemy extends Enemy {
-    constructor(x, y, isCeiling, isRed = false) {
+    constructor(x, y, isCeiling, isRed = false, parentIsland = null, relX = 0) {
         super(x, y, isRed);
-        this.width = 38;
-        this.height = 32;
+        this.width = 32;
+        this.height = 28;
         this.isCeiling = isCeiling;
-        this.shootTimer = Math.floor(Math.random() * 60);
-        this.hp = 1; // 軽快に撃破してカプセル獲得
+        this.parentIsland = parentIsland;
+        this.relX = relX;
+        this.shootTimer = Math.floor(Math.random() * 55) + 25;
+        this.hp = 1;
         this.slopeAngle = 0;
         this.groundY = y;
-        this.barrelAngle = Math.PI; // デフォルトは左向き
+        this.barrelAngle = Math.PI;
     }
 
     update() {
-        if (typeof levelManager !== 'undefined' && levelManager.stage === 2 && typeof stonehengeStage !== 'undefined' && stonehengeStage && stonehengeStage.active) {
+        if (this.parentIsland) {
+            if (!this.parentIsland.active) {
+                this.active = false;
+                return;
+            }
+            this.x = this.parentIsland.x + this.relX;
+            if (this.isCeiling) {
+                this.groundY = this.parentIsland.y + this.parentIsland.height;
+                this.y = this.groundY;
+            } else {
+                this.groundY = this.parentIsland.y;
+                this.y = this.groundY - this.height;
+            }
+            this.slopeAngle = 0;
+        } else if (typeof levelManager !== 'undefined' && levelManager.stage === 2 && typeof stonehengeStage !== 'undefined' && stonehengeStage && stonehengeStage.active) {
             this.x -= stonehengeStage.scrollSpeed;
         } else if (typeof levelManager !== 'undefined' && levelManager.stage === 4 && window.stage4 && window.stage4.terrain && window.stage4.terrain.wallActive) {
             this.x -= window.stage4.terrain.scrollSpeed;
             const centerX = this.x + this.width / 2;
-            const sampleDist = 18;
-
-            if (this.isCeiling) {
-                const yL = window.stage4.terrain.getTopY(centerX - sampleDist);
-                const yR = window.stage4.terrain.getTopY(centerX + sampleDist);
-                const yC = window.stage4.terrain.getTopY(centerX);
-                this.slopeAngle = Math.atan2(yR - yL, sampleDist * 2);
-                this.groundY = yC;
-                this.y = yC;
-            } else {
-                const yL = window.stage4.terrain.getBottomY(centerX - sampleDist);
-                const yR = window.stage4.terrain.getBottomY(centerX + sampleDist);
-                const yC = window.stage4.terrain.getBottomY(centerX);
-                this.slopeAngle = Math.atan2(yR - yL, sampleDist * 2);
-                this.groundY = yC;
-                this.y = yC - this.height;
-            }
+            const yC = this.isCeiling ? window.stage4.terrain.getTopY(centerX) : window.stage4.terrain.getBottomY(centerX);
+            this.groundY = yC;
+            this.y = this.isCeiling ? yC : (yC - this.height);
+            this.slopeAngle = 0;
         } else if (typeof levelManager !== 'undefined' && levelManager.terrain && levelManager.terrain.active) {
             this.x -= levelManager.terrain.scrollSpeed;
             const centerX = this.x + this.width / 2;
-            const sampleDist = 18;
-
-            if (this.isCeiling) {
-                const yL = levelManager.terrain.getTopY(centerX - sampleDist);
-                const yR = levelManager.terrain.getTopY(centerX + sampleDist);
-                const yC = levelManager.terrain.getTopY(centerX);
-                this.slopeAngle = Math.atan2(yR - yL, sampleDist * 2);
-                this.groundY = yC;
-                this.y = yC;
-            } else {
-                const yL = levelManager.terrain.getBottomY(centerX - sampleDist);
-                const yR = levelManager.terrain.getBottomY(centerX + sampleDist);
-                const yC = levelManager.terrain.getBottomY(centerX);
-                this.slopeAngle = Math.atan2(yR - yL, sampleDist * 2);
-                this.groundY = yC;
-                this.y = yC - this.height;
-            }
+            const yC = this.isCeiling ? levelManager.terrain.getTopY(centerX) : levelManager.terrain.getBottomY(centerX);
+            this.groundY = yC;
+            this.y = this.isCeiling ? yC : (yC - this.height);
+            this.slopeAngle = 0;
         } else {
             this.x -= this.speed;
         }
 
-        // 自機方向への砲身トラッキング
-        if (typeof player !== 'undefined') {
+        // 自機方向への段階的砲身トラッキング（本家ディー01の5段階アングル）
+        if (typeof player !== 'undefined' && player) {
             const centerX = this.x + this.width / 2;
             const centerY = this.isCeiling ? this.groundY + 12 : this.groundY - 12;
-            const targetAngle = Math.atan2(player.y - centerY, player.x - centerX);
-            this.barrelAngle = targetAngle;
+            const rawAngle = Math.atan2((player.y + player.height / 2) - centerY, (player.x + player.width / 2) - centerX);
+            // 15度刻みにクォンタイズしてアーケードらしい段階旋回にする
+            const step = Math.PI / 8;
+            this.barrelAngle = Math.round(rawAngle / step) * step;
         }
 
         this.shootTimer++;
-        if (this.shootTimer > 160) {
+        if (this.shootTimer > 135) {
             this.shootTimer = 0;
             this.shoot();
         }
@@ -1764,6 +1525,7 @@ class TurretEnemy extends Enemy {
 
     shoot() {
         if (typeof player === 'undefined' || typeof enemyBullets === 'undefined') return;
+        if (this.x < 20 || this.x > 770) return;
         const centerX = this.x + this.width / 2;
         const centerY = this.isCeiling ? this.groundY + 14 : this.groundY - 14;
 
@@ -1771,134 +1533,61 @@ class TurretEnemy extends Enemy {
         const dy = (player.y + player.height / 2) - centerY;
         const dist = Math.sqrt(dx * dx + dy * dy);
 
-        if (dist > 0 && dist < 650) {
-            const speed = 3.5;
-            // グラディウス伝統の陰影のある白い球体弾
+        if (dist > 0 && dist < 640) {
+            const speed = 3.2;
             const bullet = new EnemyBullet(centerX, centerY, (dx / dist) * speed, (dy / dist) * speed);
             enemyBullets.push(bullet);
-
-            if (typeof particles !== 'undefined') {
-                for (let i = 0; i < 4; i++) {
-                    particles.push(new Particle(centerX, centerY, '#ffffff'));
-                }
-            }
         }
     }
 
     draw(ctx) {
         ctx.save();
-        const centerX = this.x + this.width / 2;
-        ctx.translate(centerX, this.groundY);
-        ctx.rotate(this.slopeAngle);
+        const centerX = Math.round(this.x + this.width / 2);
+        const groundY = Math.round(this.groundY);
+        ctx.translate(centerX, groundY);
         if (this.isCeiling) ctx.scale(1, -1);
 
-        // --- 強化基礎マウント (重金属ベースプレート) ---
-        const baseGrad = ctx.createLinearGradient(-23, 0, 23, 0);
-        baseGrad.addColorStop(0.0, '#1e293b');
-        baseGrad.addColorStop(0.25, '#475569');
-        baseGrad.addColorStop(0.5, '#64748b');
-        baseGrad.addColorStop(0.75, '#475569');
-        baseGrad.addColorStop(1.0, '#0f172a');
-        ctx.fillStyle = baseGrad;
-        ctx.beginPath();
-        ctx.ellipse(0, 0, 23, 6, 0, 0, Math.PI * 2);
-        ctx.fill();
+        const S = 2;
+        const cLight = this.isRed ? '#fecdd3' : '#e2e8f0';
+        const cMain  = this.isRed ? '#ef4444' : '#94a3b8';
+        const cDark  = this.isRed ? '#991b1b' : '#334155';
+        const cCore  = this.isRed ? '#fde047' : '#38bdf8';
 
-        ctx.strokeStyle = 'rgba(255, 255, 255, 0.6)';
-        ctx.lineWidth = 1;
-        ctx.stroke();
-
-        // ベースボルト
-        ctx.fillStyle = '#cbd5e1';
-        ctx.fillRect(-18, -2, 2, 2);
-        ctx.fillRect(16, -2, 2, 2);
-
-        // --- メタリック旋回重砲身 ---
-        // 砲台ドーム中心 (-12px) から自機方向へ砲身を描画
+        // 1. 砲身（ドーム奥から段階的な角度で突き出るドット絵砲身）
         ctx.save();
-        ctx.translate(0, -12);
-        // 天井設置時は上下反転しているため角度を調整
+        ctx.translate(0, -6 * S);
         const effectiveAngle = this.isCeiling ? -this.barrelAngle : this.barrelAngle;
         ctx.rotate(effectiveAngle);
-
-        // 砲身シリンダーグラデーション (円筒メタリック光沢)
-        const barrelGrad = ctx.createLinearGradient(0, -5, 0, 5);
-        barrelGrad.addColorStop(0.0, '#0f172a');
-        barrelGrad.addColorStop(0.3, '#94a3b8');
-        barrelGrad.addColorStop(0.6, '#cbd5e1');
-        barrelGrad.addColorStop(1.0, '#1e293b');
-        ctx.fillStyle = barrelGrad;
-        ctx.fillRect(4, -4.5, 24, 9);
-
-        // マズルブレーキ (先端リングカラー)
-        ctx.fillStyle = '#475569';
-        ctx.fillRect(23, -6, 5, 12);
-        ctx.strokeStyle = '#cbd5e1';
-        ctx.lineWidth = 1;
-        ctx.strokeRect(23, -6, 5, 12);
-
-        // 砲口 (黒穴)
-        ctx.fillStyle = '#020617';
-        ctx.fillRect(27, -3.5, 2, 7);
-
+        ctx.fillStyle = cDark;
+        ctx.fillRect(2 * S, -2.5 * S, 11 * S, 5 * S);
+        ctx.fillStyle = cMain;
+        ctx.fillRect(2 * S, -1.5 * S, 10 * S, 3 * S);
+        ctx.fillStyle = cLight;
+        ctx.fillRect(3 * S, -1.5 * S, 8 * S, 1 * S);
+        // 砲口リング
+        ctx.fillStyle = cLight;
+        ctx.fillRect(11 * S, -2.5 * S, 2 * S, 5 * S);
         ctx.restore();
 
-        // --- 3D球面装甲砲塔ドーム ---
-        ctx.shadowColor = 'rgba(0, 0, 0, 0.7)';
-        ctx.shadowBlur = 6;
-        ctx.shadowOffsetX = 0;
-        ctx.shadowOffsetY = -2;
+        // 2. 階段状の台座マウント（接地ベース）
+        ctx.fillStyle = cDark;
+        ctx.fillRect(-8 * S, -3 * S, 16 * S, 3 * S);
+        ctx.fillStyle = cMain;
+        ctx.fillRect(-7 * S, -3 * S, 14 * S, 2 * S);
 
-        const domeGrad = ctx.createRadialGradient(-4, -20, 2, 0, -12, 16);
-        if (this.isRed) {
-            domeGrad.addColorStop(0.0, '#ffffff'); // ハイライト
-            domeGrad.addColorStop(0.25, '#ff6b81'); // 鮮烈なルビーレッド
-            domeGrad.addColorStop(0.65, '#ee0033'); // 深紅
-            domeGrad.addColorStop(0.9, '#88001b');  // 影
-            domeGrad.addColorStop(1.0, '#3a000c');  // エッジリム
-        } else {
-            domeGrad.addColorStop(0.0, '#ffffff'); // 球面ハイライト
-            domeGrad.addColorStop(0.25, '#cbd5e1'); // シルバー合金
-            domeGrad.addColorStop(0.65, '#64748b'); // 金属スレート
-            domeGrad.addColorStop(0.9, '#334155');  // 影
-            domeGrad.addColorStop(1.0, '#0f172a');  // エッジリム
-        }
-        ctx.fillStyle = domeGrad;
-        ctx.beginPath();
-        ctx.arc(0, -12, 16, Math.PI, 0);
-        ctx.closePath();
-        ctx.fill();
+        // 3. 半円ドーム型の装甲ボディ（1985年アーケード版「ディー01」）
+        ctx.fillStyle = cDark;
+        ctx.fillRect(-6 * S, -8 * S, 12 * S, 5 * S);
+        ctx.fillRect(-4 * S, -10 * S, 8 * S, 2 * S);
+        ctx.fillStyle = cMain;
+        ctx.fillRect(-5 * S, -7 * S, 10 * S, 4 * S);
+        ctx.fillRect(-3 * S, -9 * S, 6 * S, 2 * S);
+        ctx.fillStyle = cLight;
+        ctx.fillRect(-3 * S, -8 * S, 4 * S, 2 * S);
 
-        ctx.shadowColor = 'transparent';
-
-        // 装甲分割ライン
-        ctx.strokeStyle = this.isRed ? 'rgba(80, 0, 10, 0.85)' : 'rgba(15, 23, 42, 0.85)';
-        ctx.lineWidth = 1;
-        ctx.beginPath();
-        ctx.arc(0, -12, 16, Math.PI, 0);
-        ctx.stroke();
-
-        // 光学照準センサーアイ (通常はエメラルド・赤敵は黄金ゴールド)
-        const sensorGrad = ctx.createRadialGradient(4, -12, 0.5, 3, -12, 5);
-        if (this.isRed) {
-            sensorGrad.addColorStop(0.0, '#ffffff');
-            sensorGrad.addColorStop(0.3, '#fde047');
-            sensorGrad.addColorStop(0.8, '#eab308');
-            sensorGrad.addColorStop(1.0, '#854d0e');
-        } else {
-            sensorGrad.addColorStop(0.0, '#ffffff');
-            sensorGrad.addColorStop(0.3, '#34d399');
-            sensorGrad.addColorStop(0.8, '#059669');
-            sensorGrad.addColorStop(1.0, '#064e3b');
-        }
-        ctx.fillStyle = sensorGrad;
-        ctx.beginPath();
-        ctx.arc(3, -12, 4.5, 0, Math.PI * 2);
-        ctx.fill();
-
-        // センサー反射スポット
-        ctx.fillStyle = '#ffffff';
-        ctx.fillRect(2, -14, 1.5, 1.5);
+        // 中央のセンサーアイ
+        ctx.fillStyle = cCore;
+        ctx.fillRect(-1.5 * S, -6 * S, 3 * S, 2 * S);
 
         ctx.restore();
     }

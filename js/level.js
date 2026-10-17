@@ -41,90 +41,114 @@ class Terrain {
         this.segmentWidth = 40;
         this.topPoints = [];
         this.bottomPoints = [];
-        this.scrollSpeed = 1.5;
+        this.scrollSpeed = 1.6;
+        this.baseScrollSpeed = 1.6;
         this.textureOffsetX = 0;
+        this.bgOffsetX = 0;
         this.active = false;
         this.generating = false;
         this.currentSegIndex = 0;
         this.spawnIndex = 0;
+        this.floatingIslands = [];
+        this.twinVolcanoes = [];
 
         // 1985年アーケード版『グラディウス』Stage 1（火山面）完全再現プロファイルデータ
-        // 天井 (Top Y) & 床 (Bottom Y) - 全140セグメント (全長5600px)
+        // 序盤は下部のみの火山連山から始まり、中盤から天井岩盤と浮き岩が出現、終盤に二連火山が鎮座！
         this.topProfile = [
-            // 進入部 (seg 0-6): なだらかに天井が迫る
-            0, 10, 25, 45, 55, 60, 60,
-            // 第1丘陵 (seg 7-15): なだらかな起伏
-            60, 65, 75, 80, 75, 65, 60, 60, 65,
-            // 谷間と窪み (seg 16-27): 天井が少し低くなり、また広がる
-            75, 90, 110, 125, 110, 85, 70, 65, 70, 80, 75, 70,
-            // 第1火山エリア (seg 28-42): 火山対岸の天井（安定した岩盤と天井砲台）
-            70, 70, 75, 85, 90, 85, 75, 70, 70, 75, 80, 75, 70, 70, 70,
-            // 中間洞窟・山脈エリア (seg 43-60): 天井の岩嘴が下に迫り出す最狭部
-            75, 95, 125, 150, 155, 130, 95, 80, 90, 120, 145, 140, 105, 85, 75, 70, 75, 80,
-            // 第2火山エリア (seg 61-75): 2基目火山の対岸天井
-            85, 90, 85, 75, 70, 70, 75, 80, 75, 70, 70, 75, 80, 75, 70,
-            // 後半丘陵エリア (seg 76-95): 波打つ岩肌
-            75, 85, 105, 115, 100, 80, 70, 75, 90, 105, 95, 75, 70, 70, 75, 80, 75, 70, 65, 60,
-            // 終盤エリア・脱出部 (seg 96-112): 天井が徐々に高くなり、消滅
-            55, 50, 40, 30, 20, 10, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-            // 宇宙空間 (seg 113-140): 星空のみ
-            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
+            // 導入部 (seg 0-14): 上空は開けており、地上側の連山と対峙
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 20, 42, 56, 62, 62,
+            // 第1洞窟・天井岩盤エリア (seg 15-31): 天井の火山岩盤とハッチ・砲台
+            60, 64, 74, 82, 76, 64, 58, 62, 76, 96, 112, 102, 80, 66, 60, 62, 66,
+            // 第1浮き岩エリア (seg 32-47): 中央に浮き岩があるため天井はやや高め
+            64, 58, 52, 48, 48, 52, 58, 66, 78, 92, 86, 70, 60, 58, 64, 72,
+            // 中盤の狭隘洞窟エリア (seg 48-65): 天井鍾乳岩と第2浮き岩
+            84, 108, 134, 138, 114, 84, 64, 54, 48, 48, 52, 58, 68, 86, 106, 98, 78, 64,
+            // 後半ハッチ＆ジャンパー地帯 (seg 66-85): 第3浮き岩と激しい起伏
+            60, 66, 78, 88, 76, 62, 52, 46, 46, 50, 58, 68, 82, 96, 88, 72, 62, 58, 56, 52,
+            // クライマックス：二連火山エリア (seg 86-102): 二連火山の噴火空間を確保する天井岩盤
+            48, 44, 40, 36, 36, 36, 40, 44, 40, 32, 22, 12, 0, 0, 0, 0, 0,
+            // 宇宙空間への脱出 (seg 103-114)
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
         ];
         this.bottomProfile = [
-            // 進入部 (seg 0-6): なだらかに地面が隆起
-            600, 580, 550, 525, 510, 500, 490,
-            // 第1丘陵 (seg 7-15): なだらかな第1の丘
-            470, 440, 420, 420, 450, 480, 500, 510, 490,
-            // 谷間と窪み (seg 16-27): ハッチャーが鎮座する窪みと第2の丘
-            470, 450, 480, 510, 525, 510, 480, 450, 435, 450, 480, 500,
-            // 第1火山エリア (seg 28-42): なだらかに山が盛り上がり、頂上に火口（seg 33-35: Y=375）！
-            510, 490, 460, 420, 390, 375, 375, 375, 400, 440, 475, 505, 520, 520, 500,
-            // 中間洞窟・山脈エリア (seg 43-60): 起伏に富む丘陵と段差
-            470, 440, 420, 430, 460, 490, 510, 490, 460, 430, 415, 430, 465, 495, 515, 510, 485, 460,
-            // 第2火山エリア (seg 61-75): 再び雄大な山がそびえ、頂上に火口（seg 64-66: Y=365）！
-            440, 410, 380, 365, 365, 365, 390, 430, 470, 500, 515, 520, 510, 485, 460,
-            // 後半丘陵エリア (seg 76-95): 連続する起伏
-            435, 420, 445, 475, 500, 515, 490, 460, 435, 435, 465, 495, 515, 500, 470, 445, 460, 490, 510, 520,
-            // 終盤エリア・脱出部 (seg 96-112): 地面が低くなり、平坦になって消滅
-            525, 530, 540, 550, 560, 575, 590, 600, 600, 600, 600, 600, 600, 600, 600, 600, 600,
-            // 宇宙空間 (seg 113-140): 星空のみ
-            600, 600, 600, 600, 600, 600, 600, 600, 600, 600, 600, 600, 600, 600, 600, 600, 600, 600, 600, 600, 600, 600, 600, 600, 600, 600, 600, 600
+            // 導入部 (seg 0-14): 平坦な火山地表から第1の丘陵へ
+            600, 575, 545, 525, 516, 512, 508, 492, 464, 438, 432, 452, 482, 504, 512,
+            // 第1洞窟・天井岩盤エリア (seg 15-31): ハッチが鎮座する盆地と第2の丘陵
+            508, 490, 464, 448, 462, 488, 512, 518, 506, 482, 456, 442, 456, 484, 508, 516, 508,
+            // 第1浮き岩エリア (seg 32-47): 浮き岩の下をくぐれるルートと起伏
+            496, 508, 520, 526, 526, 520, 506, 484, 456, 434, 442, 472, 502, 516, 512, 494,
+            // 中盤の狭隘洞窟エリア (seg 48-65): 激しい山岳起伏と第2浮き岩
+            468, 444, 436, 454, 484, 510, 522, 526, 526, 522, 510, 488, 458, 436, 446, 478, 506, 516,
+            // 後半ハッチ＆ジャンパー地帯 (seg 66-85): ジャンパーが跳ねる大地と第3浮き岩
+            512, 496, 472, 458, 474, 502, 520, 526, 526, 520, 506, 482, 458, 448, 468, 496, 514, 518, 516, 512,
+            // クライマックス：二連火山エリア (seg 86-102): 2つの火山が並んでそびえる台地！
+            504, 492, 482, 476, 476, 476, 480, 476, 476, 476, 488, 508, 534, 562, 586, 600, 600,
+            // 宇宙空間への脱出 (seg 103-114)
+            600, 600, 600, 600, 600, 600, 600, 600, 600, 600, 600, 600
         ];
 
-        // 1985年アーケード版敵配置テーブル
+        // 1985年アーケード版 Stage 1 完全再現の敵＆ギミック配置テーブル
+        // ディー01(TURRET)、ダッカー(DUCKER / 後方奇襲DUCKER_BACK)、ジャンパー(JUMPER)、
+        // ハッチ/ダグム(HATCHER)、ルグル編隊(RUGRA)、ガルン編隊(GARUN)、ファン編隊(FAN)、
+        // 浮き岩(ISLAND)、そして終盤の二連火山(VOLCANO_TWIN)！
         this.spawns = [
-            { seg: 8, type: 'TURRET', isCeiling: true, isRed: false },
-            { seg: 10, type: 'TURRET', isCeiling: false, isRed: true }, // 赤砲台 → カプセル！
-            { seg: 12, type: 'DUCKER', isCeiling: false },
-            { seg: 14, type: 'HATCHER', isCeiling: false },
-            { seg: 18, type: 'TURRET', isCeiling: true, isRed: false },
-            { seg: 20, type: 'HATCHER', isCeiling: true },
-            { seg: 22, type: 'TURRET', isCeiling: false, isRed: false },
-            { seg: 24, type: 'GARUN', y: 260 },
-            { seg: 26, type: 'DUCKER', isCeiling: false },
-            { seg: 30, type: 'TURRET', isCeiling: true, isRed: false },
-            { seg: 34, type: 'VOLCANO_1' }, // ★第1火山！山頂 Y: 375
-            { seg: 38, type: 'TURRET', isCeiling: true, isRed: true }, // 赤砲台 → カプセル！
-            { seg: 44, type: 'TURRET', isCeiling: false, isRed: false },
-            { seg: 46, type: 'DUCKER', isCeiling: false },
-            { seg: 49, type: 'HATCHER', isCeiling: true },
-            { seg: 51, type: 'GARUN', y: 300 },
-            { seg: 53, type: 'TURRET', isCeiling: false, isRed: true }, // 赤砲台 → カプセル！
-            { seg: 55, type: 'TURRET', isCeiling: true, isRed: false },
-            { seg: 58, type: 'ZAB' },
-            { seg: 62, type: 'TURRET', isCeiling: true, isRed: false },
-            { seg: 65, type: 'VOLCANO_2' }, // ★第2火山！山頂 Y: 365
-            { seg: 69, type: 'DUCKER', isCeiling: true },
-            { seg: 71, type: 'TURRET', isCeiling: false, isRed: false },
-            { seg: 76, type: 'HATCHER', isCeiling: false },
-            { seg: 79, type: 'TURRET', isCeiling: true, isRed: false },
-            { seg: 82, type: 'DUCKER', isCeiling: false },
-            { seg: 85, type: 'GARUN', y: 250 },
-            { seg: 88, type: 'TURRET', isCeiling: false, isRed: true }, // 赤砲台 → カプセル！
-            { seg: 91, type: 'TURRET', isCeiling: true, isRed: false },
-            { seg: 94, type: 'ZAB' },
-            { seg: 98, type: 'DUCKER', isCeiling: false },
-            { seg: 101, type: 'TURRET', isCeiling: false, isRed: false }
+            // --- 序盤：連山進入＆ディー01・ダッカー・ルグル ---
+            { seg: 4,  type: 'TURRET', isCeiling: false, isRed: false },
+            { seg: 6,  type: 'TURRET', isCeiling: false, isRed: true },  // 赤ディー01（カプセル）
+            { seg: 7,  type: 'RUGRA',  y: 220, count: 4, hasRed: true },
+            { seg: 9,  type: 'DUCKER', isCeiling: false, isRed: false },
+            { seg: 11, type: 'TURRET', isCeiling: false, isRed: false },
+            { seg: 13, type: 'HATCHER', isCeiling: false, isRed: false }, // 地上ハッチ（ルシャ発進）
+            { seg: 14, type: 'FAN',    y: 180, isRed: true },
+
+            // --- 第1洞窟：天井岩盤・後方ダッカー奇襲・ガルン ---
+            { seg: 16, type: 'TURRET', isCeiling: true,  isRed: false },
+            { seg: 17, type: 'DUCKER_BACK', isCeiling: false, isRed: true }, // 左後方から追いかけてくる赤ダッカー！
+            { seg: 19, type: 'TURRET', isCeiling: false, isRed: false },
+            { seg: 21, type: 'HATCHER', isCeiling: true,  isRed: false }, // 天井ハッチ
+            { seg: 22, type: 'GARUN',  y: 260, count: 5 },
+            { seg: 24, type: 'TURRET', isCeiling: false, isRed: true },  // 赤ディー01
+            { seg: 26, type: 'DUCKER', isCeiling: false, isRed: false },
+            { seg: 28, type: 'JUMPER', isCeiling: false, isRed: false }, // 飛び跳ねて3WAY弾を撃つジャンパー！
+            { seg: 30, type: 'RUGRA',  y: 280, count: 4, hasRed: true },
+
+            // --- 第1浮き岩エリア (seg 33-46) ---
+            { seg: 33, type: 'ISLAND', y: 245, w: 168, h: 56, hasRedTurret: true },
+            { seg: 35, type: 'TURRET', isCeiling: false, isRed: false },
+            { seg: 37, type: 'DUCKER', isCeiling: true,  isRed: false },
+            { seg: 39, type: 'HATCHER', isCeiling: false, isRed: false },
+            { seg: 41, type: 'FAN',    y: 390, isRed: true },
+            { seg: 43, type: 'JUMPER', isCeiling: false, isRed: true },  // 赤ジャンパー
+            { seg: 45, type: 'TURRET', isCeiling: true,  isRed: false },
+
+            // --- 中盤狭隘エリア＆第2浮き岩 (seg 48-65) ---
+            { seg: 48, type: 'GARUN',  y: 280, count: 5 },
+            { seg: 50, type: 'TURRET', isCeiling: false, isRed: true },
+            { seg: 52, type: 'DUCKER_BACK', isCeiling: false, isRed: false }, // 後方奇襲ダッカー
+            { seg: 54, type: 'HATCHER', isCeiling: true,  isRed: false },
+            { seg: 55, type: 'ISLAND', y: 235, w: 184, h: 60, hasRedTurret: false },
+            { seg: 57, type: 'RUGRA',  y: 170, count: 4, hasRed: true },
+            { seg: 59, type: 'TURRET', isCeiling: false, isRed: false },
+            { seg: 61, type: 'DUCKER', isCeiling: false, isRed: true },
+            { seg: 63, type: 'JUMPER', isCeiling: false, isRed: false },
+            { seg: 65, type: 'TURRET', isCeiling: true,  isRed: false },
+
+            // --- 後半ハッチ＆第3浮き岩エリア (seg 66-85) ---
+            { seg: 67, type: 'HATCHER', isCeiling: false, isRed: false },
+            { seg: 69, type: 'FAN',    y: 160, isRed: true },
+            { seg: 71, type: 'ISLAND', y: 250, w: 168, h: 56, hasRedTurret: true },
+            { seg: 73, type: 'TURRET', isCeiling: false, isRed: false },
+            { seg: 75, type: 'DUCKER_BACK', isCeiling: false, isRed: true },
+            { seg: 77, type: 'GARUN',  y: 250, count: 5 },
+            { seg: 79, type: 'HATCHER', isCeiling: true,  isRed: false },
+            { seg: 81, type: 'JUMPER', isCeiling: false, isRed: false },
+            { seg: 83, type: 'RUGRA',  y: 300, count: 4, hasRed: true },
+            { seg: 85, type: 'TURRET', isCeiling: true,  isRed: false },
+
+            // --- クライマックス：本家1面名物「二連火山」配置 (seg 89 & 94) ---
+            { seg: 87, type: 'TURRET', isCeiling: false, isRed: true },
+            { seg: 89, type: 'VOLCANO_TWIN' }, // 第1火山
+            { seg: 94, type: 'VOLCANO_TWIN' }  // 第2火山（2基並んだ火山が画面中央右に来るとスクロール停止＆大噴火！）
         ];
 
         Terrain._initTexture();
@@ -137,37 +161,43 @@ class Terrain {
         patCanvas.height = 64;
         const pctx = patCanvas.getContext('2d');
 
-        // 砂岩・火山岩のベースカラー
-        pctx.fillStyle = '#8a6438';
+        // 1985年アーケード版『グラディウス』1面特有の「細胞状・塊状の茶褐色ドット絵岩盤」テクスチャ！
+        // 最暗部（黒茶色の隙間・亀裂）
+        pctx.fillStyle = '#240c00';
         pctx.fillRect(0, 0, 64, 64);
 
-        // 水平・斜めの地層クラックと陰影
-        pctx.fillStyle = '#6e4c24';
-        for (let y = 4; y < 64; y += 16) {
-            pctx.fillRect(0, y, 64, 3);
-            pctx.fillRect((y * 3) % 64, y - 4, 18, 4);
-        }
+        // 塊状の岩セル（16x16および16x12の丸みを帯びたピクセル岩塊）を互い違いに敷き詰める
+        const cells = [
+            { x: 0,  y: 0,  w: 30, h: 14 },
+            { x: 32, y: 2,  w: 30, h: 14 },
+            { x: 14, y: 16, w: 32, h: 14 },
+            { x: 48, y: 16, w: 16, h: 14 },
+            { x: 0,  y: 16, w: 12, h: 14 },
+            { x: 2,  y: 32, w: 28, h: 14 },
+            { x: 32, y: 30, w: 30, h: 16 },
+            { x: 16, y: 48, w: 30, h: 14 },
+            { x: 48, y: 48, w: 16, h: 14 },
+            { x: 0,  y: 48, w: 14, h: 14 }
+        ];
 
-        // ハイライト地層（サンドベージュ）
-        pctx.fillStyle = '#a67d4b';
-        for (let y = 10; y < 64; y += 16) {
-            pctx.fillRect(0, y, 64, 2);
-            pctx.fillRect(((y + 12) * 5) % 64, y + 2, 14, 3);
-        }
-
-        // 微細な火山岩ドット（粒状感）
-        pctx.fillStyle = '#543615';
-        for (let i = 0; i < 40; i++) {
-            const rx = (i * 17) % 64;
-            const ry = (i * 29) % 64;
-            pctx.fillRect(rx, ry, 2, 2);
-        }
-        pctx.fillStyle = '#bc9058';
-        for (let i = 0; i < 30; i++) {
-            const rx = (i * 23 + 7) % 64;
-            const ry = (i * 19 + 5) % 64;
-            pctx.fillRect(rx, ry, 2, 2);
-        }
+        cells.forEach(c => {
+            // 暗褐色ベース
+            pctx.fillStyle = '#5c2604';
+            pctx.fillRect(c.x + 2, c.y, c.w - 4, c.h);
+            pctx.fillRect(c.x, c.y + 2, c.w, c.h - 4);
+            // 中間茶色（赤茶〜黄土色）
+            pctx.fillStyle = '#9c4c14';
+            pctx.fillRect(c.x + 2, c.y + 2, c.w - 4, c.h - 4);
+            // 明部オレンジブラウン
+            pctx.fillStyle = '#cf7824';
+            pctx.fillRect(c.x + 4, c.y + 2, c.w - 8, c.h - 6);
+            // ハイライトドット（黄土色）
+            pctx.fillStyle = '#f0a840';
+            pctx.fillRect(c.x + 6, c.y + 3, Math.max(4, c.w - 14), 2);
+            // 内部のドット亀裂
+            pctx.fillStyle = '#381400';
+            pctx.fillRect(c.x + Math.floor(c.w / 2), c.y + Math.floor(c.h / 2), 4, 2);
+        });
 
         const dummyCanvas = document.createElement('canvas');
         const dctx = dummyCanvas.getContext('2d');
@@ -177,11 +207,15 @@ class Terrain {
     start() {
         this.active = true;
         this.generating = true;
+        this.scrollSpeed = this.baseScrollSpeed;
         this.textureOffsetX = 0;
+        this.bgOffsetX = 0;
         this.currentSegIndex = 0;
         this.spawnIndex = 0;
         this.topPoints = [];
         this.bottomPoints = [];
+        this.floatingIslands = [];
+        this.twinVolcanoes = [];
         let currentX = this.width;
         this.topPoints.push({ x: currentX, y: 0 });
         this.bottomPoints.push({ x: currentX, y: this.height });
@@ -194,20 +228,28 @@ class Terrain {
     update() {
         if (!this.active) return;
 
-        // スクロール
+        // スクロール更新
         this.topPoints.forEach(p => p.x -= this.scrollSpeed);
         this.bottomPoints.forEach(p => p.x -= this.scrollSpeed);
         this.textureOffsetX -= this.scrollSpeed;
+        this.bgOffsetX -= this.scrollSpeed;
+
+        // 浮き岩の更新
+        this.floatingIslands.forEach(isl => {
+            isl.scrollSpeed = this.scrollSpeed;
+            isl.update();
+        });
+        this.floatingIslands = this.floatingIslands.filter(isl => isl.active);
 
         // 画面外のポイントを削除（描画用に1つ手前まで残す）
-        while (this.topPoints.length > 2 && this.topPoints[1].x < 0) {
+        while (this.topPoints.length > 2 && this.topPoints[1].x < -40) {
             this.topPoints.shift();
             this.bottomPoints.shift();
         }
 
-        // 新規生成が停止し、全ての地形ポイントが画面左に抜けたら非アクティブ化
+        // 新規生成が停止し、全ての地形ポイントと浮き岩が画面左に抜けたら非アクティブ化
         if (!this.generating) {
-            if (this.topPoints.length <= 2 && this.topPoints[this.topPoints.length - 1].x < 0) {
+            if (this.topPoints.length <= 2 && this.topPoints[this.topPoints.length - 1].x < 0 && this.floatingIslands.length === 0) {
                 this.active = false;
                 this.topPoints = [];
                 this.bottomPoints = [];
@@ -228,7 +270,7 @@ class Terrain {
                     this.topPoints.push({ x: lastX, y: topY });
                     this.bottomPoints.push({ x: lastX, y: bottomY });
 
-                    // セグメントごとの敵スポーン判定
+                    // セグメントごとの敵＆ギミックスポーン判定
                     this.checkSpawnsForSeg(this.currentSegIndex, lastX, topY, bottomY);
 
                     this.currentSegIndex++;
@@ -252,22 +294,99 @@ class Terrain {
                     enemies.push(new TurretEnemy(x, gy, sp.isCeiling, !!sp.isRed));
                 } else if (sp.type === 'DUCKER' && typeof DuckerEnemy !== 'undefined') {
                     const gy = sp.isCeiling ? topY : bottomY;
-                    enemies.push(new DuckerEnemy(x, gy, sp.isCeiling, false));
+                    enemies.push(new DuckerEnemy(x, gy, sp.isCeiling, !!sp.isRed, false));
+                } else if (sp.type === 'DUCKER_BACK' && typeof DuckerEnemy !== 'undefined') {
+                    // 1985年アーケード版名物：画面左端（自機の後方）から猛スピードで駆け上がってくる奇襲ダッカー！
+                    const backX = 4;
+                    const gy = sp.isCeiling ? this.getTopY(backX) : this.getBottomY(backX);
+                    enemies.push(new DuckerEnemy(backX, gy, sp.isCeiling, !!sp.isRed, true));
+                } else if (sp.type === 'JUMPER' && typeof JumperEnemy !== 'undefined') {
+                    const gy = sp.isCeiling ? topY : bottomY;
+                    enemies.push(new JumperEnemy(x, gy, sp.isCeiling, !!sp.isRed));
                 } else if (sp.type === 'HATCHER' && typeof HatcherEnemy !== 'undefined') {
                     const gy = sp.isCeiling ? topY : bottomY;
-                    enemies.push(new HatcherEnemy(x, gy, sp.isCeiling));
-                } else if (sp.type === 'VOLCANO_1' || sp.type === 'VOLCANO_2') {
-                    if (typeof Volcano !== 'undefined') {
-                        // 火山を山頂に設置（幅110pxの火山を中央配置）
-                        enemies.push(new Volcano(x - 55, bottomY, true));
-                    }
+                    enemies.push(new HatcherEnemy(x, gy, sp.isCeiling, !!sp.isRed));
+                } else if (sp.type === 'ISLAND' && typeof FloatingIsland !== 'undefined') {
+                    const isl = new FloatingIsland(x, sp.y, sp.w || 168, sp.h || 56, this.scrollSpeed, !!sp.hasRedTurret);
+                    this.floatingIslands.push(isl);
+                } else if (sp.type === 'VOLCANO_TWIN' && typeof Volcano !== 'undefined') {
+                    const v = new Volcano(x - 64, bottomY, false); // 噴火はスクロール停止時に一斉開始！
+                    enemies.push(v);
+                    this.twinVolcanoes.push(v);
                 } else if (sp.type === 'GARUN' && typeof GarunFormation !== 'undefined') {
-                    new GarunFormation(sp.y, Math.random() < 0.5, 4);
-                } else if (sp.type === 'ZAB' && typeof ZabSquad !== 'undefined') {
-                    new ZabSquad('ANYWHERE', null, 3);
+                    new GarunFormation(sp.y || 260, true, sp.count || 5);
+                } else if (sp.type === 'RUGRA' && typeof RugraEnemy !== 'undefined') {
+                    const cnt = sp.count || 4;
+                    const baseY = sp.y || 240;
+                    for (let i = 0; i < cnt; i++) {
+                        const ry = baseY + (i - 1.5) * 34;
+                        enemies.push(new RugraEnemy(x + 20, ry, sp.hasRed && i === 0, i * 14));
+                    }
+                } else if (sp.type === 'FAN' && typeof Formation !== 'undefined') {
+                    new Formation(sp.y || 180, 5, sp.isRed !== false);
                 }
             }
             this.spawnIndex++;
+        }
+    }
+
+    // 1985年アーケード版 Stage 1 象徴の「背景の火山連山（山脈）」を描画
+    // （本家通り、背景の連山は当たり判定を持たない遠景・中景のドット絵山脈として前景岩盤の背後にそびえ立つ）
+    drawArcadeMountainRange(ctx) {
+        if (this.bottomPoints.length < 2) return;
+        const firstX = this.bottomPoints[0].x;
+        const lastX = this.bottomPoints[this.bottomPoints.length - 1].x;
+        const period = 320;
+        const startIdx = Math.floor((firstX - this.bgOffsetX) / period) - 1;
+        const endIdx = Math.ceil((lastX - this.bgOffsetX) / period) + 1;
+
+        for (let idx = startIdx; idx <= endIdx; idx++) {
+            const baseWorldX = idx * period + this.bgOffsetX;
+            if (baseWorldX + period < firstX + 60 || baseWorldX > lastX - 80) continue;
+
+            // 大小2つのカルデラ火山峰を持つ1985年アーケード版特有の連山シルエット
+            const peaks = [
+                { cx: baseWorldX + 95,  w: 170, h: 125, craterW: 36 },
+                { cx: baseWorldX + 240, w: 140, h: 96,  craterW: 28 }
+            ];
+
+            peaks.forEach(pk => {
+                const gy = this.getBottomY(pk.cx);
+                if (gy >= 595) return;
+                const topY = gy - pk.h;
+                const halfW = pk.w / 2;
+                const halfC = pk.craterW / 2;
+
+                // 段々になったドット絵の稜線と縦スジの岩肌
+                const steps = 12;
+                for (let s = 0; s < steps; s++) {
+                    const t0 = s / steps;
+                    const t1 = (s + 1) / steps;
+                    const y0 = Math.round(topY + t0 * pk.h);
+                    const y1 = Math.round(topY + t1 * pk.h) + 2;
+                    const hw = Math.round(halfC + t0 * (halfW - halfC));
+
+                    // 外側の暗褐色シャドウ
+                    ctx.fillStyle = '#381400';
+                    ctx.fillRect(Math.round(pk.cx - hw), y0, hw * 2, y1 - y0);
+                    // 山肌の中間茶色
+                    ctx.fillStyle = '#6c2c08';
+                    ctx.fillRect(Math.round(pk.cx - hw + 6), y0, Math.max(0, (hw - 6) * 2), y1 - y0);
+                    // 中央の黄土色ハイライト
+                    ctx.fillStyle = '#9c4814';
+                    ctx.fillRect(Math.round(pk.cx - hw * 0.55), y0, Math.round(hw * 1.1), y1 - y0);
+                    // 縦方向の岩盤ストライプ溝
+                    ctx.fillStyle = '#240c00';
+                    for (let sx = -hw + 12; sx < hw - 10; sx += 14) {
+                        ctx.fillRect(Math.round(pk.cx + sx), y0, 3, y1 - y0);
+                    }
+                }
+                // カルデラ火口縁の明部
+                ctx.fillStyle = '#c86820';
+                ctx.fillRect(Math.round(pk.cx - halfC), Math.round(topY), pk.craterW, 4);
+                ctx.fillStyle = '#240800';
+                ctx.fillRect(Math.round(pk.cx - halfC + 6), Math.round(topY + 2), pk.craterW - 12, 4);
+            });
         }
     }
 
@@ -275,60 +394,93 @@ class Terrain {
         if (this.topPoints.length < 2) return;
 
         ctx.save();
+
+        // 1. 背後の1985年アーケード版「火山連山（ドット絵山脈）」を描画
+        this.drawArcadeMountainRange(ctx);
+
+        // 2. 前景の細胞状・塊状火山岩盤ポリゴンを描画
         if (Terrain._pattern) {
             if (typeof DOMMatrix !== 'undefined') {
-                Terrain._pattern.setTransform(new DOMMatrix().translate(this.textureOffsetX, 0));
+                Terrain._pattern.setTransform(new DOMMatrix().translate(Math.round(this.textureOffsetX), 0));
             }
             ctx.fillStyle = Terrain._pattern;
         } else {
-            ctx.fillStyle = '#8a6438';
+            ctx.fillStyle = '#9c4c14';
         }
 
-        // 天井ポリゴン
+        // 天井ポリゴン（ドット絵らしい階段状ステップエッジで描画）
         ctx.beginPath();
         ctx.moveTo(this.topPoints[0].x, 0);
-        this.topPoints.forEach(p => ctx.lineTo(p.x, p.y));
+        for (let i = 0; i < this.topPoints.length; i++) {
+            const p = this.topPoints[i];
+            if (i > 0) {
+                const prev = this.topPoints[i - 1];
+                const midX = Math.round((prev.x + p.x) / 2);
+                ctx.lineTo(midX, Math.round(prev.y));
+                ctx.lineTo(midX, Math.round(p.y));
+            }
+            ctx.lineTo(Math.round(p.x), Math.round(p.y));
+        }
         ctx.lineTo(this.topPoints[this.topPoints.length - 1].x, 0);
         ctx.closePath();
         ctx.fill();
 
-        // 地面ポリゴン
+        // 地面ポリゴン（ドット絵らしい階段状ステップエッジで描画）
         ctx.beginPath();
         ctx.moveTo(this.bottomPoints[0].x, this.height);
-        this.bottomPoints.forEach(p => ctx.lineTo(p.x, p.y));
+        for (let i = 0; i < this.bottomPoints.length; i++) {
+            const p = this.bottomPoints[i];
+            if (i > 0) {
+                const prev = this.bottomPoints[i - 1];
+                const midX = Math.round((prev.x + p.x) / 2);
+                ctx.lineTo(midX, Math.round(prev.y));
+                ctx.lineTo(midX, Math.round(p.y));
+            }
+            ctx.lineTo(Math.round(p.x), Math.round(p.y));
+        }
         ctx.lineTo(this.bottomPoints[this.bottomPoints.length - 1].x, this.height);
         ctx.closePath();
         ctx.fill();
 
-        // 重厚な火山岩輪郭エッジ（濃茶）
-        ctx.strokeStyle = '#221105';
-        ctx.lineWidth = 2.5;
+        // 3. 岩盤境界のピクセル岩塊リム（黄土色ハイライト＆暗褐色エッジ）
+        for (let i = 0; i < this.bottomPoints.length - 1; i++) {
+            const p1 = this.bottomPoints[i];
+            const p2 = this.bottomPoints[i + 1];
+            if (p1.y >= 598 && p2.y >= 598) continue;
+            const steps = 4;
+            for (let s = 0; s < steps; s++) {
+                const bx = Math.round(p1.x + (p2.x - p1.x) * (s / steps));
+                const bw = Math.ceil((p2.x - p1.x) / steps) + 1;
+                const by = Math.round(p1.y + (p2.y - p1.y) * (s / steps));
+                ctx.fillStyle = '#381400';
+                ctx.fillRect(bx, by - 2, bw, 10);
+                ctx.fillStyle = '#df8428';
+                ctx.fillRect(bx + 1, by, bw - 2, 6);
+                ctx.fillStyle = '#f8c050';
+                ctx.fillRect(bx + 2, by, Math.max(2, bw - 4), 2);
+            }
+        }
 
-        // 天井ライン
-        ctx.beginPath();
-        this.topPoints.forEach((p, idx) => {
-            if (idx === 0) ctx.moveTo(p.x, p.y);
-            else ctx.lineTo(p.x, p.y);
-        });
-        ctx.stroke();
+        for (let i = 0; i < this.topPoints.length - 1; i++) {
+            const p1 = this.topPoints[i];
+            const p2 = this.topPoints[i + 1];
+            if (p1.y <= 2 && p2.y <= 2) continue;
+            const steps = 4;
+            for (let s = 0; s < steps; s++) {
+                const tx = Math.round(p1.x + (p2.x - p1.x) * (s / steps));
+                const tw = Math.ceil((p2.x - p1.x) / steps) + 1;
+                const ty = Math.round(p1.y + (p2.y - p1.y) * (s / steps));
+                ctx.fillStyle = '#381400';
+                ctx.fillRect(tx, ty - 8, tw, 10);
+                ctx.fillStyle = '#b86018';
+                ctx.fillRect(tx + 1, ty - 6, tw - 2, 5);
+                ctx.fillStyle = '#df8428';
+                ctx.fillRect(tx + 2, ty - 3, Math.max(2, tw - 4), 2);
+            }
+        }
 
-        // 地面ライン
-        ctx.beginPath();
-        this.bottomPoints.forEach((p, idx) => {
-            if (idx === 0) ctx.moveTo(p.x, p.y);
-            else ctx.lineTo(p.x, p.y);
-        });
-        ctx.stroke();
-
-        // 地面上面のハイライトライン（明るいサンドゴールド）
-        ctx.strokeStyle = 'rgba(235, 185, 120, 0.65)';
-        ctx.lineWidth = 1.2;
-        ctx.beginPath();
-        this.bottomPoints.forEach((p, idx) => {
-            if (idx === 0) ctx.moveTo(p.x, p.y - 1);
-            else ctx.lineTo(p.x, p.y - 1);
-        });
-        ctx.stroke();
+        // 4. 中空の「浮き岩 (FloatingIsland)」を描画
+        this.floatingIslands.forEach(isl => isl.draw(ctx));
 
         ctx.restore();
     }
@@ -337,7 +489,7 @@ class Terrain {
         if (this.topPoints.length < 2) return 0;
         for (let i = 0; i < this.topPoints.length - 1; i++) {
             const p1 = this.topPoints[i];
-            const p2 = this.topPoints[i+1];
+            const p2 = this.topPoints[i + 1];
             if (x >= p1.x && x <= p2.x) {
                 const t = (x - p1.x) / (p2.x - p1.x);
                 return p1.y + t * (p2.y - p1.y);
@@ -350,7 +502,7 @@ class Terrain {
         if (this.bottomPoints.length < 2) return this.height;
         for (let i = 0; i < this.bottomPoints.length - 1; i++) {
             const p1 = this.bottomPoints[i];
-            const p2 = this.bottomPoints[i+1];
+            const p2 = this.bottomPoints[i + 1];
             if (x >= p1.x && x <= p2.x) {
                 const t = (x - p1.x) / (p2.x - p1.x);
                 return p1.y + t * (p2.y - p1.y);
@@ -361,26 +513,40 @@ class Terrain {
 
     checkCollision(rect) {
         if (!this.active || this.topPoints.length < 2) return false;
-        
+
         const yTopLeft = this.getTopY(rect.x);
         const yTopRight = this.getTopY(rect.x + rect.width);
-        if (rect.y < yTopLeft || rect.y < yTopRight) return true;
+        if ((yTopLeft > 4 && rect.y < yTopLeft) || (yTopRight > 4 && rect.y < yTopRight)) return true;
 
         const yBottomLeft = this.getBottomY(rect.x);
         const yBottomRight = this.getBottomY(rect.x + rect.width);
         if (rect.y + rect.height > yBottomLeft || rect.y + rect.height > yBottomRight) return true;
 
+        // 浮き岩との衝突判定
+        for (let i = 0; i < this.floatingIslands.length; i++) {
+            if (this.floatingIslands[i].checkCollision(rect)) return true;
+        }
+
+        // 二連火山の山体との衝突判定
+        for (let i = 0; i < this.twinVolcanoes.length; i++) {
+            const v = this.twinVolcanoes[i];
+            if (v && v.active && typeof v.checkCollision === 'function' && v.checkCollision(rect)) {
+                return true;
+            }
+        }
+
         return false;
     }
-    
+
     getGroundY(x) {
         return this.getBottomY(x);
     }
 }
 
-// 浮遊大陸 (FloatingIsland: 空中に浮かぶ巨大岩石島 & 4門のレーザー砲台)
+// 1985年アーケード版 1面の「浮き岩 (FloatingIsland)」：
+// 中空に浮かぶ塊状の茶褐色火山岩島で、上下にディー01砲台（TurretEnemy）が設置されている！
 class FloatingIsland {
-    constructor(x, y, width, height, scrollSpeed = 1.5) {
+    constructor(x, y, width, height, scrollSpeed = 1.6, hasRedTurret = false) {
         this.x = x;
         this.y = y;
         this.width = width;
@@ -389,20 +555,19 @@ class FloatingIsland {
         this.active = true;
         this.turrets = [];
 
-        // 浮遊大陸に4つのレーザー砲台を設置（上面に2基、下面に2基）
-        if (typeof LaserTurretEnemy !== 'undefined' && typeof enemies !== 'undefined') {
-            const relX1 = width * 0.22;
-            const relX2 = width * 0.68;
-            
-            // 上面レーザー砲台 2基
-            const tTop1 = new LaserTurretEnemy(this, relX1, false);
-            const tTop2 = new LaserTurretEnemy(this, relX2, false);
-            // 下面レーザー砲台 2基
-            const tBottom1 = new LaserTurretEnemy(this, relX1, true);
-            const tBottom2 = new LaserTurretEnemy(this, relX2, true);
+        if (typeof TurretEnemy !== 'undefined' && typeof enemies !== 'undefined') {
+            const relX1 = Math.round(width * 0.22);
+            const relX2 = Math.round(width * 0.64);
 
-            this.turrets.push(tTop1, tTop2, tBottom1, tBottom2);
-            enemies.push(tTop1, tTop2, tBottom1, tBottom2);
+            // 上面にディー01砲台 2基（うち1基は赤カプセル砲台）
+            const tTop1 = new TurretEnemy(this.x + relX1, this.y, false, hasRedTurret, this, relX1);
+            const tTop2 = new TurretEnemy(this.x + relX2, this.y, false, false, this, relX2);
+            // 下面にディー01砲台 1基
+            const relXBot = Math.round(width * 0.44);
+            const tBot1 = new TurretEnemy(this.x + relXBot, this.y + this.height, true, false, this, relXBot);
+
+            this.turrets.push(tTop1, tTop2, tBot1);
+            enemies.push(tTop1, tTop2, tBot1);
         }
     }
 
@@ -411,20 +576,15 @@ class FloatingIsland {
         if (this.x + this.width < -150) {
             this.active = false;
         }
-        // 浮遊大陸上の砲台の位置を確実に毎フレーム同期
-        this.turrets.forEach(t => {
-            if (t.active) t.updatePosition();
-        });
     }
 
     checkCollision(rect) {
         if (!this.active) return false;
-        // 自機または弾との矩形衝突判定
         return (
-            rect.x < this.x + this.width &&
-            rect.x + rect.width > this.x &&
-            rect.y < this.y + this.height &&
-            rect.y + rect.height > this.y
+            rect.x < this.x + this.width - 6 &&
+            rect.x + rect.width > this.x + 6 &&
+            rect.y < this.y + this.height - 4 &&
+            rect.y + rect.height > this.y + 4
         );
     }
 
@@ -432,101 +592,38 @@ class FloatingIsland {
         if (!this.active) return;
         ctx.save();
 
-        const w = this.width;
-        const h = this.height;
-        const bevelX = 35;
-        const bevelY = 20;
+        const x = Math.round(this.x);
+        const y = Math.round(this.y);
+        const w = Math.round(this.width);
+        const h = Math.round(this.height);
 
-        // 立体感を際立たせるドロップシャドウ
-        ctx.shadowColor = 'rgba(0, 0, 0, 0.85)';
-        ctx.shadowBlur = 12;
-        ctx.shadowOffsetX = -5;
-        ctx.shadowOffsetY = 6;
+        // 1985年アーケード版特有のゴツゴツした細胞状・塊状の浮き岩をドット絵で描画
+        ctx.fillStyle = '#381400';
+        ctx.fillRect(x + 8, y, w - 16, h);
+        ctx.fillRect(x, y + 8, w, h - 16);
 
-        // 多層岩石グラデーション（浮遊大陸のローカル座標 this.x, this.y に100%固定・ズレ皆無！）
-        const grad = ctx.createLinearGradient(this.x, this.y, this.x, this.y + h);
-        grad.addColorStop(0.0, '#9a6332'); // 陽光を浴びる上部岩盤
-        grad.addColorStop(0.2, '#7a4b22');
-        grad.addColorStop(0.5, '#563314'); // 地層の中央部
-        grad.addColorStop(0.8, '#39200b');
-        grad.addColorStop(1.0, '#1c0f05'); // 深い底面シャドウ
-        ctx.fillStyle = grad;
+        ctx.fillStyle = '#5c2604';
+        ctx.fillRect(x + 10, y + 2, w - 20, h - 4);
+        ctx.fillRect(x + 4, y + 8, w - 8, h - 16);
 
-        // アーケード・グラディウス特有の重厚なオクタゴナル浮遊岩盤ポリゴン
-        ctx.beginPath();
-        ctx.moveTo(this.x + bevelX, this.y);
-        ctx.lineTo(this.x + w - bevelX, this.y);
-        ctx.lineTo(this.x + w, this.y + bevelY);
-        ctx.lineTo(this.x + w - 12, this.y + h - bevelY);
-        ctx.lineTo(this.x + w - bevelX - 10, this.y + h);
-        ctx.lineTo(this.x + bevelX + 10, this.y + h);
-        ctx.lineTo(this.x, this.y + h - bevelY);
-        ctx.lineTo(this.x + 12, this.y + bevelY);
-        ctx.closePath();
-        ctx.fill();
+        // 内部の塊状岩セル
+        const cols = Math.max(3, Math.floor(w / 28));
+        const rows = 2;
+        const cw = Math.floor((w - 16) / cols);
+        const ch = Math.floor((h - 8) / rows);
+        for (let r = 0; r < rows; r++) {
+            for (let c = 0; c < cols; c++) {
+                const cx = x + 8 + c * cw + (r % 2 === 1 ? 4 : -2);
+                const cy = y + 4 + r * ch;
+                ctx.fillStyle = '#9c4c14';
+                ctx.fillRect(cx + 2, cy + 2, cw - 4, ch - 4);
+                ctx.fillStyle = '#df8428';
+                ctx.fillRect(cx + 4, cy + 3, cw - 8, ch - 8);
+                ctx.fillStyle = '#f8c050';
+                ctx.fillRect(cx + 6, cy + 4, Math.max(4, cw - 12), 2);
+            }
+        }
 
-        ctx.shadowColor = 'transparent';
-
-        // 重厚な外郭エッジライン
-        ctx.strokeStyle = '#180d04';
-        ctx.lineWidth = 3;
-        ctx.stroke();
-
-        // 上部・側面エッジの光沢ハイライトライン
-        ctx.strokeStyle = 'rgba(255, 235, 190, 0.55)';
-        ctx.lineWidth = 2;
-        ctx.beginPath();
-        ctx.moveTo(this.x + bevelX, this.y + 2);
-        ctx.lineTo(this.x + w - bevelX, this.y + 2);
-        ctx.lineTo(this.x + w - 2, this.y + bevelY);
-        ctx.stroke();
-
-        // 内部地層ライン（岩肌の横縞クラック）
-        ctx.strokeStyle = 'rgba(30, 15, 5, 0.6)';
-        ctx.lineWidth = 1.5;
-        ctx.beginPath();
-        ctx.moveTo(this.x + 20, this.y + h * 0.35);
-        ctx.lineTo(this.x + w * 0.4, this.y + h * 0.38);
-        ctx.lineTo(this.x + w - 25, this.y + h * 0.32);
-        ctx.moveTo(this.x + 35, this.y + h * 0.68);
-        ctx.lineTo(this.x + w * 0.55, this.y + h * 0.65);
-        ctx.lineTo(this.x + w - 30, this.y + h * 0.72);
-        ctx.stroke();
-
-        // 4基のレーザー砲台が設置される「金属製マウントベース（砲台台座）」を島に直接描画！
-        const relX1 = w * 0.22 + 21; // 砲台センター (42px幅の中心)
-        const relX2 = w * 0.68 + 21;
-        const mountW = 44;
-        const mountH = 7;
-
-        // 上面マウント 2箇所
-        this.drawMountBase(ctx, this.x + relX1, this.y - 2, mountW, mountH, false);
-        this.drawMountBase(ctx, this.x + relX2, this.y - 2, mountW, mountH, false);
-        // 下面マウント 2箇所
-        this.drawMountBase(ctx, this.x + relX1, this.y + h - 5, mountW, mountH, true);
-        this.drawMountBase(ctx, this.x + relX2, this.y + h - 5, mountW, mountH, true);
-
-        ctx.restore();
-    }
-
-    drawMountBase(ctx, cx, y, w, h, isCeil) {
-        ctx.save();
-        const baseGrad = ctx.createLinearGradient(cx - w/2, y, cx + w/2, y);
-        baseGrad.addColorStop(0.0, '#334155');
-        baseGrad.addColorStop(0.3, '#cbd5e1');
-        baseGrad.addColorStop(0.7, '#64748b');
-        baseGrad.addColorStop(1.0, '#1e293b');
-        ctx.fillStyle = baseGrad;
-        ctx.fillRect(cx - w/2, y, w, h);
-
-        ctx.strokeStyle = '#00ffff';
-        ctx.lineWidth = 1;
-        ctx.strokeRect(cx - w/2, y, w, h);
-
-        // シアンLEDインジケーターランプ
-        ctx.fillStyle = '#00ffff';
-        ctx.fillRect(cx - 10, y + 2, 4, 3);
-        ctx.fillRect(cx + 6, y + 2, 4, 3);
         ctx.restore();
     }
 }
@@ -536,16 +633,26 @@ class LevelManager {
         this.starfield = new Starfield(canvasWidth, canvasHeight);
         this.terrain = new Terrain(canvasWidth, canvasHeight);
         this.time = 0;
-        this.state = 'AIR_BATTLE'; // AIR_BATTLE -> TERRAIN -> PRE_BOSS -> BOSS -> STAGE_CLEAR -> STAGE2
+        // 1985年アーケード版1面進行フロー：
+        // AIR_BATTLE (宇宙空中戦) -> TERRAIN (火山地帯進攻) -> VOLCANO_ERUPTION (二連火山・スクロール停止大噴火) -> BOSS_ENTRY -> BOSS (ビッグコア) -> STAGE_CLEAR
+        this.state = 'AIR_BATTLE';
         this.stage = 1;
         this.boss = null;
-        this.preBossTimer = 0;
-        this.preBossZabWave = 0;
+        this.eruptionTimer = 0;
+        this.bossEntryTimer = 0;
         this.stageClearTimer = 0;
 
-        // 空中戦ファン編隊スケジュール（本家アーケード完全再現：7編隊・全滅で赤カプセル）
-        this.airWaveTimes = [800, 3200, 5600, 8000, 10400, 12800, 15200];
-        this.airWaveYs = [150, 420, 200, 380, 250, 340, 290];
+        // 1985年アーケード版 1面開幕の宇宙空中戦スケジュール（ファン・ルグル・ガルンが交互に飛来！）
+        this.airWaves = [
+            { time: 600,   type: 'FAN',   y: 130, isRed: true },
+            { time: 2800,  type: 'FAN',   y: 430, isRed: true },
+            { time: 4900,  type: 'RUGRA', y: 230, count: 4, hasRed: true },
+            { time: 6800,  type: 'FAN',   y: 145, isRed: true },
+            { time: 8900,  type: 'GARUN', y: 270, count: 5 },
+            { time: 11100, type: 'FAN',   y: 420, isRed: true },
+            { time: 13200, type: 'RUGRA', y: 290, count: 4, hasRed: true },
+            { time: 15100, type: 'FAN',   y: 165, isRed: true }
+        ];
         this.airWaveSpawned = 0;
     }
 
@@ -556,59 +663,89 @@ class LevelManager {
             this.time += dt;
 
             if (this.state === 'AIR_BATTLE') {
-                // 空中戦フェーズ（0〜約17.5秒: 7編隊の赤いファンが順次飛来しカプセル補給）
-                if (this.airWaveSpawned < this.airWaveTimes.length) {
-                    if (this.time >= this.airWaveTimes[this.airWaveSpawned]) {
-                        const y = this.airWaveYs[this.airWaveSpawned];
-                        if (typeof Formation !== 'undefined') {
-                            new Formation(y, 4, true); // 赤ファン4機編隊（全滅で赤カプセル確定）
+                // 開幕の宇宙空中戦（ファン5機編隊・ルグル追尾編隊・ガルン螺旋編隊）
+                while (this.airWaveSpawned < this.airWaves.length && this.time >= this.airWaves[this.airWaveSpawned].time) {
+                    const wv = this.airWaves[this.airWaveSpawned];
+                    if (wv.type === 'FAN' && typeof Formation !== 'undefined') {
+                        new Formation(wv.y, 5, wv.isRed);
+                    } else if (wv.type === 'RUGRA' && typeof RugraEnemy !== 'undefined' && typeof enemies !== 'undefined') {
+                        for (let i = 0; i < (wv.count || 4); i++) {
+                            enemies.push(new RugraEnemy(820, wv.y + (i - 1.5) * 34, wv.hasRed && i === 0, i * 14));
                         }
-                        this.airWaveSpawned++;
+                    } else if (wv.type === 'GARUN' && typeof GarunFormation !== 'undefined') {
+                        new GarunFormation(wv.y, true, wv.count || 5);
                     }
+                    this.airWaveSpawned++;
                 }
 
-                // 17.5秒経過で地上戦フェーズへ突入！
-                if (this.time >= 17500) {
+                // 17.2秒経過で「Challenger 1985」BGMとともに火山連山地帯へ突入！
+                if (this.time >= 17200) {
                     this.state = 'TERRAIN';
                     this.terrain.start();
                     if (typeof Sound !== 'undefined' && typeof Sound.playStageBgm === 'function') {
-                        Sound.playStageBgm(); // Challenger 1985 へ華麗に切り替え！
+                        Sound.playStageBgm();
                     }
                 }
             } else if (this.state === 'TERRAIN') {
-                // 地上戦フェーズ（本家完全再現の固定地形マップ＋砲台・ダッカー・ハッチャー・2基の連続噴火火山）
                 this.terrain.update();
 
-                // 地形がすべて画面左に抜け去ったら、ボス前宇宙空間へ移行！
+                // 本家1面クライマックス：終盤の二連火山が画面中央〜右（第1火山 X <= 410）に到達したらスクロール停止＆大噴火開始！
+                if (this.terrain.twinVolcanoes && this.terrain.twinVolcanoes.length >= 2) {
+                    const v1 = this.terrain.twinVolcanoes[0];
+                    if (v1 && v1.active && v1.x <= 410) {
+                        this.state = 'VOLCANO_ERUPTION';
+                        this.eruptionTimer = 0;
+                        this.terrain.scrollSpeed = 0; // スクロール完全停止！
+                        this.terrain.twinVolcanoes.forEach(v => {
+                            if (v) v.isErupting = true;
+                        });
+                        if (typeof Sound !== 'undefined') {
+                            if (typeof Sound.playVolcanoSurvivalBgm === 'function') {
+                                Sound.playVolcanoSurvivalBgm();
+                            } else if (typeof Sound.playBossBgm === 'function') {
+                                Sound.playBossBgm();
+                            }
+                        }
+                    }
+                }
+
+                // 万一火山をスキップして地形が抜けきった場合のフォールバック
                 if (!this.terrain.active && this.terrain.currentSegIndex >= this.terrain.topProfile.length) {
-                    this.state = 'PRE_BOSS';
-                    this.preBossTimer = 0;
-                    this.preBossZabWave = 0;
-                    if (typeof Sound !== 'undefined' && typeof Sound.playBossBgm === 'function') {
-                        Sound.playBossBgm(); // Aircraft Carrier へ切り替え！
-                    }
-                }
-            } else if (this.state === 'PRE_BOSS') {
-                // ボス前宇宙戦フェーズ（約7秒間のボス前ザブラッシュ！）
-                this.preBossTimer += dt;
-
-                // 約1.8秒おきにザブ小隊がワープ突撃
-                if (this.preBossTimer > (this.preBossZabWave + 1) * 1800 && this.preBossZabWave < 3) {
-                    this.preBossZabWave++;
-                    if (typeof ZabSquad !== 'undefined') {
-                        new ZabSquad('ANYWHERE', null, 3);
-                    }
-                }
-
-                // 約7秒経過でビッグコア登場！
-                if (this.preBossTimer >= 7000) {
                     this.state = 'BOSS';
                     if (typeof Boss !== 'undefined') {
                         this.boss = new Boss(this.starfield.width, 220);
                     }
                 }
+            } else if (this.state === 'VOLCANO_ERUPTION') {
+                // 1985年アーケード版名物：スクロールが停止した状態で二連火山から無数の火山弾が放物線を描いて降り注ぐ！
+                this.terrain.update();
+                this.eruptionTimer += dt;
+
+                // 約10.5秒間噴火を耐え抜くと、噴火が収まり再びスクロール開始！
+                if (this.eruptionTimer >= 10500) {
+                    this.terrain.twinVolcanoes.forEach(v => {
+                        if (v) v.isErupting = false;
+                    });
+                    this.terrain.scrollSpeed = 2.4; // 地形が左へ退場していく
+                    this.state = 'BOSS_ENTRY';
+                    this.bossEntryTimer = 0;
+                }
+            } else if (this.state === 'BOSS_ENTRY') {
+                // 火山地帯を抜けて暗黒の宇宙空間へ出ると、そのままビッグコアが右から登場！
+                this.terrain.update();
+                this.bossEntryTimer += dt;
+
+                if (!this.terrain.active || this.bossEntryTimer >= 4200) {
+                    this.terrain.active = false;
+                    this.state = 'BOSS';
+                    if (typeof Sound !== 'undefined' && typeof Sound.playBossBgm === 'function') {
+                        Sound.playBossBgm();
+                    }
+                    if (typeof Boss !== 'undefined') {
+                        this.boss = new Boss(this.starfield.width, 220);
+                    }
+                }
             } else if (this.state === 'BOSS') {
-                // ビッグコア戦
                 if (this.boss) {
                     this.boss.update();
                     if (!this.boss.active) {
@@ -618,16 +755,13 @@ class LevelManager {
                 }
             } else if (this.state === 'STAGE_CLEAR') {
                 this.stageClearTimer += dt;
-                // 本家グラディウス同様、自機の自由操作を維持したまま約3秒後にステージ2へ突入！
                 if (this.stageClearTimer > 3000) {
                     this.startStage2();
                 }
             }
         } else if (this.stage === 2) {
-            // ステージ2: ストーンヘンジ面の更新
             if (typeof stonehengeStage !== 'undefined' && stonehengeStage) {
                 stonehengeStage.update(dt);
-                // STAGE_CLEAR / ALL_CLEAR 後 3 秒でステージ3へ遷移
                 if (stonehengeStage.state === 'STAGE_CLEAR' || stonehengeStage.state === 'ALL_CLEAR') {
                     if (!this.stage2ClearTimer) this.stage2ClearTimer = 0;
                     this.stage2ClearTimer += dt;
@@ -638,10 +772,8 @@ class LevelManager {
                 }
             }
         } else if (this.stage === 3) {
-            // ステージ3: モアイ面の更新
             if (window.stage3) {
                 window.stage3.update(dt);
-                // STAGE_CLEAR / ALL_CLEAR 後 3 秒でステージ4（逆火山面）へ遷移
                 if (window.stage3.state === 'STAGE_CLEAR' || window.stage3.state === 'ALL_CLEAR') {
                     if (!this.stage3ClearTimer) this.stage3ClearTimer = 0;
                     this.stage3ClearTimer += dt;
@@ -652,7 +784,6 @@ class LevelManager {
                 }
             }
         } else if (this.stage === 4) {
-            // ステージ4: 逆火山面の更新
             if (window.stage4) {
                 window.stage4.update(dt);
             }
@@ -664,15 +795,17 @@ class LevelManager {
         this.state = 'AIR_BATTLE';
         this.time = 0;
         this.boss = null;
-        this.preBossTimer = 0;
-        this.preBossZabWave = 0;
+        this.eruptionTimer = 0;
+        this.bossEntryTimer = 0;
         this.stageClearTimer = 0;
         this.airWaveSpawned = 0;
         this.terrain.active = false;
         this.terrain.generating = false;
         this.terrain.topPoints = [];
         this.terrain.bottomPoints = [];
-        this.terrain.scrollSpeed = 1.5;
+        this.terrain.floatingIslands = [];
+        this.terrain.twinVolcanoes = [];
+        this.terrain.scrollSpeed = this.terrain.baseScrollSpeed;
 
         if (typeof stonehengeStage !== 'undefined' && stonehengeStage) {
             stonehengeStage.active = false;
@@ -705,8 +838,9 @@ class LevelManager {
         this.terrain.active = false;
         this.terrain.topPoints = [];
         this.terrain.bottomPoints = [];
+        this.terrain.floatingIslands = [];
+        this.terrain.twinVolcanoes = [];
 
-        // 1面の火山や火山弾、残存敵を一掃
         if (typeof enemies !== 'undefined' && Array.isArray(enemies)) {
             enemies = enemies.filter(e => {
                 if (typeof Volcano !== 'undefined' && e instanceof Volcano) return false;
@@ -722,23 +856,21 @@ class LevelManager {
             stonehengeStage.start();
         }
         if (typeof Sound !== 'undefined' && typeof Sound.playAirBgm === 'function') {
-            Sound.playAirBgm(); // 2面開幕も原作通り宇宙空中戦BGM（Beginning of the History）からスタート！
+            Sound.playAirBgm();
         }
     }
 
     startStage3() {
-        if (this.stage === 3 && window.stage3 && window.stage3.active) return; // 二重呼び出し防止
+        if (this.stage === 3 && window.stage3 && window.stage3.active) return;
         this.stage = 3;
         this.state = 'STAGE3';
         this.time = 0;
         this.boss = null;
 
-        // ステージ2の残骸を完全クリア
         if (typeof stonehengeStage !== 'undefined' && stonehengeStage) {
             stonehengeStage.active = false;
         }
 
-        // 敵・弾をリセット
         if (typeof enemies !== 'undefined') enemies.length = 0;
         if (typeof enemyBullets !== 'undefined') enemyBullets.length = 0;
 
@@ -767,16 +899,17 @@ class LevelManager {
     }
 
     startStage4() {
-        if (this.stage === 4 && window.stage4 && window.stage4.active) return; // 二重呼び出し防止
+        if (this.stage === 4 && window.stage4 && window.stage4.active) return;
         this.stage = 4;
         this.state = 'STAGE4';
         this.time = 0;
         this.boss = null;
 
-        // 前ステージの残骸をクリア
         this.terrain.active = false;
         this.terrain.topPoints = [];
         this.terrain.bottomPoints = [];
+        this.terrain.floatingIslands = [];
+        this.terrain.twinVolcanoes = [];
         if (typeof stonehengeStage !== 'undefined' && stonehengeStage) {
             stonehengeStage.active = false;
         }
@@ -784,7 +917,6 @@ class LevelManager {
             window.stage3.active = false;
         }
 
-        // 敵・弾をリセット
         if (typeof enemies !== 'undefined') enemies.length = 0;
         if (typeof enemyBullets !== 'undefined') enemyBullets.length = 0;
 
@@ -814,7 +946,6 @@ class LevelManager {
 
     checkCollision(rect) {
         if (this.stage === 1) {
-            // 地形との衝突判定
             if (this.terrain && this.terrain.checkCollision(rect)) return true;
         } else if (this.stage === 2) {
             if (typeof stonehengeStage !== 'undefined' && stonehengeStage) {
@@ -838,12 +969,11 @@ class LevelManager {
             if (this.terrain.active) {
                 this.terrain.draw(ctx);
             }
-            
+
             if (this.state === 'BOSS' && this.boss) {
                 this.boss.draw(ctx);
             }
 
-            // ステージクリア演出テキスト
             if (this.state === 'STAGE_CLEAR') {
                 ctx.save();
                 ctx.font = 'bold 36px "Courier New", monospace';
