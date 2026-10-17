@@ -173,12 +173,12 @@ class FormationBase {
 // ファン編隊 (波打つ編隊: 大きく優雅な動き)
 // ------------------------------------------
 class Formation extends FormationBase {
-    constructor(startY, count = 4) {
+    constructor(startY, count = 4, isRed = true) {
         super(count);
         this.enemies = [];
 
         for (let i = 0; i < count; i++) {
-            const enemy = new FanEnemy(820, startY, i * 20, this);
+            const enemy = new FanEnemy(820, startY, i * 18, this, isRed);
             this.enemies.push(enemy);
             enemies.push(enemy);
         }
@@ -186,8 +186,8 @@ class Formation extends FormationBase {
 }
 
 class FanEnemy extends Enemy {
-    constructor(x, y, delay, formation) {
-        super(x, y);
+    constructor(x, y, delay, formation, isRed = false) {
+        super(x, y, isRed);
         this.startY = y;
         this.delay = delay;
         this.formation = formation;
@@ -223,79 +223,140 @@ class FanEnemy extends Enemy {
         ctx.translate(this.x + this.width / 2, this.y + this.height / 2);
         ctx.rotate(this.tilt);
 
-        // 立体ドロップシャドウ
-        // Fast draw
-
-        // 3D球面メタリック・アウターソーサー (金属円盤)
-        const outerGrad = ctx.createRadialGradient(-5, -5, 2, 0, 0, 19);
-        outerGrad.addColorStop(0.0, '#ffffff'); // 左上ハイライト
-        outerGrad.addColorStop(0.2, '#e2e8f0'); // シルバークローム
-        outerGrad.addColorStop(0.55, '#64748b'); // 金属スレート
-        outerGrad.addColorStop(0.85, '#334155'); // 影
-        outerGrad.addColorStop(1.0, '#0f172a');  // エッジリム
-        ctx.fillStyle = outerGrad;
-        ctx.beginPath();
-        ctx.arc(0, 0, 19, 0, Math.PI * 2);
-        ctx.fill();
-
-        ctx.shadowColor = 'transparent';
-
-        // ベベルエッジ (金属光沢リング)
-        ctx.strokeStyle = 'rgba(255, 255, 255, 0.65)';
-        ctx.lineWidth = 1;
-        ctx.beginPath();
-        ctx.arc(-1, -1, 18, Math.PI * 0.7, Math.PI * 1.8);
-        ctx.stroke();
-
-        // 中層ローター・タービンリング
-        const midGrad = ctx.createRadialGradient(0, 0, 4, 0, 0, 12);
-        midGrad.addColorStop(0.0, '#0284c7');
-        midGrad.addColorStop(0.6, '#0f172a');
-        midGrad.addColorStop(1.0, '#475569');
-        ctx.fillStyle = midGrad;
-        ctx.beginPath();
-        ctx.arc(0, 0, 12, 0, Math.PI * 2);
-        ctx.fill();
-
-        // 回転スリット (メカニカルなタービンファン)
-        ctx.strokeStyle = 'rgba(56, 189, 248, 0.75)';
-        ctx.lineWidth = 1.2;
-        const fanRot = this.animTimer * 1.5;
-        for (let a = 0; a < 4; a++) {
-            const angle = fanRot + (a * Math.PI / 2);
+        if (this.isRed) {
+            // 本家アーケード完全準拠：鮮やかな深紅＆朱色のファン機体（全滅で赤カプセル）
+            const outerGrad = ctx.createRadialGradient(-5, -5, 2, 0, 0, 19);
+            outerGrad.addColorStop(0.0, '#ffffff'); // 先端ハイライト
+            outerGrad.addColorStop(0.2, '#ff8da1'); // 明るい朱色
+            outerGrad.addColorStop(0.55, '#e11d48'); // 鮮やかな深紅
+            outerGrad.addColorStop(0.85, '#9f1239'); // 陰影
+            outerGrad.addColorStop(1.0, '#4c0519');  // 輪郭リム
+            ctx.fillStyle = outerGrad;
             ctx.beginPath();
-            ctx.moveTo(Math.cos(angle) * 5, Math.sin(angle) * 5);
-            ctx.lineTo(Math.cos(angle) * 11, Math.sin(angle) * 11);
+            ctx.arc(0, 0, 19, 0, Math.PI * 2);
+            ctx.fill();
+
+            // ベベルエッジハイライト
+            ctx.strokeStyle = 'rgba(255, 220, 230, 0.85)';
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            ctx.arc(-1, -1, 18, Math.PI * 0.7, Math.PI * 1.8);
             ctx.stroke();
+
+            // 中層ローター・タービンリング（赤熱・アンバー）
+            const midGrad = ctx.createRadialGradient(0, 0, 4, 0, 0, 12);
+            midGrad.addColorStop(0.0, '#f97316');
+            midGrad.addColorStop(0.6, '#7c1020');
+            midGrad.addColorStop(1.0, '#450a0a');
+            ctx.fillStyle = midGrad;
+            ctx.beginPath();
+            ctx.arc(0, 0, 12, 0, Math.PI * 2);
+            ctx.fill();
+
+            // 回転スリット（高熱ゴールド）
+            ctx.strokeStyle = 'rgba(253, 224, 71, 0.85)';
+            ctx.lineWidth = 1.2;
+            const fanRot = this.animTimer * 1.5;
+            for (let a = 0; a < 4; a++) {
+                const angle = fanRot + (a * Math.PI / 2);
+                ctx.beginPath();
+                ctx.moveTo(Math.cos(angle) * 5, Math.sin(angle) * 5);
+                ctx.lineTo(Math.cos(angle) * 11, Math.sin(angle) * 11);
+                ctx.stroke();
+            }
+
+            // 中心高輝度エネルギープラズマコア（灼熱レッド）
+            const coreGrad = ctx.createRadialGradient(2, 0, 1, 2, 0, 5);
+            coreGrad.addColorStop(0.0, '#ffffff');
+            coreGrad.addColorStop(0.4, '#fbbf24');
+            coreGrad.addColorStop(1.0, '#dc2626');
+            ctx.fillStyle = coreGrad;
+            ctx.beginPath();
+            ctx.arc(2, 0, 5, 0, Math.PI * 2);
+            ctx.fill();
+
+            // バーニア噴射炎（オレンジ＆イエロー）
+            const flame = 8 + Math.sin(this.animTimer * 2) * 4;
+            ctx.fillStyle = 'rgba(255, 120, 0, 0.85)';
+            ctx.beginPath();
+            ctx.moveTo(-16, -4);
+            ctx.lineTo(-16 - flame, 0);
+            ctx.lineTo(-16, 4);
+            ctx.closePath();
+            ctx.fill();
+
+            ctx.fillStyle = '#fffae0';
+            ctx.beginPath();
+            ctx.moveTo(-16, -2);
+            ctx.lineTo(-16 - flame * 0.5, 0);
+            ctx.lineTo(-16, 2);
+            ctx.closePath();
+            ctx.fill();
+        } else {
+            // 通常青銀バージョン
+            const outerGrad = ctx.createRadialGradient(-5, -5, 2, 0, 0, 19);
+            outerGrad.addColorStop(0.0, '#ffffff');
+            outerGrad.addColorStop(0.2, '#e2e8f0');
+            outerGrad.addColorStop(0.55, '#64748b');
+            outerGrad.addColorStop(0.85, '#334155');
+            outerGrad.addColorStop(1.0, '#0f172a');
+            ctx.fillStyle = outerGrad;
+            ctx.beginPath();
+            ctx.arc(0, 0, 19, 0, Math.PI * 2);
+            ctx.fill();
+
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.65)';
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            ctx.arc(-1, -1, 18, Math.PI * 0.7, Math.PI * 1.8);
+            ctx.stroke();
+
+            const midGrad = ctx.createRadialGradient(0, 0, 4, 0, 0, 12);
+            midGrad.addColorStop(0.0, '#0284c7');
+            midGrad.addColorStop(0.6, '#0f172a');
+            midGrad.addColorStop(1.0, '#475569');
+            ctx.fillStyle = midGrad;
+            ctx.beginPath();
+            ctx.arc(0, 0, 12, 0, Math.PI * 2);
+            ctx.fill();
+
+            ctx.strokeStyle = 'rgba(56, 189, 248, 0.75)';
+            ctx.lineWidth = 1.2;
+            const fanRot = this.animTimer * 1.5;
+            for (let a = 0; a < 4; a++) {
+                const angle = fanRot + (a * Math.PI / 2);
+                ctx.beginPath();
+                ctx.moveTo(Math.cos(angle) * 5, Math.sin(angle) * 5);
+                ctx.lineTo(Math.cos(angle) * 11, Math.sin(angle) * 11);
+                ctx.stroke();
+            }
+
+            const coreGrad = ctx.createRadialGradient(2, 0, 1, 2, 0, 5);
+            coreGrad.addColorStop(0.0, '#ffffff');
+            coreGrad.addColorStop(0.4, '#38bdf8');
+            coreGrad.addColorStop(1.0, '#0369a1');
+            ctx.fillStyle = coreGrad;
+            ctx.beginPath();
+            ctx.arc(2, 0, 5, 0, Math.PI * 2);
+            ctx.fill();
+
+            const flame = 8 + Math.sin(this.animTimer * 2) * 4;
+            ctx.fillStyle = 'rgba(0, 220, 255, 0.85)';
+            ctx.beginPath();
+            ctx.moveTo(-16, -4);
+            ctx.lineTo(-16 - flame, 0);
+            ctx.lineTo(-16, 4);
+            ctx.closePath();
+            ctx.fill();
+
+            ctx.fillStyle = '#ffffff';
+            ctx.beginPath();
+            ctx.moveTo(-16, -2);
+            ctx.lineTo(-16 - flame * 0.5, 0);
+            ctx.lineTo(-16, 2);
+            ctx.closePath();
+            ctx.fill();
         }
-
-        // 中心高輝度エネルギープラズマコア
-        const coreGrad = ctx.createRadialGradient(2, 0, 1, 2, 0, 5);
-        coreGrad.addColorStop(0.0, '#ffffff');
-        coreGrad.addColorStop(0.4, '#38bdf8');
-        coreGrad.addColorStop(1.0, '#0369a1');
-        ctx.fillStyle = coreGrad;
-        ctx.beginPath();
-        ctx.arc(2, 0, 5, 0, Math.PI * 2);
-        ctx.fill();
-
-        // バーニア噴射炎
-        const flame = 8 + Math.sin(this.animTimer * 2) * 4;
-        ctx.fillStyle = 'rgba(0, 220, 255, 0.85)';
-        ctx.beginPath();
-        ctx.moveTo(-16, -4);
-        ctx.lineTo(-16 - flame, 0);
-        ctx.lineTo(-16, 4);
-        ctx.closePath();
-        ctx.fill();
-
-        ctx.fillStyle = '#ffffff';
-        ctx.beginPath();
-        ctx.moveTo(-16, -2);
-        ctx.lineTo(-16 - flame * 0.5, 0);
-        ctx.lineTo(-16, 2);
-        ctx.closePath();
-        ctx.fill();
 
         ctx.restore();
     }
@@ -1285,13 +1346,13 @@ class RugraEnemy extends Enemy {
 // 火山 (Volcano) ＆ 火山弾 (VolcanoRock: 大きく放物線)
 // ------------------------------------------
 class Volcano extends Enemy {
-    constructor(x, y, isErupting = false) {
+    constructor(x, y, isErupting = true) {
         super(x, y);
-        this.width = 90;
-        this.height = 65;
+        this.width = 110;
+        this.height = 75;
         this.groundY = y;
         this.burstTimer = 0;
-        this.isErupting = isErupting; // ボス直前の激しい大噴火モード
+        this.isErupting = isErupting;
         this.magmaAnim = Math.random() * 10;
         this.hp = 9999; // 破壊不能ギミック
     }
@@ -1305,23 +1366,26 @@ class Volcano extends Enemy {
             this.x -= this.speed;
         }
 
-        this.magmaAnim += 0.12;
+        this.magmaAnim += 0.14;
         this.burstTimer++;
 
-        // 噴火頻度: 大噴火時は約24フレーム（0.4秒）ごとに火山弾を乱れ撃ち！
-        const threshold = this.isErupting ? 24 : 110;
-        if (this.burstTimer > threshold) {
-            this.burstTimer = 0;
-            if (typeof enemies !== 'undefined') {
-                const count = this.isErupting ? (Math.floor(Math.random() * 3) + 3) : 3;
-                for (let i = 0; i < count; i++) {
-                    const vx = (Math.random() - 0.65) * 4.2 - 1.2;
-                    const vy = - (Math.random() * 4.8 + 6.0); // 高く豪快に舞い上がる放物線
-                    enemies.push(new VolcanoRock(this.x + this.width / 2 + (Math.random() - 0.5) * 24, this.groundY - 18, vx, vy));
-                }
-                if (typeof particles !== 'undefined') {
-                    for (let p = 0; p < 6; p++) {
-                        particles.push(new Particle(this.x + this.width / 2, this.groundY - 20, Math.random() < 0.5 ? '#ff4400' : '#555555'));
+        // 画面内に火山が存在する間、本家同様にポコポコと岩石（火山弾）を連続噴射！
+        if (this.x > -80 && this.x < 850) {
+            // 約13フレーム（約0.22秒）ごとに1〜2個の火山弾を上空へ噴出！
+            if (this.burstTimer >= 13) {
+                this.burstTimer = 0;
+                if (typeof enemies !== 'undefined') {
+                    const count = Math.random() < 0.6 ? 1 : 2;
+                    for (let i = 0; i < count; i++) {
+                        const vx = (Math.random() - 0.58) * 3.8 - 0.9;
+                        const vy = -(Math.random() * 3.6 + 6.8); // 豪快に上空へ舞い上がる
+                        const size = Math.floor(Math.random() * 14) + 24; // 直径 24〜38px
+                        enemies.push(new VolcanoRock(this.x + this.width / 2 + (Math.random() - 0.5) * 22, this.groundY - this.height + 6, vx, vy, size));
+                    }
+                    if (typeof particles !== 'undefined') {
+                        for (let p = 0; p < 3; p++) {
+                            particles.push(new Particle(this.x + this.width / 2, this.groundY - this.height + 4, Math.random() < 0.5 ? '#ff4400' : '#885533'));
+                        }
                     }
                 }
             }
@@ -1342,8 +1406,8 @@ class Volcano extends Enemy {
 
         ctx.beginPath();
         ctx.moveTo(-this.width / 2, 0);
-        ctx.lineTo(-24, -this.height);
-        ctx.lineTo(24, -this.height);
+        ctx.lineTo(-28, -this.height);
+        ctx.lineTo(28, -this.height);
         ctx.lineTo(this.width / 2, 0);
         ctx.closePath();
         ctx.fill();
@@ -1356,12 +1420,12 @@ class Volcano extends Enemy {
         ctx.strokeStyle = `rgba(255, 68, 0, ${0.6 + Math.sin(this.magmaAnim) * 0.3})`;
         ctx.lineWidth = 2;
         ctx.beginPath();
-        ctx.moveTo(-10, -this.height + 8);
-        ctx.lineTo(-16, -this.height * 0.4);
-        ctx.lineTo(-26, 0);
-        ctx.moveTo(8, -this.height + 6);
-        ctx.lineTo(14, -this.height * 0.5);
-        ctx.lineTo(24, 0);
+        ctx.moveTo(-12, -this.height + 8);
+        ctx.lineTo(-18, -this.height * 0.4);
+        ctx.lineTo(-30, 0);
+        ctx.moveTo(10, -this.height + 6);
+        ctx.lineTo(16, -this.height * 0.5);
+        ctx.lineTo(28, 0);
         ctx.stroke();
 
         // 火口の白熱マグマ溜まり（激しく煮え滾る溶岩）
@@ -1377,7 +1441,7 @@ class Volcano extends Enemy {
         ctx.fillStyle = magmaGrad;
 
         ctx.beginPath();
-        ctx.ellipse(0, -this.height + 4, 22, 7, 0, 0, Math.PI * 2);
+        ctx.ellipse(0, -this.height + 4, 27, 8, 0, 0, Math.PI * 2);
         ctx.fill();
 
         ctx.restore();

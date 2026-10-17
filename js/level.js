@@ -42,17 +42,146 @@ class Terrain {
         this.topPoints = [];
         this.bottomPoints = [];
         this.scrollSpeed = 1.5;
-        this.textureOffsetX = 0; // 滑らかなテクスチャスクロール用オフセット
+        this.textureOffsetX = 0;
         this.active = false;
         this.generating = false;
-        this.targetTopY = 50;
-        this.targetBottomY = canvasHeight - 50;
+        this.currentSegIndex = 0;
+        this.spawnIndex = 0;
+
+        // 1985年アーケード版『グラディウス』Stage 1（火山面）完全再現プロファイルデータ
+        // 天井 (Top Y) & 床 (Bottom Y) - 全140セグメント (全長5600px)
+        this.topProfile = [
+            // 進入部 (seg 0-6): なだらかに天井が迫る
+            0, 10, 25, 45, 55, 60, 60,
+            // 第1丘陵 (seg 7-15): なだらかな起伏
+            60, 65, 75, 80, 75, 65, 60, 60, 65,
+            // 谷間と窪み (seg 16-27): 天井が少し低くなり、また広がる
+            75, 90, 110, 125, 110, 85, 70, 65, 70, 80, 75, 70,
+            // 第1火山エリア (seg 28-42): 火山対岸の天井（安定した岩盤と天井砲台）
+            70, 70, 75, 85, 90, 85, 75, 70, 70, 75, 80, 75, 70, 70, 70,
+            // 中間洞窟・山脈エリア (seg 43-60): 天井の岩嘴が下に迫り出す最狭部
+            75, 95, 125, 150, 155, 130, 95, 80, 90, 120, 145, 140, 105, 85, 75, 70, 75, 80,
+            // 第2火山エリア (seg 61-75): 2基目火山の対岸天井
+            85, 90, 85, 75, 70, 70, 75, 80, 75, 70, 70, 75, 80, 75, 70,
+            // 後半丘陵エリア (seg 76-95): 波打つ岩肌
+            75, 85, 105, 115, 100, 80, 70, 75, 90, 105, 95, 75, 70, 70, 75, 80, 75, 70, 65, 60,
+            // 終盤エリア・脱出部 (seg 96-112): 天井が徐々に高くなり、消滅
+            55, 50, 40, 30, 20, 10, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            // 宇宙空間 (seg 113-140): 星空のみ
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
+        ];
+        this.bottomProfile = [
+            // 進入部 (seg 0-6): なだらかに地面が隆起
+            600, 580, 550, 525, 510, 500, 490,
+            // 第1丘陵 (seg 7-15): なだらかな第1の丘
+            470, 440, 420, 420, 450, 480, 500, 510, 490,
+            // 谷間と窪み (seg 16-27): ハッチャーが鎮座する窪みと第2の丘
+            470, 450, 480, 510, 525, 510, 480, 450, 435, 450, 480, 500,
+            // 第1火山エリア (seg 28-42): なだらかに山が盛り上がり、頂上に火口（seg 33-35: Y=375）！
+            510, 490, 460, 420, 390, 375, 375, 375, 400, 440, 475, 505, 520, 520, 500,
+            // 中間洞窟・山脈エリア (seg 43-60): 起伏に富む丘陵と段差
+            470, 440, 420, 430, 460, 490, 510, 490, 460, 430, 415, 430, 465, 495, 515, 510, 485, 460,
+            // 第2火山エリア (seg 61-75): 再び雄大な山がそびえ、頂上に火口（seg 64-66: Y=365）！
+            440, 410, 380, 365, 365, 365, 390, 430, 470, 500, 515, 520, 510, 485, 460,
+            // 後半丘陵エリア (seg 76-95): 連続する起伏
+            435, 420, 445, 475, 500, 515, 490, 460, 435, 435, 465, 495, 515, 500, 470, 445, 460, 490, 510, 520,
+            // 終盤エリア・脱出部 (seg 96-112): 地面が低くなり、平坦になって消滅
+            525, 530, 540, 550, 560, 575, 590, 600, 600, 600, 600, 600, 600, 600, 600, 600, 600,
+            // 宇宙空間 (seg 113-140): 星空のみ
+            600, 600, 600, 600, 600, 600, 600, 600, 600, 600, 600, 600, 600, 600, 600, 600, 600, 600, 600, 600, 600, 600, 600, 600, 600, 600, 600, 600
+        ];
+
+        // 1985年アーケード版敵配置テーブル
+        this.spawns = [
+            { seg: 8, type: 'TURRET', isCeiling: true, isRed: false },
+            { seg: 10, type: 'TURRET', isCeiling: false, isRed: true }, // 赤砲台 → カプセル！
+            { seg: 12, type: 'DUCKER', isCeiling: false },
+            { seg: 14, type: 'HATCHER', isCeiling: false },
+            { seg: 18, type: 'TURRET', isCeiling: true, isRed: false },
+            { seg: 20, type: 'HATCHER', isCeiling: true },
+            { seg: 22, type: 'TURRET', isCeiling: false, isRed: false },
+            { seg: 24, type: 'GARUN', y: 260 },
+            { seg: 26, type: 'DUCKER', isCeiling: false },
+            { seg: 30, type: 'TURRET', isCeiling: true, isRed: false },
+            { seg: 34, type: 'VOLCANO_1' }, // ★第1火山！山頂 Y: 375
+            { seg: 38, type: 'TURRET', isCeiling: true, isRed: true }, // 赤砲台 → カプセル！
+            { seg: 44, type: 'TURRET', isCeiling: false, isRed: false },
+            { seg: 46, type: 'DUCKER', isCeiling: false },
+            { seg: 49, type: 'HATCHER', isCeiling: true },
+            { seg: 51, type: 'GARUN', y: 300 },
+            { seg: 53, type: 'TURRET', isCeiling: false, isRed: true }, // 赤砲台 → カプセル！
+            { seg: 55, type: 'TURRET', isCeiling: true, isRed: false },
+            { seg: 58, type: 'ZAB' },
+            { seg: 62, type: 'TURRET', isCeiling: true, isRed: false },
+            { seg: 65, type: 'VOLCANO_2' }, // ★第2火山！山頂 Y: 365
+            { seg: 69, type: 'DUCKER', isCeiling: true },
+            { seg: 71, type: 'TURRET', isCeiling: false, isRed: false },
+            { seg: 76, type: 'HATCHER', isCeiling: false },
+            { seg: 79, type: 'TURRET', isCeiling: true, isRed: false },
+            { seg: 82, type: 'DUCKER', isCeiling: false },
+            { seg: 85, type: 'GARUN', y: 250 },
+            { seg: 88, type: 'TURRET', isCeiling: false, isRed: true }, // 赤砲台 → カプセル！
+            { seg: 91, type: 'TURRET', isCeiling: true, isRed: false },
+            { seg: 94, type: 'ZAB' },
+            { seg: 98, type: 'DUCKER', isCeiling: false },
+            { seg: 101, type: 'TURRET', isCeiling: false, isRed: false }
+        ];
+
+        Terrain._initTexture();
+    }
+
+    static _initTexture() {
+        if (Terrain._pattern) return;
+        const patCanvas = document.createElement('canvas');
+        patCanvas.width = 64;
+        patCanvas.height = 64;
+        const pctx = patCanvas.getContext('2d');
+
+        // 砂岩・火山岩のベースカラー
+        pctx.fillStyle = '#8a6438';
+        pctx.fillRect(0, 0, 64, 64);
+
+        // 水平・斜めの地層クラックと陰影
+        pctx.fillStyle = '#6e4c24';
+        for (let y = 4; y < 64; y += 16) {
+            pctx.fillRect(0, y, 64, 3);
+            pctx.fillRect((y * 3) % 64, y - 4, 18, 4);
+        }
+
+        // ハイライト地層（サンドベージュ）
+        pctx.fillStyle = '#a67d4b';
+        for (let y = 10; y < 64; y += 16) {
+            pctx.fillRect(0, y, 64, 2);
+            pctx.fillRect(((y + 12) * 5) % 64, y + 2, 14, 3);
+        }
+
+        // 微細な火山岩ドット（粒状感）
+        pctx.fillStyle = '#543615';
+        for (let i = 0; i < 40; i++) {
+            const rx = (i * 17) % 64;
+            const ry = (i * 29) % 64;
+            pctx.fillRect(rx, ry, 2, 2);
+        }
+        pctx.fillStyle = '#bc9058';
+        for (let i = 0; i < 30; i++) {
+            const rx = (i * 23 + 7) % 64;
+            const ry = (i * 19 + 5) % 64;
+            pctx.fillRect(rx, ry, 2, 2);
+        }
+
+        const dummyCanvas = document.createElement('canvas');
+        const dctx = dummyCanvas.getContext('2d');
+        Terrain._pattern = dctx.createPattern(patCanvas, 'repeat');
     }
 
     start() {
         this.active = true;
         this.generating = true;
         this.textureOffsetX = 0;
+        this.currentSegIndex = 0;
+        this.spawnIndex = 0;
+        this.topPoints = [];
+        this.bottomPoints = [];
         let currentX = this.width;
         this.topPoints.push({ x: currentX, y: 0 });
         this.bottomPoints.push({ x: currentX, y: this.height });
@@ -68,7 +197,7 @@ class Terrain {
         // スクロール
         this.topPoints.forEach(p => p.x -= this.scrollSpeed);
         this.bottomPoints.forEach(p => p.x -= this.scrollSpeed);
-        this.textureOffsetX -= this.scrollSpeed; // 1px単位で滑らかに左へ移動
+        this.textureOffsetX -= this.scrollSpeed;
 
         // 画面外のポイントを削除（描画用に1つ手前まで残す）
         while (this.topPoints.length > 2 && this.topPoints[1].x < 0) {
@@ -76,7 +205,7 @@ class Terrain {
             this.bottomPoints.shift();
         }
 
-        // 新規生成が停止し、全ての地形が左に抜けたら非アクティブ化
+        // 新規生成が停止し、全ての地形ポイントが画面左に抜けたら非アクティブ化
         if (!this.generating) {
             if (this.topPoints.length <= 2 && this.topPoints[this.topPoints.length - 1].x < 0) {
                 this.active = false;
@@ -91,55 +220,54 @@ class Terrain {
             let lastX = this.topPoints.length > 0 ? this.topPoints[this.topPoints.length - 1].x : this.width;
             while (lastX < this.width + this.segmentWidth) {
                 lastX += this.segmentWidth;
-                
-                // 徐々に高さを変えて滑らかな岩肌を作る
-                this.targetTopY += (Math.random() - 0.5) * 50;
-                if (this.targetTopY < 20) this.targetTopY = 20;
-                if (this.targetTopY > 150) this.targetTopY = 150;
 
-                this.targetBottomY += (Math.random() - 0.5) * 50;
-                if (this.targetBottomY > this.height - 20) this.targetBottomY = this.height - 20;
-                if (this.targetBottomY < this.height - 150) this.targetBottomY = this.height - 150;
+                if (this.currentSegIndex < this.topProfile.length) {
+                    const topY = this.topProfile[this.currentSegIndex];
+                    const bottomY = this.bottomProfile[this.currentSegIndex];
 
-                this.topPoints.push({ x: lastX, y: this.targetTopY });
-                this.bottomPoints.push({ x: lastX, y: this.targetBottomY });
+                    this.topPoints.push({ x: lastX, y: topY });
+                    this.bottomPoints.push({ x: lastX, y: bottomY });
 
-                // 地形上の敵・ギミックのスポーン判定
-                if (typeof enemies !== 'undefined') {
-                    const roll = Math.random();
-                    // 砲台 (青銀 / たまに赤)
-                    if (roll < 0.08) {
-                        const isRed = Math.random() < 0.15;
-                        enemies.push(new TurretEnemy(lastX, this.targetTopY, true, isRed));
-                    } else if (roll < 0.16) {
-                        const isRed = Math.random() < 0.15;
-                        enemies.push(new TurretEnemy(lastX, this.targetBottomY, false, isRed));
-                    }
-                    // ダッカー（歩行ロボット: 地面または天井）
-                    else if (roll < 0.22) {
-                        const isCeil = Math.random() < 0.5;
-                        const isRed = Math.random() < 0.15;
-                        const gy = isCeil ? this.targetTopY : this.targetBottomY;
-                        if (typeof DuckerEnemy !== 'undefined') {
-                            enemies.push(new DuckerEnemy(lastX, gy, isCeil, isRed));
-                        }
-                    }
-                    // ハッチャー（母艦）
-                    else if (roll < 0.26) {
-                        const isCeil = Math.random() < 0.5;
-                        const gy = isCeil ? this.targetTopY : this.targetBottomY;
-                        if (typeof HatcherEnemy !== 'undefined') {
-                            enemies.push(new HatcherEnemy(lastX, gy, isCeil, false));
-                        }
-                    }
-                    // 火山（地面クレーター）
-                    else if (roll < 0.29) {
-                        if (typeof Volcano !== 'undefined') {
-                            enemies.push(new Volcano(lastX, this.targetBottomY));
-                        }
-                    }
+                    // セグメントごとの敵スポーン判定
+                    this.checkSpawnsForSeg(this.currentSegIndex, lastX, topY, bottomY);
+
+                    this.currentSegIndex++;
+                } else {
+                    // 全セグメントの生成完了！
+                    this.generating = false;
+                    break;
                 }
             }
+        }
+    }
+
+    checkSpawnsForSeg(segIdx, x, topY, bottomY) {
+        if (typeof enemies === 'undefined') return;
+
+        while (this.spawnIndex < this.spawns.length && this.spawns[this.spawnIndex].seg <= segIdx) {
+            const sp = this.spawns[this.spawnIndex];
+            if (sp.seg === segIdx) {
+                if (sp.type === 'TURRET' && typeof TurretEnemy !== 'undefined') {
+                    const gy = sp.isCeiling ? topY : bottomY;
+                    enemies.push(new TurretEnemy(x, gy, sp.isCeiling, !!sp.isRed));
+                } else if (sp.type === 'DUCKER' && typeof DuckerEnemy !== 'undefined') {
+                    const gy = sp.isCeiling ? topY : bottomY;
+                    enemies.push(new DuckerEnemy(x, gy, sp.isCeiling, false));
+                } else if (sp.type === 'HATCHER' && typeof HatcherEnemy !== 'undefined') {
+                    const gy = sp.isCeiling ? topY : bottomY;
+                    enemies.push(new HatcherEnemy(x, gy, sp.isCeiling));
+                } else if (sp.type === 'VOLCANO_1' || sp.type === 'VOLCANO_2') {
+                    if (typeof Volcano !== 'undefined') {
+                        // 火山を山頂に設置（幅110pxの火山を中央配置）
+                        enemies.push(new Volcano(x - 55, bottomY, true));
+                    }
+                } else if (sp.type === 'GARUN' && typeof GarunFormation !== 'undefined') {
+                    new GarunFormation(sp.y, Math.random() < 0.5, 4);
+                } else if (sp.type === 'ZAB' && typeof ZabSquad !== 'undefined') {
+                    new ZabSquad('ANYWHERE', null, 3);
+                }
+            }
+            this.spawnIndex++;
         }
     }
 
@@ -147,35 +275,59 @@ class Terrain {
         if (this.topPoints.length < 2) return;
 
         ctx.save();
-        if (typeof images !== 'undefined' && images.terrain && images.terrain.complete) {
-            const pattern = ctx.createPattern(images.terrain, 'repeat');
+        if (Terrain._pattern) {
             if (typeof DOMMatrix !== 'undefined') {
-                pattern.setTransform(new DOMMatrix().translate(this.textureOffsetX, 0));
+                Terrain._pattern.setTransform(new DOMMatrix().translate(this.textureOffsetX, 0));
             }
-            ctx.fillStyle = pattern;
+            ctx.fillStyle = Terrain._pattern;
         } else {
-            ctx.fillStyle = '#664422';
+            ctx.fillStyle = '#8a6438';
         }
 
-        ctx.strokeStyle = '#221100';
-        ctx.lineWidth = 2;
-
-        // 天井
+        // 天井ポリゴン
         ctx.beginPath();
         ctx.moveTo(this.topPoints[0].x, 0);
         this.topPoints.forEach(p => ctx.lineTo(p.x, p.y));
         ctx.lineTo(this.topPoints[this.topPoints.length - 1].x, 0);
         ctx.closePath();
         ctx.fill();
-        ctx.stroke();
 
-        // 地面
+        // 地面ポリゴン
         ctx.beginPath();
         ctx.moveTo(this.bottomPoints[0].x, this.height);
         this.bottomPoints.forEach(p => ctx.lineTo(p.x, p.y));
         ctx.lineTo(this.bottomPoints[this.bottomPoints.length - 1].x, this.height);
         ctx.closePath();
         ctx.fill();
+
+        // 重厚な火山岩輪郭エッジ（濃茶）
+        ctx.strokeStyle = '#221105';
+        ctx.lineWidth = 2.5;
+
+        // 天井ライン
+        ctx.beginPath();
+        this.topPoints.forEach((p, idx) => {
+            if (idx === 0) ctx.moveTo(p.x, p.y);
+            else ctx.lineTo(p.x, p.y);
+        });
+        ctx.stroke();
+
+        // 地面ライン
+        ctx.beginPath();
+        this.bottomPoints.forEach((p, idx) => {
+            if (idx === 0) ctx.moveTo(p.x, p.y);
+            else ctx.lineTo(p.x, p.y);
+        });
+        ctx.stroke();
+
+        // 地面上面のハイライトライン（明るいサンドゴールド）
+        ctx.strokeStyle = 'rgba(235, 185, 120, 0.65)';
+        ctx.lineWidth = 1.2;
+        ctx.beginPath();
+        this.bottomPoints.forEach((p, idx) => {
+            if (idx === 0) ctx.moveTo(p.x, p.y - 1);
+            else ctx.lineTo(p.x, p.y - 1);
+        });
         ctx.stroke();
 
         ctx.restore();
@@ -384,131 +536,89 @@ class LevelManager {
         this.starfield = new Starfield(canvasWidth, canvasHeight);
         this.terrain = new Terrain(canvasWidth, canvasHeight);
         this.time = 0;
-        this.state = 'WAVES'; // WAVES -> VOLCANO_SURVIVAL -> POST_VOLCANO -> BOSS -> STAGE_CLEAR -> STAGE2
+        this.state = 'AIR_BATTLE'; // AIR_BATTLE -> TERRAIN -> PRE_BOSS -> BOSS -> STAGE_CLEAR -> STAGE2
         this.stage = 1;
         this.boss = null;
-        this.floatingIslands = [];
-        this.islandSpawnTimes = [22000, 32000, 42000]; // 途中に3つ浮遊大陸をテンポ良く設置
-        this.islandSpawnedCount = 0;
-        this.volcanoSpawned = false; // 超巨大火山のスポーンフラグ
-        this.superVolcano = null;
-        this.volcanoSurvivalTimer = 0; // 30秒サバイバルタイマー (ms)
-        this.postVolcanoTimer = 0;
+        this.preBossTimer = 0;
+        this.preBossZabWave = 0;
         this.stageClearTimer = 0;
+
+        // 空中戦ファン編隊スケジュール（本家アーケード完全再現：7編隊・全滅で赤カプセル）
+        this.airWaveTimes = [800, 3200, 5600, 8000, 10400, 12800, 15200];
+        this.airWaveYs = [150, 420, 200, 380, 250, 340, 290];
+        this.airWaveSpawned = 0;
     }
 
     update(dt) {
         this.starfield.update();
 
         if (this.stage === 1) {
-            this.terrain.update();
+            this.time += dt;
 
-            // 浮遊大陸の更新
-            this.floatingIslands.forEach(island => island.update());
-            this.floatingIslands = this.floatingIslands.filter(island => island.active);
-            
-            if (this.state === 'WAVES') {
-                this.time += dt;
-                
-                // 20秒経過で地上地形が出現（空中戦からスムーズに地形戦へ突入）
-                if (this.time > 20000 && !this.terrain.active && this.terrain.topPoints.length === 0) {
+            if (this.state === 'AIR_BATTLE') {
+                // 空中戦フェーズ（0〜約17.5秒: 7編隊の赤いファンが順次飛来しカプセル補給）
+                if (this.airWaveSpawned < this.airWaveTimes.length) {
+                    if (this.time >= this.airWaveTimes[this.airWaveSpawned]) {
+                        const y = this.airWaveYs[this.airWaveSpawned];
+                        if (typeof Formation !== 'undefined') {
+                            new Formation(y, 4, true); // 赤ファン4機編隊（全滅で赤カプセル確定）
+                        }
+                        this.airWaveSpawned++;
+                    }
+                }
+
+                // 17.5秒経過で地上戦フェーズへ突入！
+                if (this.time >= 17500) {
+                    this.state = 'TERRAIN';
                     this.terrain.start();
-                    if (typeof Sound !== 'undefined') {
-                        Sound.playStageBgm(); // 陸地出現！最高に溌剌としたメインBGMへ劇的転換！
+                    if (typeof Sound !== 'undefined' && typeof Sound.playStageBgm === 'function') {
+                        Sound.playStageBgm(); // Challenger 1985 へ華麗に切り替え！
+                    }
+                }
+            } else if (this.state === 'TERRAIN') {
+                // 地上戦フェーズ（本家完全再現の固定地形マップ＋砲台・ダッカー・ハッチャー・2基の連続噴火火山）
+                this.terrain.update();
+
+                // 地形がすべて画面左に抜け去ったら、ボス前宇宙空間へ移行！
+                if (!this.terrain.active && this.terrain.currentSegIndex >= this.terrain.topProfile.length) {
+                    this.state = 'PRE_BOSS';
+                    this.preBossTimer = 0;
+                    this.preBossZabWave = 0;
+                    if (typeof Sound !== 'undefined' && typeof Sound.playBossBgm === 'function') {
+                        Sound.playBossBgm(); // Aircraft Carrier へ切り替え！
+                    }
+                }
+            } else if (this.state === 'PRE_BOSS') {
+                // ボス前宇宙戦フェーズ（約7秒間のボス前ザブラッシュ！）
+                this.preBossTimer += dt;
+
+                // 約1.8秒おきにザブ小隊がワープ突撃
+                if (this.preBossTimer > (this.preBossZabWave + 1) * 1800 && this.preBossZabWave < 3) {
+                    this.preBossZabWave++;
+                    if (typeof ZabSquad !== 'undefined') {
+                        new ZabSquad('ANYWHERE', null, 3);
                     }
                 }
 
-                // 途中に3つの浮遊大陸を順次出現（各島に4つのレーザー砲台）
-                if (this.islandSpawnedCount < 3 && this.time > this.islandSpawnTimes[this.islandSpawnedCount]) {
-                    const idx = this.islandSpawnedCount;
-                    // 島ごとに高さを変えてルートの戦略性を生む
-                    const heights = [200, 310, 230];
-                    const widths = [270, 290, 310];
-                    const thicks = [70, 80, 75];
-                    const island = new FloatingIsland(
-                        this.starfield.width + 50,
-                        heights[idx],
-                        widths[idx],
-                        thicks[idx],
-                        this.terrain.scrollSpeed
-                    );
-                    this.floatingIslands.push(island);
-                    this.islandSpawnedCount++;
-                }
-
-                // 52秒経過（浮遊大陸3基直後）で「超巨大火山 (SuperVolcano)」が堂々と進入！
-                if (this.time > 52000 && !this.volcanoSpawned && typeof SuperVolcano !== 'undefined') {
-                    this.volcanoSpawned = true;
-                    const spawnX = this.starfield.width + 30;
-                    const groundY = this.terrain.getBottomY(spawnX + 105);
-                    this.superVolcano = new SuperVolcano(spawnX, groundY);
-                    if (typeof enemies !== 'undefined') {
-                        enemies.push(this.superVolcano);
-                    }
-                }
-
-                // 超巨大火山が定位置（画面中央やや右 x <= 500）に到達したら、
-                // 画面スクロール完全停止＆20秒サバイバル大噴火イベント突入！
-                if (this.superVolcano && this.superVolcano.positioned && this.state === 'WAVES') {
-                    this.state = 'VOLCANO_SURVIVAL';
-                    this.volcanoSurvivalTimer = 20000; // 20秒間耐える！
-                    this.terrain.scrollSpeed = 0; // 地形スクロールをピタリと停止！
-                    this.superVolcano.startMajorEruption(); // 大噴火開始！
-                    // 原作準拠の緊迫BGM『Aircraft Carrier』を再生開始！
-                    if (typeof Sound !== 'undefined') {
-                        Sound.playVolcanoSurvivalBgm();
-                    }
-                }
-            } else if (this.state === 'VOLCANO_SURVIVAL') {
-                this.volcanoSurvivalTimer -= dt;
-
-                // 20秒耐え抜いたら火山沈静化、スクロール再開してボス戦へ！
-                if (this.volcanoSurvivalTimer <= 0) {
-                    this.volcanoSurvivalTimer = 0;
-                    if (this.superVolcano) {
-                        this.superVolcano.stopEruption();
-                    }
-                    this.terrain.scrollSpeed = 4.0; // スクロール再開（スムーズかつ確実に火山を画面外へ）
-                    this.terrain.stopGenerating(); // 新規地形生成を終了
-                    this.state = 'POST_VOLCANO';
-                    this.postVolcanoTimer = 0;
-                }
-            } else if (this.state === 'POST_VOLCANO') {
-                this.postVolcanoTimer += dt;
-                // 約4.5秒（地形と火山が完全に左に抜けた頃）でボス戦へ突入！
-                if (this.postVolcanoTimer > 4500 || !this.terrain.active) {
+                // 約7秒経過でビッグコア登場！
+                if (this.preBossTimer >= 7000) {
                     this.state = 'BOSS';
-                    this.time = 0;
-                    this.terrain.active = false;
-                    if (this.superVolcano && this.superVolcano.x + this.superVolcano.width < 0) {
-                        this.superVolcano.active = false;
-                        this.superVolcano = null;
-                    }
-                    if (typeof Sound !== 'undefined') Sound.playBossBgm();
                     if (typeof Boss !== 'undefined') {
-                        this.boss = new Boss(this.starfield.width, 200);
+                        this.boss = new Boss(this.starfield.width, 220);
                     }
                 }
             } else if (this.state === 'BOSS') {
-                if (this.superVolcano && (!this.superVolcano.active || this.superVolcano.x + this.superVolcano.width < 0)) {
-                    this.superVolcano.active = false;
-                    this.superVolcano = null;
-                }
+                // ビッグコア戦
                 if (this.boss) {
                     this.boss.update();
                     if (!this.boss.active) {
                         this.state = 'STAGE_CLEAR';
                         this.stageClearTimer = 0;
-                        if (this.superVolcano) {
-                            this.superVolcano.active = false;
-                            this.superVolcano = null;
-                        }
                     }
                 }
             } else if (this.state === 'STAGE_CLEAR') {
                 this.stageClearTimer += dt;
-                // 本家グラディウス同様、自機を右端に押し付けずプレイヤーの自由操作を維持したまま次ステージへ遷移
-                // 約3秒後にステージ2（ストーンヘンジ面）へ突入
+                // 本家グラディウス同様、自機の自由操作を維持したまま約3秒後にステージ2へ突入！
                 if (this.stageClearTimer > 3000) {
                     this.startStage2();
                 }
@@ -517,7 +627,7 @@ class LevelManager {
             // ステージ2: ストーンヘンジ面の更新
             if (typeof stonehengeStage !== 'undefined' && stonehengeStage) {
                 stonehengeStage.update(dt);
-                // STAGE_CLEAR / ALL_CLEAR 後 3 秒でステージ3へ遷移（バックアップガード）
+                // STAGE_CLEAR / ALL_CLEAR 後 3 秒でステージ3へ遷移
                 if (stonehengeStage.state === 'STAGE_CLEAR' || stonehengeStage.state === 'ALL_CLEAR') {
                     if (!this.stage2ClearTimer) this.stage2ClearTimer = 0;
                     this.stage2ClearTimer += dt;
@@ -551,19 +661,13 @@ class LevelManager {
 
     startStage1() {
         this.stage = 1;
-        this.state = 'WAVES';
+        this.state = 'AIR_BATTLE';
         this.time = 0;
         this.boss = null;
-        if (this.superVolcano) {
-            this.superVolcano.active = false;
-            this.superVolcano = null;
-        }
-        this.volcanoSpawned = false;
-        this.volcanoSurvivalTimer = 0;
-        this.postVolcanoTimer = 0;
+        this.preBossTimer = 0;
+        this.preBossZabWave = 0;
         this.stageClearTimer = 0;
-        this.floatingIslands = [];
-        this.islandSpawnedCount = 0;
+        this.airWaveSpawned = 0;
         this.terrain.active = false;
         this.terrain.generating = false;
         this.terrain.topPoints = [];
@@ -598,11 +702,6 @@ class LevelManager {
         this.state = 'STAGE2';
         this.time = 0;
         this.boss = null;
-        if (this.superVolcano) {
-            this.superVolcano.active = false;
-            this.superVolcano = null;
-        }
-        this.floatingIslands = [];
         this.terrain.active = false;
         this.terrain.topPoints = [];
         this.terrain.bottomPoints = [];
@@ -610,14 +709,12 @@ class LevelManager {
         // 1面の火山や火山弾、残存敵を一掃
         if (typeof enemies !== 'undefined' && Array.isArray(enemies)) {
             enemies = enemies.filter(e => {
-                if (typeof SuperVolcano !== 'undefined' && e instanceof SuperVolcano) return false;
+                if (typeof Volcano !== 'undefined' && e instanceof Volcano) return false;
                 if (typeof VolcanoRock !== 'undefined' && e instanceof VolcanoRock) return false;
                 return e.active;
             });
             window.enemies = enemies;
         }
-
-        // 自機とオプションの現在位置・軌跡をそのまま維持し、ワープ現象を防止
 
         if (typeof StonehengeStage !== 'undefined') {
             stonehengeStage = new StonehengeStage(this.starfield.width, this.starfield.height);
@@ -645,7 +742,6 @@ class LevelManager {
         if (typeof enemies !== 'undefined') enemies.length = 0;
         if (typeof enemyBullets !== 'undefined') enemyBullets.length = 0;
 
-        // 自機とオプションの現在位置・軌跡をそのまま維持し、ワープ現象を防止
         if (typeof player !== 'undefined') {
             if (typeof player.vx !== 'undefined') player.vx = 0;
             if (typeof player.vy !== 'undefined') player.vy = 0;
@@ -663,7 +759,7 @@ class LevelManager {
         }
         if (typeof Sound !== 'undefined' && typeof Sound.playAirBgm === 'function') {
             try {
-                Sound.playAirBgm(); // 3面開幕も原作通り宇宙空中戦BGM（Beginning of the History）からスタート！
+                Sound.playAirBgm();
             } catch (serr) {
                 console.warn('Sound playAirBgm error:', serr);
             }
@@ -678,11 +774,6 @@ class LevelManager {
         this.boss = null;
 
         // 前ステージの残骸をクリア
-        if (this.superVolcano) {
-            this.superVolcano.active = false;
-            this.superVolcano = null;
-        }
-        this.floatingIslands = [];
         this.terrain.active = false;
         this.terrain.topPoints = [];
         this.terrain.bottomPoints = [];
@@ -697,7 +788,6 @@ class LevelManager {
         if (typeof enemies !== 'undefined') enemies.length = 0;
         if (typeof enemyBullets !== 'undefined') enemyBullets.length = 0;
 
-        // 自機とオプションの現在位置・軌跡をそのまま維持し、ワープ現象を防止
         if (typeof player !== 'undefined') {
             if (typeof player.vx !== 'undefined') player.vx = 0;
             if (typeof player.vy !== 'undefined') player.vy = 0;
@@ -715,7 +805,7 @@ class LevelManager {
         }
         if (typeof Sound !== 'undefined' && typeof Sound.playAirBgm === 'function') {
             try {
-                Sound.playAirBgm(); // 4面開幕も原作通り宇宙空中戦BGM（Beginning of the History）からスタート！
+                Sound.playAirBgm();
             } catch (serr) {
                 console.warn('Sound playAirBgm error:', serr);
             }
@@ -724,14 +814,8 @@ class LevelManager {
 
     checkCollision(rect) {
         if (this.stage === 1) {
-            // 地形との衝突
+            // 地形との衝突判定
             if (this.terrain && this.terrain.checkCollision(rect)) return true;
-            // 浮遊大陸との衝突
-            for (let i = 0; i < this.floatingIslands.length; i++) {
-                if (this.floatingIslands[i].checkCollision(rect)) return true;
-            }
-            // 超巨大火山との衝突
-            if (this.superVolcano && this.superVolcano.checkCollision(rect)) return true;
         } else if (this.stage === 2) {
             if (typeof stonehengeStage !== 'undefined' && stonehengeStage) {
                 return stonehengeStage.checkCollision(rect);
@@ -751,47 +835,8 @@ class LevelManager {
     draw(ctx) {
         if (this.stage === 1) {
             this.starfield.draw(ctx);
-            this.terrain.draw(ctx);
-            
-            // 浮遊大陸の描画
-            this.floatingIslands.forEach(island => island.draw(ctx));
-
-            // 火山大噴火サバイバルHUD演出（画面上部の緊迫した警告・カウントダウン）
-            if (this.state === 'VOLCANO_SURVIVAL') {
-                ctx.save();
-                const remainSec = Math.max(0, (this.volcanoSurvivalTimer / 1000)).toFixed(1);
-                const pulse = Math.sin(Date.now() * 0.008);
-
-                // 上部警告バナー背景（半透明黒＋赤熱グロー枠）
-                ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
-                ctx.fillRect(this.starfield.width / 2 - 250, 14, 500, 56);
-                ctx.strokeStyle = `rgba(255, 68, 0, ${0.7 + pulse * 0.3})`;
-                ctx.lineWidth = 2.5;
-                ctx.strokeRect(this.starfield.width / 2 - 250, 14, 500, 56);
-
-                ctx.textAlign = 'center';
-                ctx.font = 'bold 20px "Courier New", monospace';
-                ctx.fillStyle = '#ff3300';
-                ctx.shadowColor = '#ff5500';
-                ctx.shadowBlur = 12;
-                ctx.fillText('WARNING: VOLCANO MAJOR ERUPTION!', this.starfield.width / 2, 38);
-
-                ctx.font = 'bold 18px "Courier New", monospace';
-                ctx.fillStyle = '#ffea00';
-                ctx.shadowColor = '#ffaa00';
-                ctx.shadowBlur = 10;
-                ctx.fillText(`SURVIVE : ${remainSec}s`, this.starfield.width / 2, 60);
-
-                ctx.restore();
-            } else if (this.state === 'POST_VOLCANO') {
-                ctx.save();
-                ctx.textAlign = 'center';
-                ctx.font = 'bold 22px "Courier New", monospace';
-                ctx.fillStyle = '#00ffff';
-                ctx.shadowColor = '#0088ff';
-                ctx.shadowBlur = 10;
-                ctx.fillText('VOLCANO SUBSIDED - ENEMY CORE APPROACHING!', this.starfield.width / 2, 45);
-                ctx.restore();
+            if (this.terrain.active) {
+                this.terrain.draw(ctx);
             }
             
             if (this.state === 'BOSS' && this.boss) {

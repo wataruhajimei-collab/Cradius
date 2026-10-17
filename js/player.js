@@ -141,6 +141,13 @@ class Player {
             this.weaponType = 'LASER';
         }
 
+        // テスト用ショートカット: 1キーで即座にステージ1（火山面）へワープ
+        if (Input.isDown('Digit1')) {
+            if (typeof levelManager !== 'undefined') {
+                levelManager.startStage1();
+            }
+        }
+
         // テスト用ショートカット: 2キーで即座にステージ2（ストーンヘンジ面）へワープ
         if (Input.isDown('Digit2')) {
             if (typeof levelManager !== 'undefined' && levelManager.stage !== 2) {
@@ -162,12 +169,17 @@ class Player {
             }
         }
 
-        // テスト用ショートカット: Vキーで即座に1面火山大噴火または4面クラゲロボット大巡回ゾーンへワープ
+        // テスト用ショートカット: Vキーで即座に1面火山ゾーンまたは4面クラゲロボット大巡回ゾーンへワープ
         if (Input.isDown('KeyV')) {
             if (typeof levelManager !== 'undefined') {
                 if (levelManager.stage === 1) {
-                    levelManager.time = 65500;
-                    if (!levelManager.terrain.active) levelManager.terrain.start();
+                    levelManager.state = 'TERRAIN';
+                    levelManager.terrain.start();
+                    levelManager.terrain.currentSegIndex = 28;
+                    levelManager.time = 18000;
+                    if (typeof Sound !== 'undefined' && typeof Sound.playStageBgm === 'function') {
+                        Sound.playStageBgm();
+                    }
                 } else if (levelManager.stage === 4 && window.stage4 && window.stage4.state === 'STAGE') {
                     if (typeof window.stage4.startJellyfishRush === 'function') {
                         window.stage4.startJellyfishRush();

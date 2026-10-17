@@ -78,8 +78,13 @@ function startOrJumpStage(stageNum = 1, mode = 'STAGE', autoEquipPower = null) {
         if (targetStage === 1) {
             levelManager.startStage1();
             if (mode === 'VOLCANO') {
-                levelManager.time = 51500;
-                if (!levelManager.terrain.active) levelManager.terrain.start();
+                levelManager.state = 'TERRAIN';
+                levelManager.terrain.start();
+                levelManager.terrain.currentSegIndex = 28;
+                levelManager.time = 18000;
+                if (typeof Sound !== 'undefined' && typeof Sound.playStageBgm === 'function') {
+                    Sound.playStageBgm();
+                }
             } else if (mode === 'BOSS') {
                 levelManager.state = 'BOSS';
                 levelManager.terrain.active = false;
@@ -87,7 +92,7 @@ function startOrJumpStage(stageNum = 1, mode = 'STAGE', autoEquipPower = null) {
                     Sound.playBossBgm(true);
                 }
                 if (typeof Boss !== 'undefined') {
-                    levelManager.boss = new Boss(levelManager.starfield.width, 200);
+                    levelManager.boss = new Boss(levelManager.starfield.width, 220);
                 }
             }
         } else if (targetStage === 2) {
@@ -490,79 +495,7 @@ function update(dt) {
 
     levelManager.update(dt);
 
-    // ----------------------------------------------------
-    // 敵の大群スポーン（10倍密度・青銀基調・たまに赤でカプセル）
-    // ----------------------------------------------------
-    if (levelManager.state === 'WAVES') {
-        enemySpawnTimer += dt;
-        const stageTime = levelManager.time;
-
-        // 空中戦フェーズ（0〜40秒）: 大きな編隊が約850msごとに整然と襲来！
-        if (stageTime < 40000) {
-            if (enemySpawnTimer > 850) {
-                const roll = Math.random();
-                const y = Math.random() * (canvas.height - 240) + 120;
-
-                // 1. Fan編隊（4機の群れ：全滅でカプセル確定）
-                if (roll < 0.45) {
-                    if (typeof Formation !== 'undefined') {
-                        new Formation(y, 4);
-                    }
-                }
-                // 2. Garun編隊（4機のUターン群れ：全滅でカプセル確定）
-                else if (roll < 0.75) {
-                    if (typeof GarunFormation !== 'undefined') {
-                        const isUp = Math.random() < 0.5;
-                        new GarunFormation(y, isUp, 4);
-                    }
-                }
-                // 3. Zab小隊（3機の奇襲群れ：全滅でカプセル確定）
-                else if (roll < 0.90) {
-                    if (typeof ZabSquad !== 'undefined') {
-                        const sides = ['TOP', 'BOTTOM', 'BACK', 'FRONT'];
-                        const side = sides[Math.floor(Math.random() * sides.length)];
-                        new ZabSquad(side, y, 3);
-                    }
-                }
-                // 4. ルグラ（高速突進迎撃機）
-                else {
-                    if (typeof RugraEnemy !== 'undefined') {
-                        enemies.push(new RugraEnemy(canvas.width, y));
-                    }
-                }
-                enemySpawnTimer = 0;
-            }
-        }
-        // 地形激戦フェーズ（40〜130秒）: 地形敵＋空からの編隊が約1050msごとに襲来！
-        else if (stageTime < 130000) {
-            if (enemySpawnTimer > 1050) {
-                const roll = Math.random();
-                const y = Math.random() * (canvas.height - 300) + 150;
-
-                // Fan編隊（全滅でカプセル）
-                if (roll < 0.45) {
-                    if (typeof Formation !== 'undefined') {
-                        new Formation(y, 4);
-                    }
-                }
-                // Zab小隊（全滅でカプセル）
-                else if (roll < 0.75) {
-                    if (typeof ZabSquad !== 'undefined') {
-                        const side = Math.random() < 0.4 ? 'BACK' : 'FRONT';
-                        new ZabSquad(side, y, 3);
-                    }
-                }
-                // ルグラ高速突進
-                else {
-                    if (typeof RugraEnemy !== 'undefined') {
-                        enemies.push(new RugraEnemy(canvas.width, y));
-                    }
-                }
-                enemySpawnTimer = 0;
-            }
-        }
-        // 地形離脱フェーズ（130〜145秒）: ボス直前の静寂
-    }
+    // ステージ1のスポーンおよび進行はLevelManager（アーケード完全準拠）にて自律管理されます
 
     enemies.forEach(e => e.update());
     enemies = enemies.filter(e => {

@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <title>1985 Arcade Authentic Stage 1 Verification</title>
+</head>
+<body>
+    <h1>1985 Arcade Authentic Stage 1 Full Verification</h1>
+    <div id="results">Running tests...</div>
+
+    <script src="js/sound.js"></script>
+    <script src="js/input.js"></script>
+    <script src="js/collision.js"></script>
+    <script src="js/particle.js"></script>
+    <script src="js/bullet.js"></script>
+    <script src="js/enemy.js"></script>
+    <script src="js/powerup.js"></script>
+    <script src="js/ui.js"></script>
+    <script src="js/option.js"></script>
+    <script src="js/level.js"></script>
+    <script src="js/stonehenge.js"></script>
+    <script src="js/boss.js"></script>
+    <script src="js/player.js"></script>
+
+    <script>
+        const log = [];
+        function assert(condition, msg) {
+            if (!condition) {
+                log.push('FAIL: ' + msg);
+                console.error('FAIL: ' + msg);
+                throw new Error(msg);
+            } else {
+                log.push('PASS: ' + msg);
+            }
+        }
+
+        window.enemies = [];
+        window.enemyBullets = [];
+        window.playerBullets = [];
+        window.capsules = [];
+        window.particles = [];
+        window.player = new Player(100, 300);
+
+        try {
+            // ==========================================
+            // TEST 1: LevelManager Stage 1 初期状態
+            // ==========================================
+            log.push('--- TEST 1: LevelManager Stage 1 Initialization ---');
+            const lm = new LevelManager(800, 600);
+            window.levelManager = lm;
+            lm.startStage1();
+
+            assert(lm.stage === 1, "Stage is 1");
+            assert(lm.state === 'AIR_BATTLE', "Initial state is AIR_BATTLE");
+            assert(lm.airWaveTimes.length === 7, "Exactly 7 aerial waves scheduled");
+            assert(lm.terrain.topProfile.length >= 140, "Fixed terrain has at least 140 top profile segments");
+            assert(lm.terrain.bottomProfile.length === lm.terrain.topProfile.length, "Bottom profile matches top profile length");
+
+            // ==========================================
+            // TEST 2: 空中戦ファン編隊と赤カプセル
+            // ==========================================
+            log.push('--- TEST 2: Aerial Battle Red Fan Formation ---');
+            enemies.length = 0;
+            capsules.length = 0;
+            const form = new Formation(200, 4, true);
+            assert(form.totalCount === 4, "Formation count is 4");
+            assert(form.enemies.length === 4, "4 FanEnemies created");
+            assert(form.enemies[0].isRed === true, "FanEnemy isRed is true (arcade authentic)");
+
+            // 編隊全滅で赤カプセル確定ドロップ
+            for (let i = 0; i < 4; i++) {
+                form.notifyDestroyed(400, 200);
+            }
+            assert(capsules.length === 1, "Capsule dropped upon formation destruction");
+
+            // ==========================================
+            // TEST 3: 固定地形マップと火山配置
+            // ==========================================
+            log.push('--- TEST 3: Authentic Stage 1 Fixed Terrain & Volcanoes ---');
+            enemies.length = 0;
+            lm.terrain.start();
+            assert(lm.terrain.active === true, "Terrain is active");
+            assert(lm.terrain.generating === true, "Terrain is generating");
+
+            // 地形をスクロール・セグメント進行させて火山や砲台をスポーンさせる
+            for (let f = 0; f < 1100; f++) {
+                lm.terrain.update();
+            }
+
+            const volcanoes = enemies.filter(e => e instanceof Volcano);
+            assert(volcanoes.length >= 1, "At least Volcano 1 has spawned on the mountain peak");
+            const v1 = volcanoes[0];
+            assert(v1.width === 110, "Volcano width is authentic 110px");
+            assert(v1.height === 75, "Volcano height is 75px");
+
+            // 火山からの火山弾噴射テスト
+            const initialRockCount = enemies.filter(e => e instanceof VolcanoRock).length;
+            v1.x = 400; // 画面中央に配置
+            for (let f = 0; f < 30; f++) {
+                v1.update();
+            }
+            const afterRockCount = enemies.filter(e => e instanceof VolcanoRock).length;
+            assert(afterRockCount > initialRockCount, "Volcano continuously erupts VolcanoRocks");
+
+            // ==========================================
+            // TEST 4: 地形上の敵ラインナップ（砲台、ダッカー、ハッチャー、ガルン、ザブ）
+            // ==========================================
+            log.push('--- TEST 4: Stage 1 Enemy Lineup ---');
+            // 全セグメントを走査してスポーンテーブルを検証
+            const types = lm.terrain.spawns.map(s => s.type);
+            assert(types.includes('TURRET'), "Lineup includes Turret");
+            assert(types.includes('DUCKER'), "Lineup includes Ducker");
+            assert(types.includes('HATCHER'), "Lineup includes Hatcher");
+            assert(types.includes('VOLCANO_1'), "Lineup includes Volcano 1");
+            assert(types.includes('VOLCANO_2'), "Lineup includes Volcano 2");
+            assert(types.includes('GARUN'), "Lineup includes Garun");
+            assert(types.includes('ZAB'), "Lineup includes Zab");
+
+            // 1面にはルグラ、ジャンパー、アイアンメイデン等の非原作敵は含まれない
+            assert(!types.includes('JUMPER'), "Stage 1 does NOT contain Jumper");
+            assert(!types.includes('IRON_MAIDEN'), "Stage 1 does NOT contain Iron Maiden");
+            assert(!types.includes('RUGRA'), "Stage 1 does NOT contain Rugra");
+
+            // ==========================================
+            // TEST 5: ボス前ザブラッシュ＆ビッグコア
+            // ==========================================
+            log.push('--- TEST 5: Pre-Boss Zab Rush & Big Core ---');
+            lm.state = 'PRE_BOSS';
+            lm.preBossTimer = 7100;
+            lm.update(16);
+            assert(lm.state === 'BOSS', "State transitioned to BOSS");
+            assert(lm.boss instanceof Boss, "Big Core Boss spawned");
+
+            log.push('ALL 5 TESTS PASSED SUCCESSFULLY!');
+            document.getElementById('results').innerHTML = '<pre>' + log.join('\n') + '</pre>';
+        } catch (err) {
+            document.getElementById('results').innerHTML = '<pre style="color:red">' + log.join('\n') + '\nERROR: ' + err.message + '</pre>';
+        }
+    </script>
+</body>
+</html>
