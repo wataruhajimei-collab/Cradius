@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
@@ -6,12 +6,12 @@
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
     <meta http-equiv="Expires" content="0">
-    <title>ã‚¯ãƒ©ãƒ‡ã‚£ã‚¦ã‚¹</title>
-    <!-- ãƒ›ãƒ¼ãƒ ç”»é¢è¿½åŠ ç”¨ã‚¢ã‚¤ã‚³ãƒ³ãƒ»Webã‚¢ãƒ—ãƒªè¨­å®š -->
+    <title>クラディウス</title>
+    <!-- ホーム画面追加用アイコン・Webアプリ設定 -->
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <meta name="apple-mobile-web-app-title" content="ã‚¯ãƒ©ãƒ‡ã‚£ã‚¦ã‚¹">
-    <meta name="application-name" content="ã‚¯ãƒ©ãƒ‡ã‚£ã‚¦ã‚¹">
+    <meta name="apple-mobile-web-app-title" content="クラディウス">
+    <meta name="application-name" content="クラディウス">
     <meta name="theme-color" content="#000000">
     <link rel="apple-touch-icon" href="apple-touch-icon.png">
     <link rel="icon" type="image/png" href="favicon.png">
@@ -23,14 +23,14 @@
 </head>
 <body>
     <div id="game-wrapper">
-        <!-- ã‚²ãƒ¼ãƒ ç”»é¢ï¼ˆç”»é¢ç›®ä¸€æ¯ã«æ‹¡å¤§ï¼‰ -->
+        <!-- ゲーム画面（画面目一杯に拡大） -->
         <div id="game-container">
             <canvas id="gameCanvas" width="800" height="600"></canvas>
         </div>
-        <!-- ã‚¢ãƒ¼ã‚±ãƒ¼ãƒ‰ãƒ»ã‚°ãƒ©ãƒ‡ã‚£ã‚¦ã‚¹å¿ å®Ÿå†ç¾ã‚¿ã‚¤ãƒˆãƒ«ç”»é¢ã‚ªãƒ¼ãƒãƒ¼ãƒ¬ã‚¤ -->
+        <!-- アーケード・グラディウス忠実再現タイトル画面オーバーレイ -->
         <div id="start-screen" class="arcade-start-screen">
             <div class="arcade-cabinet-frame">
-                <!-- ä¸Šéƒ¨ã‚¹ã‚³ã‚¢è¡¨ç¤ºè¡Œ (1P / HI / 2P) -->
+                <!-- 上部スコア表示行 (1P / HI / 2P) -->
                 <div class="arcade-top-score-row">
                     <div class="arcade-score-item">
                         <span class="arcade-score-label">1P</span>
@@ -46,12 +46,12 @@
                     </div>
                 </div>
 
-                <!-- ãƒ¡ã‚¤ãƒ³ã‚¦ã‚¤ãƒ³ã‚°ã‚¨ãƒ³ãƒ–ãƒ¬ãƒ ãƒ­ã‚´ -->
+                <!-- メインウイングエンブレムロゴ -->
                 <div class="arcade-title-block">
                     <img src="assets/title_logo.svg" alt="CRADIUS" class="arcade-title-logo">
                 </div>
 
-                <!-- ä¸­å¤®ãƒ†ã‚­ã‚¹ãƒˆ: ã‚³ã‚¤ãƒ³æŠ•å…¥ï¼ã‚¹ã‚¿ãƒ¼ãƒˆ & ãƒœãƒ¼ãƒŠã‚¹ã‚¹ã‚³ã‚¢å‘ŠçŸ¥ -->
+                <!-- 中央テキスト: コイン投入／スタート & ボーナススコア告知 -->
                 <div class="arcade-center-block">
                     <div id="btn-start" class="arcade-coin-prompt" role="button" tabindex="0">PLEASE DEPOSIT COIN</div>
                     
@@ -66,35 +66,35 @@
                         </div>
                     </div>
 
-                    <!-- BGMé›†ï¼ˆã‚µã‚¦ãƒ³ãƒ‰ãƒ†ã‚¹ãƒˆï¼‰ã‚’é–‹ããƒœã‚¿ãƒ³ -->
+                    <!-- BGM集（サウンドテスト）を開くボタン -->
                     <button id="btn-bgm-collection" type="button" class="arcade-bgm-collection-btn">
-                        ðŸŽµ BGMé›†ã‚’é–‹ã (SOUND TEST)
+                        🎵 BGM集を開く (SOUND TEST)
                     </button>
 
-                    <!-- é–‹ç™ºè€…å°‚ç”¨éš ã—ã‚¹ãƒ†ãƒ¼ã‚¸ã‚»ãƒ¬ã‚¯ãƒˆï¼ˆåˆæœŸçŠ¶æ…‹ã¯éžè¡¨ç¤ºï¼šKomamiãƒ­ã‚´3å›žã‚¿ãƒƒãƒ—ã§ã®ã¿å‡ºç¾ï¼‰ -->
+                    <!-- 開発者専用隠しステージセレクト（初期状態は非表示：Komamiロゴ3回タップでのみ出現） -->
                     <div id="title-stage-select" class="arcade-stage-select-row dev-secret-hidden" style="display: none;" aria-hidden="true">
                         <button type="button" class="arcade-stage4-direct-btn btn-st1" data-stage="1" data-mode="STAGE">
-                            ðŸŒ‹ 1é¢ (ç«å±±)
+                            🌋 1面 (火山)
                         </button>
                         <button type="button" class="arcade-stage4-direct-btn btn-st2" data-stage="2" data-mode="STAGE">
-                            ðŸ—¿ 2é¢ (ã‚¹ãƒˆãƒ¼ãƒ³ãƒ˜ãƒ³ã‚¸)
+                            🗿 2面 (ストーンヘンジ)
                         </button>
                         <button type="button" class="arcade-stage4-direct-btn btn-st3" data-stage="3" data-mode="STAGE">
-                            ðŸ—¿ 3é¢ (ãƒ¢ã‚¢ã‚¤éºè·¡)
+                            🗿 3面 (モアイ遺跡)
                         </button>
                         <button type="button" class="arcade-stage4-direct-btn" data-stage="4" data-mode="STAGE">
-                            ðŸ”¥ 4é¢ (é€†ç«å±±)
+                            🔥 4面 (逆火山)
                         </button>
                         <button type="button" class="arcade-stage4-direct-btn btn-jellyfish" data-stage="4" data-mode="JELLYFISH">
-                            ðŸ¤– 4é¢ãƒ»å¤§åž‹ãƒ¡ã‚«å·¡å›ž
+                            🤖 4面・大型メカ巡回
                         </button>
                         <button type="button" class="arcade-stage4-direct-btn" data-stage="4" data-mode="BOSS">
-                            ðŸ‘‘ 4é¢ãƒ»ãƒœã‚¹
+                            👑 4面・ボス
                         </button>
                     </div>
                 </div>
 
-                <!-- ä¸‹éƒ¨: ã‚³ãƒžãƒŸãƒ­ã‚´ãƒ»è‘—ä½œæ¨© & ã‚¯ãƒ¬ã‚¸ãƒƒãƒˆè¡¨ç¤ºï¼ˆKomamiãƒ­ã‚´ã‚¿ãƒƒãƒ—ã§é–‹ç™ºè€…ç”¨ãƒ¡ãƒ‹ãƒ¥ãƒ¼è¡¨ç¤ºï¼‰ -->
+                <!-- 下部: コマミロゴ・著作権 & クレジット表示（Komamiロゴタップで開発者用メニュー表示） -->
                 <div class="arcade-footer-block">
                     <div class="konami-brand-row">
                         <span id="secret-konami-logo" class="konami-wordmark">Komami<span class="konami-reg">&reg;</span></span>
@@ -108,102 +108,102 @@
                     </div>
                 </div>
 
-                <!-- æ“ä½œãƒ’ãƒ³ãƒˆ -->
+                <!-- 操作ヒント -->
                 <div class="arcade-tap-hint">TAP SCREEN OR PRESS [SPACE] TO START</div>
             </div>
         </div>
 
-        <!-- BGMé›†ï¼ˆã‚µã‚¦ãƒ³ãƒ‰ãƒ†ã‚¹ãƒˆï¼‰ãƒ¢ãƒ¼ãƒ€ãƒ« -->
+        <!-- BGM集（サウンドテスト）モーダル -->
         <div id="bgm-modal" class="bgm-modal-overlay" aria-hidden="true">
             <div class="bgm-modal-dialog" role="dialog" aria-labelledby="bgm-modal-title">
                 <div class="bgm-modal-header">
-                    <h2 id="bgm-modal-title" class="bgm-modal-title">ðŸŽµ BGM COLLECTION</h2>
-                    <button id="btn-bgm-close" type="button" class="bgm-modal-close-btn" aria-label="é–‰ã˜ã‚‹">âœ• é–‰ã˜ã‚‹</button>
+                    <h2 id="bgm-modal-title" class="bgm-modal-title">🎵 BGM COLLECTION</h2>
+                    <button id="btn-bgm-close" type="button" class="bgm-modal-close-btn" aria-label="閉じる">✕ 閉じる</button>
                 </div>
-                <div id="bgm-now-playing" class="bgm-now-playing">æ›²ã‚’é¸æŠžã—ã¦è©¦è´ã§ãã¾ã™</div>
+                <div id="bgm-now-playing" class="bgm-now-playing">曲を選択して試聴できます</div>
                 <div class="bgm-track-list">
                     <button type="button" class="bgm-track-btn" data-bgm="AIR">
                         <span class="bgm-track-num">01</span>
                         <span class="bgm-track-info">
-                            <span class="bgm-track-name">BEGINNING OF THE HISTORY (ç©ºä¸­æˆ¦BGM)</span>
-                            <span class="bgm-track-desc">120 BPM / 1985å¹´ACç‰ˆã€ŒBeginning of the Historyã€å®Ÿæ©Ÿå®Œå…¨æŽ¡è­œ</span>
+                            <span class="bgm-track-name">BEGINNING OF THE HISTORY (空中戦BGM)</span>
+                            <span class="bgm-track-desc">120 BPM / 1985年AC版「Beginning of the History」実機完全採譜</span>
                         </span>
-                        <span class="bgm-track-play">â–¶ å†ç”Ÿ</span>
+                        <span class="bgm-track-play">▶ 再生</span>
                     </button>
                     <button type="button" class="bgm-track-btn" data-bgm="STAGE1">
                         <span class="bgm-track-num">02</span>
                         <span class="bgm-track-info">
-                            <span class="bgm-track-name">CHALLENGER 1985 (1é¢ãƒ»ç«å±±)</span>
-                            <span class="bgm-track-desc">134 BPM / 1985å¹´ACç‰ˆ1é¢ã€ŒChallenger 1985ã€å®Ÿæ©Ÿ13å°ç¯€ãƒ«ãƒ¼ãƒ—å®Œå…¨æŽ¡è­œ</span>
+                            <span class="bgm-track-name">CHALLENGER 1985 (1面・火山)</span>
+                            <span class="bgm-track-desc">134 BPM / 1985年AC版1面「Challenger 1985」実機13小節ループ完全採譜</span>
                         </span>
-                        <span class="bgm-track-play">â–¶ å†ç”Ÿ</span>
+                        <span class="bgm-track-play">▶ 再生</span>
                     </button>
                     <button type="button" class="bgm-track-btn" data-bgm="VOLCANO">
                         <span class="bgm-track-num">03</span>
                         <span class="bgm-track-info">
-                            <span class="bgm-track-name">AIRCRAFT CARRIER (1é¢ãƒ»ç«å±±å™´ç«)</span>
-                            <span class="bgm-track-desc">134 BPM / 1985å¹´ã‚°ãƒ©ãƒ‡ã‚£ã‚¦ã‚¹1é¢çµ‚ç›¤ãƒ»ç«å±±å™´ç«ã€œãƒœã‚¹æˆ¦ã€ŒAircraft Carrierã€å®Ÿæ©Ÿå®Œå…¨æŽ¡è­œ</span>
+                            <span class="bgm-track-name">AIRCRAFT CARRIER (1面・火山噴火)</span>
+                            <span class="bgm-track-desc">134 BPM / 1985年グラディウス1面終盤・火山噴火〜ボス戦「Aircraft Carrier」実機完全採譜</span>
                         </span>
-                        <span class="bgm-track-play">â–¶ å†ç”Ÿ</span>
+                        <span class="bgm-track-play">▶ 再生</span>
                     </button>
                     <button type="button" class="bgm-track-btn" data-bgm="STAGE2">
                         <span class="bgm-track-num">04</span>
                         <span class="bgm-track-info">
-                            <span class="bgm-track-name">BEAT BACK (2é¢ãƒ»ã‚¹ãƒˆãƒ¼ãƒ³ãƒ˜ãƒ³ã‚¸)</span>
-                            <span class="bgm-track-desc">146 BPM / 1985å¹´ACç‰ˆ2é¢ã€ŒBeat Backã€å®Ÿæ©Ÿ14å°ç¯€ãƒ«ãƒ¼ãƒ—å®Œå…¨æŽ¡è­œ</span>
+                            <span class="bgm-track-name">BEAT BACK (2面・ストーンヘンジ)</span>
+                            <span class="bgm-track-desc">146 BPM / 1985年AC版2面「Beat Back」実機14小節ループ完全採譜</span>
                         </span>
-                        <span class="bgm-track-play">â–¶ å†ç”Ÿ</span>
+                        <span class="bgm-track-play">▶ 再生</span>
                     </button>
                     <button type="button" class="bgm-track-btn" data-bgm="STAGE3">
                         <span class="bgm-track-num">05</span>
                         <span class="bgm-track-info">
-                            <span class="bgm-track-name">BLANK MASK (3é¢ãƒ»ãƒ¢ã‚¢ã‚¤éºè·¡)</span>
-                            <span class="bgm-track-desc">124 BPM / 1985å¹´ACç‰ˆ3é¢ã€ŒBlank Maskã€å®Ÿæ©Ÿ11å°ç¯€ãƒ«ãƒ¼ãƒ—å®Œå…¨æŽ¡è­œ</span>
+                            <span class="bgm-track-name">BLANK MASK (3面・モアイ遺跡)</span>
+                            <span class="bgm-track-desc">124 BPM / 1985年AC版3面「Blank Mask」実機11小節ループ完全採譜</span>
                         </span>
-                        <span class="bgm-track-play">â–¶ å†ç”Ÿ</span>
+                        <span class="bgm-track-play">▶ 再生</span>
                     </button>
                     <button type="button" class="bgm-track-btn" data-bgm="STAGE4">
                         <span class="bgm-track-num">06</span>
                         <span class="bgm-track-info">
-                            <span class="bgm-track-name">FREE FLYER (4é¢ãƒ»é€†ç«å±±)</span>
-                            <span class="bgm-track-desc">134 BPM / 1985å¹´ACç‰ˆ4é¢ã€ŒFree Flyerã€å®Ÿæ©Ÿ13å°ç¯€ãƒ«ãƒ¼ãƒ—å®Œå…¨æŽ¡è­œ</span>
+                            <span class="bgm-track-name">FREE FLYER (4面・逆火山)</span>
+                            <span class="bgm-track-desc">134 BPM / 1985年AC版4面「Free Flyer」実機13小節ループ完全採譜</span>
                         </span>
-                        <span class="bgm-track-play">â–¶ å†ç”Ÿ</span>
+                        <span class="bgm-track-play">▶ 再生</span>
                     </button>
                     <button type="button" class="bgm-track-btn" data-bgm="BOSS">
                         <span class="bgm-track-num">07</span>
                         <span class="bgm-track-info">
-                            <span class="bgm-track-name">AIRCRAFT CARRIER (ãƒœã‚¹æˆ¦BGM)</span>
-                            <span class="bgm-track-desc">134 BPM / 1985å¹´ACç‰ˆãƒœã‚¹æˆ¦ã€ŒAircraft Carrierã€åŠéŸ³éšŽä¸Šæ˜‡ã‚¤ãƒ³ãƒˆãƒ­ï¼‹5chå¯¾ä½æ³•å®Œå…¨æŽ¡è­œ</span>
+                            <span class="bgm-track-name">AIRCRAFT CARRIER (ボス戦BGM)</span>
+                            <span class="bgm-track-desc">134 BPM / 1985年AC版ボス戦「Aircraft Carrier」半音階上昇イントロ＋5ch対位法完全採譜</span>
                         </span>
-                        <span class="bgm-track-play">â–¶ å†ç”Ÿ</span>
+                        <span class="bgm-track-play">▶ 再生</span>
                     </button>
                 </div>
                 <div class="bgm-modal-footer">
-                    <button id="btn-bgm-stop" type="button" class="bgm-stop-btn">â¹ åœæ­¢ (STOP)</button>
-                    <button id="btn-bgm-close-bottom" type="button" class="bgm-return-btn">ã‚¿ã‚¤ãƒˆãƒ«ç”»é¢ã¸æˆ»ã‚‹</button>
+                    <button id="btn-bgm-stop" type="button" class="bgm-stop-btn">⏹ 停止 (STOP)</button>
+                    <button id="btn-bgm-close-bottom" type="button" class="bgm-return-btn">タイトル画面へ戻る</button>
                 </div>
             </div>
         </div>
 
-        <!-- ç”»é¢å…¨ä½“ï¼ˆä½™ç™½ã‚’å«ã‚€å…¨åŸŸï¼‰ã‚’ã‚«ãƒãƒ¼ã™ã‚‹ã‚¿ãƒƒãƒæ“ä½œãƒ¬ã‚¤ãƒ¤ãƒ¼ -->
+        <!-- 画面全体（余白を含む全域）をカバーするタッチ操作レイヤー -->
         <div id="touch-layer">
-            <!-- ç”»é¢å·¦å´ï¼ˆä½™ç™½ã€œç”»é¢ä¸­å¤®ï¼‰ï¼šã©ã“ã§ã‚‚ã‚¹ãƒ¯ã‚¤ãƒ—ç§»å‹•å¯èƒ½ -->
+            <!-- 画面左側（余白〜画面中央）：どこでもスワイプ移動可能 -->
             <div id="touch-move-zone">
-                <div id="move-hint">ç”»é¢ã®ã©ã“ã§ã‚‚ã‚¹ãƒ¯ã‚¤ãƒ—ç§»å‹•</div>
-                <!-- æŒ‡ã®ç›´ä¸‹ã«ç¾ã‚Œã‚‹ãƒ•ãƒ­ãƒ¼ãƒ†ã‚£ãƒ³ã‚°ã‚¸ãƒ§ã‚¤ã‚¹ãƒ†ã‚£ãƒƒã‚¯ -->
+                <div id="move-hint">画面のどこでもスワイプ移動</div>
+                <!-- 指の直下に現れるフローティングジョイスティック -->
                 <div id="joystick-base">
                     <div id="joystick-stick"></div>
                 </div>
             </div>
 
-            <!-- å³å´ã‚¢ã‚¯ã‚·ãƒ§ãƒ³ãƒœã‚¿ãƒ³ï¼ˆä½™ç™½ã¾ãŸã¯ç”»é¢å³ç«¯ã«é…ç½®ï¼‰ -->
+            <!-- 右側アクションボタン（余白または画面右端に配置） -->
             <div id="action-buttons">
-                <button id="btn-powerup" class="action-btn btn-power" aria-label="ãƒ‘ãƒ¯ãƒ¼ã‚¢ãƒƒãƒ—">
+                <button id="btn-powerup" class="action-btn btn-power" aria-label="パワーアップ">
                     <span class="btn-main">POWER</span>
                     <span class="btn-sub">[X]</span>
                 </button>
-                <button id="btn-shot" class="action-btn btn-shot" aria-label="ã‚·ãƒ§ãƒƒãƒˆ">
+                <button id="btn-shot" class="action-btn btn-shot" aria-label="ショット">
                     <span class="btn-main">SHOT</span>
                     <span class="btn-sub">[Z]</span>
                 </button>
@@ -211,21 +211,21 @@
         </div>
     </div>
 
-    <script src="js/sound.js?v=8.1"></script>
-    <script src="js/input.js?v=8.1"></script>
-    <script src="js/collision.js?v=8.1"></script>
-    <script src="js/particle.js?v=8.1"></script>
-    <script src="js/bullet.js?v=8.1"></script>
-    <script src="js/enemy.js?v=8.1"></script>
-    <script src="js/powerup.js?v=8.1"></script>
-    <script src="js/ui.js?v=8.1"></script>
-    <script src="js/option.js?v=8.1"></script>
-    <script src="js/boss.js?v=8.1"></script>
-    <script src="js/level.js?v=8.1"></script>
-    <script src="js/stonehenge.js?v=8.1"></script>
-    <script src="js/stage3.js?v=8.1"></script>
-    <script src="js/stage4.js?v=8.1"></script>
-    <script src="js/player.js?v=8.1"></script>
-    <script src="js/main.js?v=8.1"></script>
+    <script src="js/sound.js?v=9.0"></script>
+    <script src="js/input.js?v=9.0"></script>
+    <script src="js/collision.js?v=9.0"></script>
+    <script src="js/particle.js?v=9.0"></script>
+    <script src="js/bullet.js?v=9.0"></script>
+    <script src="js/enemy.js?v=9.0"></script>
+    <script src="js/powerup.js?v=9.0"></script>
+    <script src="js/ui.js?v=9.0"></script>
+    <script src="js/option.js?v=9.0"></script>
+    <script src="js/boss.js?v=9.0"></script>
+    <script src="js/level.js?v=9.0"></script>
+    <script src="js/stonehenge.js?v=9.0"></script>
+    <script src="js/stage3.js?v=9.0"></script>
+    <script src="js/stage4.js?v=9.0"></script>
+    <script src="js/player.js?v=9.0"></script>
+    <script src="js/main.js?v=9.0"></script>
 </body>
 </html>

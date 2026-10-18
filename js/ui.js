@@ -1,10 +1,10 @@
 class UI {
     constructor() {
-        this.powerUpItems = ['SPEED', 'MISSILE', 'DOUBLE', 'LASER', 'OPTION', '?' ];
-        this.itemWidth = 90;
-        this.itemHeight = 30;
-        this.padding = 10;
-        this.y = 550; // 画面下部
+        this.powerUpItems = ['SPEEDUP', 'MISSILE', 'DOUBLE', 'LASER', 'OPTION', '?' ];
+        this.itemWidth = 92;
+        this.itemHeight = 24;
+        this.padding = 4;
+        this.y = 568; // 画面最下部（地表ライン y=532〜556 の下に配置し地上物を隠さない）
 
         // スコア＆ハイスコア管理（コナミ伝統の初期ハイスコア 57300 点）
         this.score = 0;
@@ -119,30 +119,47 @@ class UI {
         ctx.shadowOffsetX = 2;
         ctx.shadowOffsetY = 2;
 
-        const topY = 12;
+        const topY = 8;
 
         // 左: 1P スコア
         ctx.textAlign = 'left';
-        ctx.fillStyle = '#4ea8eb';
-        ctx.fillText('1P', 28, topY);
-        ctx.fillStyle = '#ffffff';
-        ctx.fillText(this.formatScore(this.score), 78, topY);
+        ctx.fillStyle = '#98c8f8';
+        ctx.fillText('1P', 24, topY);
+        ctx.fillStyle = '#d8e8ff';
+        ctx.fillText(String(Math.floor(this.score || 0)), 110, topY);
+
+        // 1P下の残機アイコン（上向きビックバイパー小型ドット絵 × 2機）
+        for (let li = 0; li < 2; li++) {
+            const lx = 26 + li * 20;
+            const ly = topY + 18;
+            // オレンジのバーニア＆ベース
+            ctx.fillStyle = '#d87818';
+            ctx.fillRect(lx + 2, ly + 10, 12, 4);
+            // 白銀の機体ウイング
+            ctx.fillStyle = '#f0f4ff';
+            ctx.fillRect(lx + 6, ly, 4, 12);
+            ctx.fillRect(lx + 4, ly + 4, 8, 8);
+            ctx.fillRect(lx + 1, ly + 8, 14, 4);
+            // コックピット暗部
+            ctx.fillStyle = '#385888';
+            ctx.fillRect(lx + 7, ly + 4, 2, 4);
+        }
 
         // 中央: HI (ハイスコア)
-        ctx.textAlign = 'center';
-        const hiCenterX = canvasWidth / 2;
-        ctx.fillStyle = '#4ea8eb';
-        ctx.fillText('HI', hiCenterX - 68, topY);
-        ctx.fillStyle = (this.score > 0 && this.score >= this.hiScore) ? '#ffea00' : '#ffffff';
-        ctx.fillText(this.formatScore(this.hiScore), hiCenterX + 18, topY);
+        ctx.textAlign = 'left';
+        const hiStartX = Math.round(canvasWidth * 0.36);
+        ctx.fillStyle = '#98c8f8';
+        ctx.fillText('HI', hiStartX, topY);
+        ctx.fillStyle = (this.score > 0 && this.score >= this.hiScore) ? '#ffea00' : '#d8e8ff';
+        ctx.fillText(String(Math.floor(this.hiScore || 57300)), hiStartX + 96, topY);
 
         // 右: STAGE 表示
         const currentStage = (typeof levelManager !== 'undefined' && levelManager && levelManager.stage) ? levelManager.stage : 1;
         ctx.textAlign = 'right';
-        ctx.fillStyle = '#4ea8eb';
-        ctx.fillText('STAGE', canvasWidth - 54, topY);
-        ctx.fillStyle = '#ffffff';
-        ctx.fillText(String(currentStage), canvasWidth - 28, topY);
+        ctx.fillStyle = '#98c8f8';
+        ctx.fillText('STAGE', canvasWidth - 48, topY);
+        ctx.fillStyle = '#d8e8ff';
+        ctx.fillText(String(currentStage), canvasWidth - 22, topY);
 
         // ボーナス到達バナー演出
         if (this.bonusBannerTimer > 0) {
@@ -182,54 +199,48 @@ class UI {
         }
 
         // ====================================================
-        // 3. 画面下部 パワーアップメーターの描画
+        // 3. 画面下部 パワーアップメーターの描画（参照画像の銀プレート＆濃紺＋黄色選択枠を完全再現）
         // ====================================================
-        const startX = (canvasWidth - (this.itemWidth * this.powerUpItems.length + this.padding * (this.powerUpItems.length - 1))) / 2;
+        const startX = Math.round((canvasWidth - (this.itemWidth * this.powerUpItems.length + this.padding * (this.powerUpItems.length - 1))) / 2);
 
+        ctx.save();
         for (let i = 0; i < this.powerUpItems.length; i++) {
             const x = startX + i * (this.itemWidth + this.padding);
             const canActivate = player ? player.canActivatePowerUp(i) : true;
             const isSelected = (i === powerUpIndex);
-            
-            // 背景と枠線のスタイル決定
-            if (isSelected) {
-                if (canActivate) {
-                    // 選択可能スロットを選択中: 鮮やかなオレンジ
-                    ctx.fillStyle = '#ff8800';
-                    ctx.strokeStyle = '#ffffff';
-                } else {
-                    // 選択不可（取得済み）スロットを選択中: 暗いトーンで発動不可を明示
-                    ctx.fillStyle = '#221105';
-                    ctx.strokeStyle = '#664422';
-                }
-            } else {
-                if (canActivate) {
-                    // 選択可能スロット（非選択）
-                    ctx.fillStyle = '#000000';
-                    ctx.strokeStyle = '#555555';
-                } else {
-                    // 選択不可（取得済み）スロット（非選択）: グレーアウト
-                    ctx.fillStyle = '#050505';
-                    ctx.strokeStyle = '#222222';
-                }
-            }
-            
-            ctx.fillRect(x, this.y, this.itemWidth, this.itemHeight);
-            ctx.lineWidth = 2;
-            ctx.strokeRect(x, this.y, this.itemWidth, this.itemHeight);
 
-            // テキストの描画
             if (isSelected) {
-                ctx.fillStyle = canActivate ? '#000000' : '#886644';
+                // 選択中スロット：外枠シルバー＋黄色ハイライト枠＋濃紺背景＋黄色文字（参照画像の「DOUBLE」状態）
+                ctx.fillStyle = '#c0c4cc';
+                ctx.fillRect(x, this.y, this.itemWidth, this.itemHeight);
+                ctx.fillStyle = '#f0d830';
+                ctx.fillRect(x + 2, this.y + 2, this.itemWidth - 4, this.itemHeight - 4);
+                ctx.fillStyle = '#101858';
+                ctx.fillRect(x + 4, this.y + 4, this.itemWidth - 8, this.itemHeight - 8);
             } else {
-                ctx.fillStyle = canActivate ? '#00ffff' : '#334444';
+                // 通常スロット：シルバーグレーの立体プレート（装備済みスロットは文字が消えてブランク銀板になる本家仕様）
+                ctx.fillStyle = '#787c88';
+                ctx.fillRect(x, this.y, this.itemWidth, this.itemHeight);
+                ctx.fillStyle = '#d8dce4';
+                ctx.fillRect(x + 1, this.y + 1, this.itemWidth - 2, 2);
+                ctx.fillStyle = '#b0b4bc';
+                ctx.fillRect(x + 2, this.y + 3, this.itemWidth - 4, this.itemHeight - 5);
             }
-            
-            ctx.font = 'bold 16px Courier New';
-            ctx.textAlign = 'center';
-            ctx.textBaseline = 'middle';
-            ctx.fillText(this.powerUpItems[i], x + this.itemWidth / 2, this.y + this.itemHeight / 2);
+
+            // 装備済みでない場合（または選択中）のみラベル文字を描画（装備済みは参照画像のMISSILE欄の通りブランク表示）
+            if (canActivate) {
+                ctx.font = 'bold 13px "Courier New", monospace';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                if (isSelected) {
+                    ctx.fillStyle = '#f8e830';
+                } else {
+                    ctx.fillStyle = '#0c1028';
+                }
+                ctx.fillText(this.powerUpItems[i], x + this.itemWidth / 2, this.y + this.itemHeight / 2 + 1);
+            }
         }
+        ctx.restore();
     }
 }
 

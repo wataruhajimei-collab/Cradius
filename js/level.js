@@ -3,13 +3,16 @@ class Starfield {
         this.stars = [];
         this.width = canvasWidth;
         this.height = canvasHeight;
-        
-        for (let i = 0; i < 100; i++) {
+        // 1985年アーケード版＆参照画像のカラフルな微小ドット星々（赤・青・黄・シアン・白）
+        const palette = ['#ffffff', '#ffffff', '#ff4848', '#4888ff', '#ffe048', '#58e8ff', '#ff88c8'];
+        for (let i = 0; i < 110; i++) {
             this.stars.push({
                 x: Math.random() * this.width,
-                y: Math.random() * this.height,
-                speed: Math.random() * 2 + 0.5,
-                size: Math.random() * 2 + 1
+                y: Math.random() * (this.height - 36),
+                speed: Math.random() * 1.4 + 0.35,
+                size: Math.random() < 0.78 ? 1 : 2,
+                color: palette[i % palette.length],
+                blinkOffset: Math.random() * 100
             });
         }
     }
@@ -17,20 +20,22 @@ class Starfield {
     update() {
         this.stars.forEach(star => {
             star.x -= star.speed;
+            star.blinkOffset += 0.08;
             if (star.x < 0) {
                 star.x = this.width;
-                star.y = Math.random() * this.height;
+                star.y = Math.random() * (this.height - 36);
             }
         });
     }
 
     draw(ctx) {
-        ctx.fillStyle = '#ffffff';
+        ctx.save();
         this.stars.forEach(star => {
-            ctx.globalAlpha = star.speed / 2.5;
-            ctx.fillRect(star.x, star.y, star.size, star.size);
+            if (Math.sin(star.blinkOffset) < -0.75) return;
+            ctx.fillStyle = star.color;
+            ctx.fillRect(Math.round(star.x), Math.round(star.y), star.size, star.size);
         });
-        ctx.globalAlpha = 1.0;
+        ctx.restore();
     }
 }
 
@@ -42,8 +47,7 @@ class Terrain {
         this.topPoints = [];
         this.bottomPoints = [];
         this.scrollSpeed = 1.5;
-        this.baseScrollSpeed = 1.5; // arcade original approx 1.5 px per frame
-        // ... later in code (line 729) will use baseScrollSpeed
+        this.baseScrollSpeed = 1.5;
         this.textureOffsetX = 0;
         this.bgOffsetX = 0;
         this.active = false;
@@ -52,108 +56,101 @@ class Terrain {
         this.spawnIndex = 0;
         this.floatingIslands = [];
         this.twinVolcanoes = [];
+        this.treeClusters = [];
 
-        // 1985年アーケード版『グラディウス』Stage 1 の地形：
-        // 参照画面の通り、地面・天井は画面端に張り付く「薄い」金茶色の岩帯で、起伏はなだらか。
-        // 画面の大半は宇宙空間のまま。背景の山脈は存在しない。
+        // 1985年アーケード版＆参照画像 完全再現のStage 1地形プロファイル：
+        // 序盤（seg 0-30）は上下とも波打つ金茶色の岩帯と「赤ドーム・青ドーム2基・緑の針葉樹林」が並ぶ高原地帯。
+        // 中盤（seg 31-65）は高低差のある山岳起伏と浮き岩・ダッカー・ジャンパー地帯。
+        // 後半（seg 66-85）は再びドーム＆森林谷を経て、終盤（seg 86-102）の二連火山・スクロール停止大噴火へ！
         this.topProfile = [
-            // seg 0-14: 天井なし
-            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-            // seg 15-31: 薄い天井帯（ハッチ・砲台）
-            0, 0, 24, 30, 34, 32, 28, 26, 30, 34, 38, 34, 28, 24, 0, 0, 0,
-            // seg 32-47: 天井なし
-            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-            // seg 48-65: 薄い天井帯
-            0, 0, 22, 28, 32, 36, 34, 30, 26, 28, 32, 36, 34, 28, 22, 0, 0, 0,
-            // seg 66-85: 天井なし
-            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-            // seg 86-102: 二連火山エリア（天井なし）
+            // seg 0-30: 序盤高原エリア（参照画像の波打つ金茶色天井帯 y=26〜42）
+            0, 0, 18, 30, 38, 34, 28, 36, 42, 34, 28, 36, 40, 32, 26,
+            34, 40, 34, 28, 36, 42, 36, 28, 34, 40, 34, 26, 18, 0, 0, 0,
+            // seg 31-47: 中盤・第1浮き岩＆山岳エリア
+            0, 22, 36, 48, 54, 44, 34, 28, 36, 48, 58, 50, 38, 24, 0, 0,
+            // seg 48-65: 中盤・第2洞窟＆浮き岩エリア
+            0, 24, 40, 56, 64, 54, 40, 32, 42, 56, 62, 50, 36, 24, 0, 0, 0, 0,
+            // seg 66-85: 後半・第2ドーム＆森林高原エリア（参照画像スタイルの天井帯）
+            0, 22, 34, 40, 32, 28, 36, 42, 34, 28, 36, 40, 32, 24, 16, 0, 0, 0, 0, 0,
+            // seg 86-102: クライマックス・二連火山エリア（天井は開けて火山弾が降り注ぐ）
             0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-            // seg 103-114: 宇宙空間への脱出
+            // seg 103-114: 宇宙空間への脱出（ビッグコア戦へ）
             0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
         ];
+
         this.bottomProfile = [
-            // seg 0-14: 地面が下端からせり上がり、薄い地表へ
-            600, 590, 575, 560, 560, 556, 552, 548, 546, 550, 556, 560, 562, 560, 556,
-            // seg 15-31
-            552, 548, 544, 544, 548, 554, 560, 562, 558, 552, 548, 546, 550, 556, 560, 560, 558,
-            // seg 32-47
-            556, 552, 548, 548, 552, 558, 562, 562, 558, 552, 546, 542, 544, 550, 556, 560,
-            // seg 48-65
-            556, 550, 544, 540, 540, 544, 550, 556, 560, 560, 556, 550, 544, 540, 542, 548, 554, 558,
-            // seg 66-85
-            556, 552, 548, 546, 550, 556, 560, 562, 560, 556, 552, 548, 546, 548, 554, 558, 560, 558, 556, 554,
-            // seg 86-102: 二連火山が載る平坦な台地、その後地面が消える
-            552, 548, 546, 546, 546, 546, 546, 546, 546, 546, 548, 552, 560, 580, 600, 600, 600,
+            // seg 0-30: 序盤高原エリア（パワーメーター y=568 のすぐ上に金茶色の地表 y=534〜546 が広がる！）
+            600, 568, 548, 538, 536, 536, 538, 542, 544, 538, 536, 536, 536, 538, 538,
+            538, 540, 544, 538, 536, 536, 538, 536, 536, 538, 542, 546, 542, 538, 536, 538,
+            // seg 31-47: 中盤・起伏のある岩山と谷（ダッカー＆ジャンパー＆浮き岩）
+            534, 518, 492, 472, 484, 512, 534, 540, 536, 514, 482, 468, 488, 518, 536, 540,
+            // seg 48-65: 中盤・第2岩山＆浮き岩エリア
+            536, 516, 488, 470, 482, 510, 534, 538, 536, 518, 490, 476, 496, 522, 536, 540, 538, 536,
+            // seg 66-85: 後半・第2ドーム＆森林高原エリア
+            536, 536, 538, 542, 538, 536, 536, 538, 538, 542, 538, 536, 536, 538, 542, 544, 540, 538, 536, 538,
+            // seg 86-102: 二連火山が鎮座する平坦な大地、その後宇宙空間へ抜ける
+            538, 538, 538, 538, 538, 538, 538, 538, 538, 538, 540, 546, 558, 578, 600, 600, 600,
             // seg 103-114
             600, 600, 600, 600, 600, 600, 600, 600, 600, 600, 600, 600
         ];
 
-        // 1985年アーケード版 Stage 1 完全再現の敵＆ギミック配置テーブル
-        // ディー01(TURRET)、ダッカー(DUCKER / 後方奇襲DUCKER_BACK)、ジャンパー(JUMPER)、
-        // ハッチ/ダグム(HATCHER)、ルグル編隊(RUGRA)、ガルン編隊(GARUN)、ファン編隊(FAN)、
-        // 浮き岩(ISLAND)、そして終盤の二連火山(VOLCANO_TWIN)！
+        // 1985年アーケード版＆参照画像 完全再現のStage 1 敵＆地上物配置テーブル
         this.spawns = [
-            // --- 序盤：連山進入＆ディー01・ダッカー・ルグル ---
-            { seg: 4,  type: 'TURRET', isCeiling: false, isRed: false },
-            { seg: 6,  type: 'TURRET', isCeiling: false, isRed: true },  // 赤ディー01（カプセル）
-            { seg: 7,  type: 'RUGRA',  y: 220, count: 4, hasRed: true },
-            { seg: 9,  type: 'DUCKER', isCeiling: false, isRed: false },
-            { seg: 11, type: 'TURRET', isCeiling: false, isRed: false },
-            { seg: 13, type: 'HATCHER', isCeiling: false, isRed: false }, // 地上ハッチ（ルシャ発進）
-            { seg: 14, type: 'FAN',    y: 180, isRed: true },
+            // --- 序盤（seg 3-30）：参照画像の「赤ドーム＋水色ドーム2基＋緑の森林＋銀青二股機」完全再現！ ---
+            { seg: 4,  type: 'HATCHER', isCeiling: false, isRed: true },   // 左の赤ドーム基地
+            { seg: 7,  type: 'RUGRA',   y: 250, count: 3, hasRed: false }, // 右から飛来する銀青ツインノーズ機
+            { seg: 8,  type: 'HATCHER', isCeiling: false, isRed: false },  // 中央の水色ドーム基地 #1
+            { seg: 10, type: 'HATCHER', isCeiling: false, isRed: false },  // 右隣の水色ドーム基地 #2
+            { seg: 12, type: 'TREES',   count: 10 },                       // 右端の緑の針葉樹林（森林クラスター）！
+            { seg: 15, type: 'FAN',     y: 170, isRed: true },
+            { seg: 16, type: 'TURRET',  isCeiling: false, isRed: false },
+            { seg: 17, type: 'DUCKER',  isCeiling: false, isRed: true },
+            { seg: 19, type: 'HATCHER', isCeiling: false, isRed: true },   // 赤ドーム基地
+            { seg: 21, type: 'HATCHER', isCeiling: true,  isRed: false },  // 天井ドーム基地
+            { seg: 22, type: 'GARUN',   y: 250, count: 5 },
+            { seg: 23, type: 'HATCHER', isCeiling: false, isRed: false },  // 水色ドーム基地
+            { seg: 25, type: 'TREES',   count: 8 },                        // 第2の緑の針葉樹林
+            { seg: 27, type: 'DUCKER_BACK', isCeiling: false, isRed: true },
+            { seg: 29, type: 'RUGRA',   y: 230, count: 4, hasRed: true },
 
-            // --- 第1洞窟：天井岩盤・後方ダッカー奇襲・ガルン ---
-            { seg: 16, type: 'TURRET', isCeiling: true,  isRed: false },
-            { seg: 17, type: 'DUCKER_BACK', isCeiling: false, isRed: true }, // 左後方から追いかけてくる赤ダッカー！
-            { seg: 19, type: 'TURRET', isCeiling: false, isRed: false },
-            { seg: 21, type: 'HATCHER', isCeiling: true,  isRed: false }, // 天井ハッチ
-            { seg: 22, type: 'GARUN',  y: 260, count: 5 },
-            { seg: 24, type: 'TURRET', isCeiling: false, isRed: true },  // 赤ディー01
-            { seg: 26, type: 'DUCKER', isCeiling: false, isRed: false },
-            { seg: 28, type: 'JUMPER', isCeiling: false, isRed: false }, // 飛び跳ねて3WAY弾を撃つジャンパー！
-            { seg: 30, type: 'RUGRA',  y: 280, count: 4, hasRed: true },
+            // --- 中盤前半（seg 31-47）：岩山起伏＆第1浮き岩・ダッカー・ジャンパー ---
+            { seg: 33, type: 'TURRET',  isCeiling: false, isRed: false },
+            { seg: 35, type: 'ISLAND',  y: 250, w: 168, h: 52, hasRedTurret: true },
+            { seg: 37, type: 'DUCKER',  isCeiling: true,  isRed: false },
+            { seg: 39, type: 'JUMPER',  isCeiling: false, isRed: false },
+            { seg: 41, type: 'FAN',     y: 370, isRed: true },
+            { seg: 43, type: 'TURRET',  isCeiling: false, isRed: true },
+            { seg: 45, type: 'JUMPER',  isCeiling: false, isRed: true },
 
-            // --- 第1浮き岩エリア (seg 33-46) ---
-            { seg: 33, type: 'ISLAND', y: 245, w: 168, h: 56, hasRedTurret: true },
-            { seg: 35, type: 'TURRET', isCeiling: false, isRed: false },
-            { seg: 37, type: 'DUCKER', isCeiling: true,  isRed: false },
-            { seg: 39, type: 'HATCHER', isCeiling: false, isRed: false },
-            { seg: 41, type: 'FAN',    y: 390, isRed: true },
-            { seg: 43, type: 'JUMPER', isCeiling: false, isRed: true },  // 赤ジャンパー
-            { seg: 45, type: 'TURRET', isCeiling: true,  isRed: false },
-
-            // --- 中盤狭隘エリア＆第2浮き岩 (seg 48-65) ---
-            { seg: 48, type: 'GARUN',  y: 280, count: 5 },
-            { seg: 50, type: 'TURRET', isCeiling: false, isRed: true },
-            { seg: 52, type: 'DUCKER_BACK', isCeiling: false, isRed: false }, // 後方奇襲ダッカー
+            // --- 中盤後半（seg 48-65）：第2洞窟＆浮き岩エリア ---
+            { seg: 48, type: 'GARUN',   y: 270, count: 5 },
+            { seg: 50, type: 'TURRET',  isCeiling: false, isRed: true },
+            { seg: 52, type: 'DUCKER_BACK', isCeiling: false, isRed: false },
             { seg: 54, type: 'HATCHER', isCeiling: true,  isRed: false },
-            { seg: 55, type: 'ISLAND', y: 235, w: 184, h: 60, hasRedTurret: false },
-            { seg: 57, type: 'RUGRA',  y: 170, count: 4, hasRed: true },
-            { seg: 59, type: 'TURRET', isCeiling: false, isRed: false },
-            { seg: 61, type: 'DUCKER', isCeiling: false, isRed: true },
-            { seg: 63, type: 'JUMPER', isCeiling: false, isRed: false },
-            { seg: 65, type: 'TURRET', isCeiling: true,  isRed: false },
+            { seg: 55, type: 'ISLAND',  y: 240, w: 176, h: 54, hasRedTurret: false },
+            { seg: 57, type: 'RUGRA',   y: 180, count: 4, hasRed: true },
+            { seg: 59, type: 'TURRET',  isCeiling: false, isRed: false },
+            { seg: 61, type: 'DUCKER',  isCeiling: false, isRed: true },
+            { seg: 63, type: 'JUMPER',  isCeiling: false, isRed: false },
 
-            // --- 後半ハッチ＆第3浮き岩エリア (seg 66-85) ---
-            { seg: 67, type: 'HATCHER', isCeiling: false, isRed: false },
-            { seg: 69, type: 'FAN',    y: 160, isRed: true },
-            { seg: 71, type: 'ISLAND', y: 250, w: 168, h: 56, hasRedTurret: true },
-            { seg: 73, type: 'TURRET', isCeiling: false, isRed: false },
-            { seg: 75, type: 'DUCKER_BACK', isCeiling: false, isRed: true },
-            { seg: 77, type: 'GARUN',  y: 250, count: 5 },
-            { seg: 79, type: 'HATCHER', isCeiling: true,  isRed: false },
-            { seg: 81, type: 'JUMPER', isCeiling: false, isRed: false },
-            { seg: 83, type: 'RUGRA',  y: 300, count: 4, hasRed: true },
-            { seg: 85, type: 'TURRET', isCeiling: true,  isRed: false },
+            // --- 後半（seg 66-85）：第2ドーム＆森林高原エリア ---
+            { seg: 67, type: 'HATCHER', isCeiling: false, isRed: true },
+            { seg: 69, type: 'FAN',     y: 165, isRed: true },
+            { seg: 70, type: 'HATCHER', isCeiling: false, isRed: false },
+            { seg: 72, type: 'HATCHER', isCeiling: false, isRed: false },
+            { seg: 74, type: 'TREES',   count: 9 },
+            { seg: 76, type: 'DUCKER_BACK', isCeiling: false, isRed: true },
+            { seg: 78, type: 'GARUN',   y: 250, count: 5 },
+            { seg: 80, type: 'HATCHER', isCeiling: true,  isRed: false },
+            { seg: 82, type: 'JUMPER',  isCeiling: false, isRed: false },
+            { seg: 84, type: 'RUGRA',   y: 280, count: 4, hasRed: true },
 
             // --- クライマックス：本家1面名物「二連火山」配置 (seg 89 & 94) ---
-            { seg: 87, type: 'TURRET', isCeiling: false, isRed: true },
+            { seg: 87, type: 'TURRET',  isCeiling: false, isRed: true },
             { seg: 89, type: 'VOLCANO_TWIN' }, // 第1火山
             { seg: 94, type: 'VOLCANO_TWIN' }  // 第2火山（2基並んだ火山が画面中央右に来るとスクロール停止＆大噴火！）
         ];
 
-        this.spawns = this.spawns.filter(s => s.type !== 'ISLAND');
         Terrain._initTexture();
     }
 
@@ -164,43 +161,25 @@ class Terrain {
         patCanvas.height = 64;
         const pctx = patCanvas.getContext('2d');
 
-        // 1985年アーケード版『グラディウス』1面特有の「細胞状・塊状の茶褐色ドット絵岩盤」テクスチャ！
-        // 最暗部（黒茶色の隙間・亀裂）
-        pctx.fillStyle = '#4a2c00';
+        // 参照画像の「金茶色（ゴールデンオーカー）の粒状・海綿状ドット岩肌」を2x2pxディザで緻密に生成！
+        // （レンガブロックではなく、有機的に入り組んだ金茶・黄土・焦げ茶の岩肌テクスチャ）
+        pctx.fillStyle = '#8c5008';
         pctx.fillRect(0, 0, 64, 64);
 
-        // 塊状の岩セル（16x16および16x12の丸みを帯びたピクセル岩塊）を互い違いに敷き詰める
-        const cells = [
-            { x: 0,  y: 0,  w: 30, h: 14 },
-            { x: 32, y: 2,  w: 30, h: 14 },
-            { x: 14, y: 16, w: 32, h: 14 },
-            { x: 48, y: 16, w: 16, h: 14 },
-            { x: 0,  y: 16, w: 12, h: 14 },
-            { x: 2,  y: 32, w: 28, h: 14 },
-            { x: 32, y: 30, w: 30, h: 16 },
-            { x: 16, y: 48, w: 30, h: 14 },
-            { x: 48, y: 48, w: 16, h: 14 },
-            { x: 0,  y: 48, w: 14, h: 14 }
-        ];
-
-        cells.forEach(c => {
-            // 暗褐色ベース
-            pctx.fillStyle = '#8a5a10';
-            pctx.fillRect(c.x + 2, c.y, c.w - 4, c.h);
-            pctx.fillRect(c.x, c.y + 2, c.w, c.h - 4);
-            // 中間茶色（赤茶〜黄土色）
-            pctx.fillStyle = '#b8801c';
-            pctx.fillRect(c.x + 2, c.y + 2, c.w - 4, c.h - 4);
-            // 明部オレンジブラウン
-            pctx.fillStyle = '#d8a030';
-            pctx.fillRect(c.x + 4, c.y + 2, c.w - 8, c.h - 6);
-            // ハイライトドット（黄土色）
-            pctx.fillStyle = '#f0c850';
-            pctx.fillRect(c.x + 6, c.y + 3, Math.max(4, c.w - 14), 2);
-            // 内部のドット亀裂
-            pctx.fillStyle = '#3a2400';
-            pctx.fillRect(c.x + Math.floor(c.w / 2), c.y + Math.floor(c.h / 2), 4, 2);
-        });
+        const palette = ['#482000', '#683404', '#8c5008', '#ac6810', '#c88018', '#e09c24', '#f0b834'];
+        for (let py = 0; py < 64; py += 2) {
+            for (let px = 0; px < 64; px += 2) {
+                // 周期的な有機ノイズで塊感と粒状ディザを両立
+                const n1 = Math.sin(px * 0.296 + py * 0.196) + Math.cos(px * 0.196 - py * 0.392);
+                const n2 = Math.sin((px + 12) * 0.589) * Math.cos((py + 8) * 0.589);
+                const dither = ((px + py) % 4 === 0) ? 0.35 : -0.25;
+                const val = n1 * 0.55 + n2 * 0.65 + dither;
+                let idx = Math.floor((val + 1.8) / 3.6 * palette.length);
+                idx = Math.max(0, Math.min(palette.length - 1, idx));
+                pctx.fillStyle = palette[idx];
+                pctx.fillRect(px, py, 2, 2);
+            }
+        }
 
         const dummyCanvas = document.createElement('canvas');
         const dctx = dummyCanvas.getContext('2d');
@@ -219,6 +198,7 @@ class Terrain {
         this.bottomPoints = [];
         this.floatingIslands = [];
         this.twinVolcanoes = [];
+        this.treeClusters = [];
         let currentX = this.width;
         this.topPoints.push({ x: currentX, y: 0 });
         this.bottomPoints.push({ x: currentX, y: this.height });
@@ -235,8 +215,13 @@ class Terrain {
         this.topPoints.forEach(p => p.x -= this.scrollSpeed);
         this.bottomPoints.forEach(p => p.x -= this.scrollSpeed);
         this.textureOffsetX -= this.scrollSpeed;
-        // 背景の山は地形に固定されて同じ速度で左へ流れる（遅いと地面に対して右へ滑って見える）
         this.bgOffsetX -= this.scrollSpeed;
+
+        // 緑の針葉樹林クラスターのスクロール更新
+        this.treeClusters.forEach(tc => {
+            tc.x -= this.scrollSpeed;
+        });
+        this.treeClusters = this.treeClusters.filter(tc => tc.x + tc.count * 14 > -60);
 
         // 浮き岩の更新
         this.floatingIslands.forEach(isl => {
@@ -257,6 +242,7 @@ class Terrain {
                 this.active = false;
                 this.topPoints = [];
                 this.bottomPoints = [];
+                this.treeClusters = [];
                 return;
             }
         }
@@ -301,7 +287,6 @@ class Terrain {
                     const gy = sp.isCeiling ? topY : bottomY;
                     enemies.push(new DuckerEnemy(x, gy, sp.isCeiling, !!sp.isRed, false));
                 } else if (sp.type === 'DUCKER_BACK' && typeof DuckerEnemy !== 'undefined') {
-                    // 1985年アーケード版名物：画面左端（自機の後方）から猛スピードで駆け上がってくる奇襲ダッカー！
                     const backX = 4;
                     const gy = sp.isCeiling ? this.getTopY(backX) : this.getBottomY(backX);
                     enemies.push(new DuckerEnemy(backX, gy, sp.isCeiling, !!sp.isRed, true));
@@ -311,11 +296,17 @@ class Terrain {
                 } else if (sp.type === 'HATCHER' && typeof HatcherEnemy !== 'undefined') {
                     const gy = sp.isCeiling ? topY : bottomY;
                     enemies.push(new HatcherEnemy(x, gy, sp.isCeiling, !!sp.isRed));
+                } else if (sp.type === 'TREES') {
+                    this.treeClusters.push({
+                        x: x,
+                        count: sp.count || 8,
+                        seed: segIdx * 17
+                    });
                 } else if (sp.type === 'ISLAND' && typeof FloatingIsland !== 'undefined') {
                     const isl = new FloatingIsland(x, sp.y, sp.w || 168, sp.h || 56, this.scrollSpeed, !!sp.hasRedTurret);
                     this.floatingIslands.push(isl);
                 } else if (sp.type === 'VOLCANO_TWIN' && typeof Volcano !== 'undefined') {
-                    const v = new Volcano(x - 64, bottomY, false); // 噴火はスクロール停止時に一斉開始！
+                    const v = new Volcano(x - 64, bottomY, false);
                     enemies.push(v);
                     this.twinVolcanoes.push(v);
                 } else if (sp.type === 'GARUN' && typeof GarunFormation !== 'undefined') {
@@ -335,63 +326,47 @@ class Terrain {
         }
     }
 
-    // 1985年アーケード版 Stage 1 象徴の「背景の火山連山（山脈）」を描画
-    // （本家通り、背景の連山は当たり判定を持たない遠景・中景のドット絵山脈として前景岩盤の背後にそびえ立つ）
-    drawArcadeMountainRange(ctx) {
-        if (this.bottomPoints.length < 2) return;
-        const firstX = this.bottomPoints[0].x;
-        const lastX = this.bottomPoints[this.bottomPoints.length - 1].x;
-        const period = 320;
-        const startIdx = Math.floor((firstX - this.bgOffsetX) / period) - 1;
-        const endIdx = Math.ceil((lastX - this.bgOffsetX) / period) + 1;
+    // 参照画像右下の「緑の針葉樹林（ドット絵コニカルツリー群）」を地面上に描画
+    drawTreeClusters(ctx) {
+        for (let c = 0; c < this.treeClusters.length; c++) {
+            const tc = this.treeClusters[c];
+            for (let i = 0; i < tc.count; i++) {
+                const tx = Math.round(tc.x + i * 11);
+                if (tx < -24 || tx > this.width + 24) continue;
+                const gy = Math.round(this.getBottomY(tx + 6));
+                if (gy >= 590) continue;
 
-        for (let idx = startIdx; idx <= endIdx; idx++) {
-            const baseWorldX = idx * period + this.bgOffsetX;
-            if (baseWorldX + period < firstX + 60 || baseWorldX > lastX - 80) continue;
+                // 木ごとの自然な高さバリエーション (22〜30px)
+                const h = 23 + ((tc.seed + i * 7) % 8);
+                const topY = gy - h;
 
-            // 大小2つのカルデラ火山峰を持つ1985年アーケード版特有の連山シルエット
-            const peaks = [
-                { cx: baseWorldX + 95,  w: 170, h: 125, craterW: 36 },
-                { cx: baseWorldX + 240, w: 140, h: 96,  craterW: 28 }
-            ];
+                // 1. 樹冠の暗緑色ベースシルエット（円錐状のピクセルツリー）
+                ctx.fillStyle = '#245000';
+                ctx.fillRect(tx + 4, topY, 4, 4);
+                ctx.fillRect(tx + 2, topY + 4, 8, 6);
+                ctx.fillRect(tx + 1, topY + 10, 10, 7);
+                ctx.fillRect(tx, topY + 17, 12, h - 17);
 
-            peaks.forEach(pk => {
-                // 背景山岳は固定したベースラインで描画し、上下揺れを防止
-                const baseY = 600; // 遠景山岳の基準高さ（画面外下部）
-                const topY = baseY - pk.h;
-                const halfW = pk.w / 2;
-                const halfC = pk.craterW / 2;
+                // 2. 中間の鮮やかなリーフグリーン
+                ctx.fillStyle = '#589808';
+                ctx.fillRect(tx + 4, topY + 1, 3, 3);
+                ctx.fillRect(tx + 2, topY + 4, 6, 6);
+                ctx.fillRect(tx + 1, topY + 10, 8, 7);
+                ctx.fillRect(tx + 1, topY + 17, 9, h - 18);
 
-                // 段々になったドット絵の稜線と縦スジの岩肌
-                const steps = 12;
-                for (let s = 0; s < steps; s++) {
-                    const t0 = s / steps;
-                    const t1 = (s + 1) / steps;
-                    const y0 = Math.round(topY + t0 * pk.h);
-                    const y1 = Math.round(topY + t1 * pk.h) + 2;
-                    const hw = Math.round(halfC + t0 * (halfW - halfC));
+                // 3. 左側・頂部のイエローグリーン太陽光ハイライト（参照画像の明るい黄緑エッジ）
+                ctx.fillStyle = '#98d018';
+                ctx.fillRect(tx + 4, topY + 1, 2, 3);
+                ctx.fillRect(tx + 2, topY + 4, 4, 5);
+                ctx.fillRect(tx + 1, topY + 10, 5, 6);
+                ctx.fillRect(tx + 1, topY + 17, 5, h - 19);
 
-                    // 外側の暗褐色シャドウ
-                    ctx.fillStyle = '#3a2400';
-                    ctx.fillRect(Math.round(pk.cx - hw), y0, hw * 2, y1 - y0);
-                    // 山肌の中間茶色
-                    ctx.fillStyle = '#6c2c08';
-                    ctx.fillRect(Math.round(pk.cx - hw + 6), y0, Math.max(0, (hw - 6) * 2), y1 - y0);
-                    // 中央の黄土色ハイライト
-                    ctx.fillStyle = '#9c4814';
-                    ctx.fillRect(Math.round(pk.cx - hw * 0.55), y0, Math.round(hw * 1.1), y1 - y0);
-                    // 縦方向の岩盤ストライプ溝
-                    ctx.fillStyle = '#4a2c00';
-                    for (let sx = -hw + 12; sx < hw - 10; sx += 14) {
-                        ctx.fillRect(Math.round(pk.cx + sx), y0, 3, y1 - y0);
-                    }
-                }
-                // カルデラ火口縁の明部
-                ctx.fillStyle = '#c86820';
-                ctx.fillRect(Math.round(pk.cx - halfC), Math.round(topY), pk.craterW, 4);
-                ctx.fillStyle = '#240800';
-                ctx.fillRect(Math.round(pk.cx - halfC + 6), Math.round(topY + 2), pk.craterW - 12, 4);
-            });
+                ctx.fillStyle = '#c8f038';
+                ctx.fillRect(tx + 4, topY + 2, 1, 2);
+                ctx.fillRect(tx + 3, topY + 5, 2, 3);
+                ctx.fillRect(tx + 2, topY + 11, 2, 4);
+                ctx.fillRect(tx + 2, topY + 18, 2, 4);
+            }
         }
     }
 
@@ -400,69 +375,79 @@ class Terrain {
 
         ctx.save();
 
-        // 1. 背後の1985年アーケード版「火山連山（ドット絵山脈）」を描画
-        // （本家に背景山脈は無い）
+        // 1. 地上の緑の針葉樹林クラスターを描画（地表リムのすぐ奥に根元が馴染むよう配置）
+        this.drawTreeClusters(ctx);
 
-        // 2. 前景の細胞状・塊状火山岩盤ポリゴンを描画
+        // 2. 前景の粒状ゴールデンオーカー岩盤ポリゴンを描画
         if (Terrain._pattern) {
             if (typeof DOMMatrix !== 'undefined') {
                 Terrain._pattern.setTransform(new DOMMatrix().translate(Math.round(this.textureOffsetX), 0));
             }
             ctx.fillStyle = Terrain._pattern;
         } else {
-            ctx.fillStyle = '#b8801c';
+            ctx.fillStyle = '#b87414';
         }
 
-        // 天井ポリゴン（ドット絵らしい階段状ステップエッジで描画）
+        // 天井ポリゴン（参照画像の丸みを帯びた波状ローブで描画）
         ctx.beginPath();
         ctx.moveTo(this.topPoints[0].x, 0);
-        for (let i = 0; i < this.topPoints.length; i++) {
-            const p = this.topPoints[i];
-            if (i > 0) {
-                const prev = this.topPoints[i - 1];
-                const midX = Math.round((prev.x + p.x) / 2);
-                ctx.lineTo(midX, Math.round(prev.y));
-                ctx.lineTo(midX, Math.round(p.y));
+        for (let i = 0; i < this.topPoints.length - 1; i++) {
+            const p1 = this.topPoints[i];
+            const p2 = this.topPoints[i + 1];
+            const subSteps = 4;
+            for (let s = 0; s <= subSteps; s++) {
+                const t = s / subSteps;
+                const sx = Math.round(p1.x + (p2.x - p1.x) * t);
+                let sy = p1.y + (p2.y - p1.y) * t;
+                if (sy > 4) {
+                    sy += Math.sin(t * Math.PI) * 3.5;
+                }
+                ctx.lineTo(sx, Math.round(sy));
             }
-            ctx.lineTo(Math.round(p.x), Math.round(p.y));
         }
         ctx.lineTo(this.topPoints[this.topPoints.length - 1].x, 0);
         ctx.closePath();
         ctx.fill();
 
-        // 地面ポリゴン（ドット絵らしい階段状ステップエッジで描画）
+        // 地面ポリゴン（参照画像のなだらかな波状地表で描画）
         ctx.beginPath();
         ctx.moveTo(this.bottomPoints[0].x, this.height);
-        for (let i = 0; i < this.bottomPoints.length; i++) {
-            const p = this.bottomPoints[i];
-            if (i > 0) {
-                const prev = this.bottomPoints[i - 1];
-                const midX = Math.round((prev.x + p.x) / 2);
-                ctx.lineTo(midX, Math.round(prev.y));
-                ctx.lineTo(midX, Math.round(p.y));
+        for (let i = 0; i < this.bottomPoints.length - 1; i++) {
+            const p1 = this.bottomPoints[i];
+            const p2 = this.bottomPoints[i + 1];
+            const subSteps = 4;
+            for (let s = 0; s <= subSteps; s++) {
+                const t = s / subSteps;
+                const sx = Math.round(p1.x + (p2.x - p1.x) * t);
+                let sy = p1.y + (p2.y - p1.y) * t;
+                if (sy < 595) {
+                    sy -= Math.sin(t * Math.PI) * 3.0;
+                }
+                ctx.lineTo(sx, Math.round(sy));
             }
-            ctx.lineTo(Math.round(p.x), Math.round(p.y));
         }
         ctx.lineTo(this.bottomPoints[this.bottomPoints.length - 1].x, this.height);
         ctx.closePath();
         ctx.fill();
 
-        // 3. 岩盤境界のピクセル岩塊リム（黄土色ハイライト＆暗褐色エッジ）
+        // 3. 地表＆天井の粒状ゴールデンオーカー縁取りリム（参照画像の波打つ明部クラスト＆暗部シャドウ）
         for (let i = 0; i < this.bottomPoints.length - 1; i++) {
             const p1 = this.bottomPoints[i];
             const p2 = this.bottomPoints[i + 1];
             if (p1.y >= 598 && p2.y >= 598) continue;
-            const steps = 4;
+            const steps = 8;
             for (let s = 0; s < steps; s++) {
-                const bx = Math.round(p1.x + (p2.x - p1.x) * (s / steps));
+                const t = s / steps;
+                const bx = Math.round(p1.x + (p2.x - p1.x) * t);
                 const bw = Math.ceil((p2.x - p1.x) / steps) + 1;
-                const by = Math.round(p1.y + (p2.y - p1.y) * (s / steps));
-                ctx.fillStyle = '#3a2400';
-                ctx.fillRect(bx, by - 2, bw, 10);
-                ctx.fillStyle = '#d8a030';
-                ctx.fillRect(bx + 1, by, bw - 2, 6);
-                ctx.fillStyle = '#f8dc70';
-                ctx.fillRect(bx + 2, by, Math.max(2, bw - 4), 2);
+                const lobe = (p1.y < 595 && p2.y < 595) ? Math.round(Math.sin(t * Math.PI) * 3.0) : 0;
+                const by = Math.round(p1.y + (p2.y - p1.y) * t) - lobe;
+                ctx.fillStyle = '#582800';
+                ctx.fillRect(bx, by - 1, bw, 8);
+                ctx.fillStyle = '#c88018';
+                ctx.fillRect(bx, by, bw, 5);
+                ctx.fillStyle = '#f0b834';
+                ctx.fillRect(bx + 1, by, Math.max(2, bw - 2), 2);
             }
         }
 
@@ -470,17 +455,19 @@ class Terrain {
             const p1 = this.topPoints[i];
             const p2 = this.topPoints[i + 1];
             if (p1.y <= 2 && p2.y <= 2) continue;
-            const steps = 4;
+            const steps = 8;
             for (let s = 0; s < steps; s++) {
-                const tx = Math.round(p1.x + (p2.x - p1.x) * (s / steps));
+                const t = s / steps;
+                const tx = Math.round(p1.x + (p2.x - p1.x) * t);
                 const tw = Math.ceil((p2.x - p1.x) / steps) + 1;
-                const ty = Math.round(p1.y + (p2.y - p1.y) * (s / steps));
-                ctx.fillStyle = '#3a2400';
-                ctx.fillRect(tx, ty - 8, tw, 10);
-                ctx.fillStyle = '#b8801c';
-                ctx.fillRect(tx + 1, ty - 6, tw - 2, 5);
-                ctx.fillStyle = '#d8a030';
-                ctx.fillRect(tx + 2, ty - 3, Math.max(2, tw - 4), 2);
+                const lobe = (p1.y > 4 && p2.y > 4) ? Math.round(Math.sin(t * Math.PI) * 3.5) : 0;
+                const ty = Math.round(p1.y + (p2.y - p1.y) * t) + lobe;
+                ctx.fillStyle = '#582800';
+                ctx.fillRect(tx, ty - 7, tw, 8);
+                ctx.fillStyle = '#c88018';
+                ctx.fillRect(tx, ty - 5, tw, 4);
+                ctx.fillStyle = '#f0b834';
+                ctx.fillRect(tx + 1, ty - 2, Math.max(2, tw - 2), 2);
             }
         }
 
@@ -647,16 +634,13 @@ class LevelManager {
         this.bossEntryTimer = 0;
         this.stageClearTimer = 0;
 
-        // 1985年アーケード版 1面開幕の宇宙空中戦スケジュール（ファン・ルグル・ガルンが交互に飛来！）
+        // 1985年アーケード版 1面開幕の宇宙空中戦スケジュール（ファン・ルグル・ガルンがテンポよく飛来し、10.5秒で地上エリアへ突入！）
         this.airWaves = [
-            { time: 600,   type: 'FAN',   y: 130, isRed: true },
-            { time: 2800,  type: 'FAN',   y: 430, isRed: true },
-            { time: 4900,  type: 'RUGRA', y: 230, count: 4, hasRed: true },
-            { time: 6800,  type: 'FAN',   y: 145, isRed: true },
-            { time: 8900,  type: 'GARUN', y: 270, count: 5 },
-            { time: 11100, type: 'FAN',   y: 420, isRed: true },
-            { time: 13200, type: 'RUGRA', y: 290, count: 4, hasRed: true },
-            { time: 15100, type: 'FAN',   y: 165, isRed: true }
+            { time: 400,  type: 'FAN',   y: 130, isRed: true },
+            { time: 2300, type: 'FAN',   y: 420, isRed: true },
+            { time: 4200, type: 'RUGRA', y: 240, count: 4, hasRed: true },
+            { time: 6200, type: 'FAN',   y: 150, isRed: true },
+            { time: 8100, type: 'GARUN', y: 270, count: 5 }
         ];
         this.airWaveSpawned = 0;
     }
@@ -683,8 +667,8 @@ class LevelManager {
                     this.airWaveSpawned++;
                 }
 
-                // 17.2秒経過で「Challenger 1985」BGMとともに火山連山地帯へ突入！
-                if (this.time >= 17200) {
+                // 10.5秒経過で「Challenger 1985」BGMとともにドーム基地＆緑の針葉樹林・火山連山地帯へ突入！
+                if (this.time >= 10500) {
                     this.state = 'TERRAIN';
                     this.terrain.start();
                     if (typeof Sound !== 'undefined' && typeof Sound.playStageBgm === 'function') {
@@ -810,6 +794,7 @@ class LevelManager {
         this.terrain.bottomPoints = [];
         this.terrain.floatingIslands = [];
         this.terrain.twinVolcanoes = [];
+        this.terrain.treeClusters = [];
         this.terrain.scrollSpeed = this.terrain.baseScrollSpeed;
 
         if (typeof stonehengeStage !== 'undefined' && stonehengeStage) {
