@@ -275,8 +275,8 @@ class Terrain {
         //   実機から1:1抽出した山岳スプライト (ARCADE_MOUNTAIN_ROWS) を森林帯の背後に配置！
         this.topProfile = [];
         this.bottomProfile = [];
-        for (let s = 0; s <= 112; s++) {
-            if (s < 2 || s > 99) {
+        for (let s = 0; s <= 200; s++) {
+            if (s < 2) {
                 this.topProfile.push(0);
                 this.bottomProfile.push(600);
             } else {
@@ -352,7 +352,7 @@ class Terrain {
             // --- Section 5: クライマックス・深紅パレット変化＋緑の樹海＋二連火山大噴火 (sakura_04.png, grad0027.png, grad0030.png) ---
             { seg: 86, type: 'TREES',   widthPx: 1800 },                   // 二連火山の麓一面に広がる緑の樹林帯 (grad0027 / grad0030)
             { seg: 88, type: 'VOLCANO_TWIN' },                             // 第1深紅火山（画面左端付近 x ≈ 20 に停止）
-            { seg: 103, type: 'VOLCANO_TWIN' }                             // 第2深紅火山（画面右端付近 x ≈ 620 に停止、2つの火山の真ん中からビッグコアがせり上がる！）
+            { seg: 101, type: 'VOLCANO_TWIN' }                             // 第2深紅火山（画面右端 x ≈ 540..780 に停止、右半分が切れることなく完全表示！）
         ];
 
         Terrain._initSprites();
@@ -701,6 +701,12 @@ class Terrain {
                 if (p.x < minTerrainX) minTerrainX = p.x;
                 if (p.x > maxTerrainX) maxTerrainX = p.x;
             }
+        }
+
+        // 深紅パレット（火山大噴火＆ビッグコアボス戦）時は、天井が画面右端まで途切れることなく100%全域表示！
+        if (this.isCrimsonPalette) {
+            minTerrainX = 0;
+            maxTerrainX = this.width;
         }
 
         if (maxTerrainX > minTerrainX) {
