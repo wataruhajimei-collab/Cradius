@@ -20,47 +20,68 @@ class PowerUpCapsule {
     }
 
     draw(ctx) {
-        // 1985年アーケード版 パワーカプセル（赤カプセル／青カプセル）：
-        // 四隅に白い斜めプロング（爪）を備え、中央の赤オレンジ（または青）の十字コアが点滅回転するドット絵
-        ctx.save();
-        const cx = Math.round(this.x + this.width / 2);
-        const cy = Math.round(this.y + this.height / 2);
-        const phase = Math.floor(this.animTimer) % 2;
-
-        ctx.translate(cx, cy);
-
-        // 1. 四隅のシルバーホワイト・プロング（斜め突起）
-        ctx.fillStyle = phase === 0 ? '#dce8f8' : '#98b0d0';
-        ctx.fillRect(-8, -7, 4, 3);
-        ctx.fillRect(4, -7, 4, 3);
-        ctx.fillRect(-8, 4, 4, 3);
-        ctx.fillRect(4, 4, 4, 3);
-
-        // 2. カプセル外周リング（赤カプセル＝ダークレッド＆オレンジ、青カプセル＝ディープブルー＆シアン）
-        const outerCol = this.isBlue ? '#1848c8' : '#b82000';
-        const midCol   = this.isBlue ? '#3898ff' : '#f86818';
-        const coreCol  = this.isBlue ? '#b8f0ff' : '#f8e830';
-
-        ctx.fillStyle = outerCol;
-        ctx.fillRect(-7, -5, 14, 10);
-        ctx.fillRect(-5, -7, 10, 14);
-
-        // 3. 中間発光ボディ
-        ctx.fillStyle = midCol;
-        ctx.fillRect(-5, -4, 10, 8);
-        ctx.fillRect(-3, -6, 6, 12);
-
-        // 4. 中心コア（フレームごとに十字⇔ひし形に脈動）
-        ctx.fillStyle = coreCol;
-        if (phase === 0) {
-            ctx.fillRect(-4, -2, 8, 4);
-            ctx.fillRect(-2, -4, 4, 8);
-        } else {
-            ctx.fillRect(-3, -3, 6, 6);
+        // 1985年アーケード版 パワーカプセル：実機 12x10 ドット行列完全再現 (1dot=2.5px -> 30x25)
+        if (!PowerUpCapsule._canvasRed || !PowerUpCapsule._canvasBlue) {
+            const palRed = {
+                '1': '#8C726C', '2': '#DCDECC', '3': '#740204', '4': '#C40204',
+                '5': '#EC0224', '6': '#FC9A04', '7': '#ECDE04', '8': '#FCFEFC'
+            };
+            const palBlue = {
+                '1': '#8C726C', '2': '#DCDECC', '3': '#040274', '4': '#1C72C4',
+                '5': '#7CC2FC', '6': '#B4DEFC', '7': '#DCFEFC', '8': '#FCFEFC'
+            };
+            const rows0 = [
+                "12........21",
+                "234444444432",
+                ".4555665554.",
+                ".4566776654.",
+                ".4677887764.",
+                ".4677887764.",
+                ".4566776654.",
+                ".4555665554.",
+                "234444444432",
+                "12........21"
+            ];
+            const rows1 = [
+                "12........21",
+                "234444444432",
+                ".4556666554.",
+                ".4567777654.",
+                ".4678888764.",
+                ".4678888764.",
+                ".4567777654.",
+                ".4556666554.",
+                "234444444432",
+                "12........21"
+            ];
+            const makeC = (pal, rows) => {
+                const S = 3;
+                const c = document.createElement('canvas');
+                c.width = 12 * S;
+                c.height = 10 * S;
+                const g = c.getContext('2d');
+                rows.forEach((r, y) => {
+                    for (let x = 0; x < 12; x++) {
+                        const col = pal[r[x]];
+                        if (!col) continue;
+                        g.fillStyle = col;
+                        g.fillRect(x * S, y * S, S, S);
+                    }
+                });
+                return c;
+            };
+            PowerUpCapsule._canvasRed = [makeC(palRed, rows0), makeC(palRed, rows1)];
+            PowerUpCapsule._canvasBlue = [makeC(palBlue, rows0), makeC(palBlue, rows1)];
         }
-        ctx.fillStyle = '#ffffff';
-        ctx.fillRect(-1, -1, 2, 2);
 
+        ctx.save();
+        ctx.imageSmoothingEnabled = false;
+        const phase = Math.floor(this.animTimer) % 2;
+        const arr = this.isBlue ? PowerUpCapsule._canvasBlue : PowerUpCapsule._canvasRed;
+        const spr = arr[phase];
+        const cx = Math.round(this.x + this.width / 2 - spr.width / 2);
+        const cy = Math.round(this.y + this.height / 2 - spr.height / 2);
+        ctx.drawImage(spr, cx, cy);
         ctx.restore();
     }
 }

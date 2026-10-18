@@ -1,3 +1,47 @@
+// 1985年アーケード版 ビックバイパー 32x14 ドット行列 (grad0017.png より抽出)
+const VIC_VIPER_PALETTE = {
+    '1': '#8C0204', '2': '#5C4A44', '3': '#7C6A5C', '4': '#8C726C', '5': '#A48A7C',
+    '6': '#DCDECC', '7': '#C4B2A4', '8': '#547EC4', '9': '#DCB2B4', 'A': '#C47E54',
+    'B': '#040274', 'C': '#ECDEB4', 'D': '#DCB28C', 'E': '#0402A4', 'F': '#1C72C4',
+    'G': '#7CC2FC', 'H': '#FCFEFC', 'I': '#A44234', 'J': '#B4DEFC', 'K': '#0402C4',
+    'L': '#DCFEFC', 'M': '#A44254'
+};
+const VIC_VIPER_ROWS = [
+    "..............1.................",
+    "...............22...............",
+    "...............33422............",
+    "........5675...3333333..........",
+    ".........56678.2222222222.......",
+    "..........766695555555444433....",
+    "..........466666733AAA555777775.",
+    ".....BB....66666673CCDDAA444444.",
+    "...BBEFG.H.HHHHHHH73DCDDDI2JJJJJ",
+    ".BBKKFGL.6.776666667MIIII.2.....",
+    "...BBKFG.5.44766666666HHHHHHHH7.",
+    ".....BB...2..576666666666667532.",
+    "...........H8.5777777776H543....",
+    "...........JH8.66666HH533......."
+];
+let _vicViperCanvas = null;
+function getVicViperCanvas() {
+    if (_vicViperCanvas) return _vicViperCanvas;
+    const S = 3;
+    const c = document.createElement('canvas');
+    c.width = 32 * S;
+    c.height = 14 * S;
+    const g = c.getContext('2d');
+    for (let y = 0; y < VIC_VIPER_ROWS.length; y++) {
+        for (let x = 0; x < 32; x++) {
+            const col = VIC_VIPER_PALETTE[VIC_VIPER_ROWS[y][x]];
+            if (!col) continue;
+            g.fillStyle = col;
+            g.fillRect(x * S, y * S, S, S);
+        }
+    }
+    _vicViperCanvas = c;
+    return c;
+}
+
 class Player {
     constructor(x, y) {
         this.x = x;
@@ -389,71 +433,18 @@ class Player {
         }
 
         // ============================================================
-        // 1985年アーケード版『グラディウス』ビックバイパー (VIC VIPER) 完全再現ドット描画
-        // 白銀の鋭いデルタウェッジ機体＋中央オレンジキャノピー＋下部ブルーフィン＋青白い後方バーニア炎
+        // 1985年アーケード版 ビックバイパー (grad0017.png から抽出した 32x14 ドット行列を 1dot=3px で描画)
         // ============================================================
-        const px = Math.round(this.x);
-        const py = Math.round(this.y);
-        const bank = this.bankAngle || 0;
-        const wingExpand = Math.round(Math.abs(bank) * 3);
+        const vv = getVicViperCanvas();
+        ctx.imageSmoothingEnabled = false;
+        const px = Math.round(this.x + this.width / 2 - vv.width / 2);
+        const py = Math.round(this.y + this.height / 2 - vv.height / 2);
+        ctx.drawImage(vv, px, py);
 
-        // 1. 後方エンジン噴射炎（1985年AC版の鮮やかな青〜水色〜白のジェットフレーム）
-        const flicker = Math.floor(Date.now() / 40) % 2;
-        const flameLen = flicker === 0 ? 11 : 8;
-        ctx.fillStyle = '#1858d8';
-        ctx.fillRect(px - flameLen, py + 7, flameLen, 6);
-        ctx.fillStyle = '#58b8ff';
-        ctx.fillRect(px - flameLen + 3, py + 8, flameLen - 3, 4);
-        ctx.fillStyle = '#ffffff';
-        ctx.fillRect(px - 4, py + 9, 4, 2);
-
-        // 2. 後部垂直尾翼＆下部ブルーベントラルフィン
-        // 上部スwept垂直尾翼（シルバー＆ホワイト）
-        ctx.fillStyle = '#7888a8';
-        ctx.fillRect(px + 2, py + 1 - wingExpand, 10, 6 + wingExpand);
-        ctx.fillStyle = '#dce4f4';
-        ctx.fillRect(px + 1, py - wingExpand, 8, 3);
-        ctx.fillStyle = '#ffffff';
-        ctx.fillRect(px, py - wingExpand, 5, 2);
-
-        // 下部ブルーフィン＆エンジンブロック（本家特有の鮮やかなコバルトブルー）
-        ctx.fillStyle = '#1848a8';
-        ctx.fillRect(px + 3, py + 13, 14, 5 + wingExpand);
-        ctx.fillStyle = '#3880f8';
-        ctx.fillRect(px + 5, py + 14, 10, 3 + Math.floor(wingExpand * 0.6));
-
-        // 3. メイン・デルタウェッジ船体（重厚なシルバーグレー下地＋純白アッパーカウル）
-        ctx.fillStyle = '#485878'; // 船体下部シャドウライン
-        ctx.fillRect(px + 2, py + 11, 28, 4);
-        ctx.fillRect(px + 30, py + 10, 7, 3);
-
-        ctx.fillStyle = '#98a4bc'; // 中間シルバーグレー装甲
-        ctx.fillRect(px + 2, py + 6, 30, 6);
-        ctx.fillRect(px + 32, py + 8, 6, 4);
-
-        ctx.fillStyle = '#e0e8f8'; // アッパーデッキ明シルバー
-        ctx.fillRect(px + 4, py + 5 - Math.floor(wingExpand * 0.5), 24, 5 + Math.floor(wingExpand * 0.5));
-        ctx.fillRect(px + 28, py + 7, 9, 3);
-
-        ctx.fillStyle = '#ffffff'; // 先端まで貫く純白ハイライトライン（双胴ウェッジノーズ）
-        ctx.fillRect(px + 6, py + 5 - Math.floor(wingExpand * 0.5), 18, 3);
-        ctx.fillRect(px + 24, py + 7, 13, 3);
-        ctx.fillRect(px + 37, py + 8, 4, 2);
-
-        // 4. 機体中央のオレンジ・アンバーキャノピー（1985年AC版ビックバイパーの象徴）
-        ctx.fillStyle = '#982000';
-        ctx.fillRect(px + 15, py + 6, 11, 5);
-        ctx.fillStyle = '#e85818';
-        ctx.fillRect(px + 16, py + 6, 9, 4);
-        ctx.fillStyle = '#f8a030';
-        ctx.fillRect(px + 17, py + 7, 6, 2);
-        ctx.fillStyle = '#fff0a0';
-        ctx.fillRect(px + 18, py + 7, 3, 1);
-
-        // 5. 翼端・エアインテークの黒スリットディテール
-        ctx.fillStyle = '#101828';
-        ctx.fillRect(px + 11, py + 9, 4, 2);
-        ctx.fillRect(px + 26, py + 10, 4, 1);
+        // 後方バーニア炎（実機同様の2フレーム点滅）
+        const flicker = Math.floor(Date.now() / 50) % 2;
+        ctx.fillStyle = flicker === 0 ? '#ECDE04' : '#FCA67C';
+        ctx.fillRect(px - (flicker === 0 ? 6 : 3), py + 24, flicker === 0 ? 6 : 3, 3);
 
         // 被弾時のショックウェーブリング描画
         if (this.hitFlashTimer > 0) {
@@ -467,54 +458,72 @@ class Player {
         ctx.restore();
 
         // ============================================================
-        // 1985年アーケード版 シールド（機首前方に上下2つ並ぶ回転八角スター結晶体）
-        // 耐久力が減ると青（#3888ff）から赤オレンジ（#f85818）に変化する本家仕様
+        // 1985年アーケード版 シールド (grad0130.png 16x25 ドット行列完全再現)
         // ============================================================
         if (this.shieldActive) {
+            if (!Player._shieldCanvasBlue || !Player._shieldCanvasRed) {
+                const palBlue = {
+                    '1':'#247EC4', '2':'#7CC2FC', '3':'#DCDEDC', '4':'#04028C', '5':'#04027C',
+                    '6':'#A4DEFC', '7':'#A4A6A4', '8':'#CCEEFC', '9':'#145EA4', 'A':'#747274',
+                    'C':'#FCFEFC', 'D':'#DCDECC', 'F':'#B4DEFC'
+                };
+                const palRed = {
+                    '1':'#C42434', '2':'#FC7C8C', '3':'#DCDEDC', '4':'#8C0414', '5':'#7C040C',
+                    '6':'#FCA4B4', '7':'#A4A6A4', '8':'#FCCECE', '9':'#A41424', 'A':'#747274',
+                    'C':'#FCFEFC', 'D':'#DCCEDC', 'F':'#FCB4C4'
+                };
+                const rows = [
+                    "..12.34516667.21",
+                    "..12.34816667.21",
+                    ".92..3.4416.7..2",
+                    ".12.33A.54.A77.2",
+                    ".2.....AAAA.....",
+                    ".12222..AA..2222",
+                    "..91112.AA.21119",
+                    "......12..21....",
+                    "CCCDEF.1221.FFFF",
+                    "..92.221122.29..",
+                    "...12...22...21.",
+                    "...12.7....7.21.",
+                    "...12.777777.21.",
+                    "..12..7.44.A..21",
+                    ".12..7.5416.A..2",
+                    ".2.777441666AAA.",
+                    ".2.A33461666AAA.",
+                    ".12..3.4516.A..2",
+                    "..12..3.44.A..21",
+                    "...12.333333.21.",
+                    "...12.3....3.21.",
+                    "...12...22...21.",
+                    "...92.221122.29.",
+                    "....1219..9121.."
+                ];
+                const makeC = (pal) => {
+                    const S = 3;
+                    const c = document.createElement('canvas');
+                    c.width = 16 * S;
+                    c.height = rows.length * S;
+                    const g = c.getContext('2d');
+                    rows.forEach((r, y) => {
+                        for (let x = 0; x < 16; x++) {
+                            const col = pal[r[x]];
+                            if (!col) continue;
+                            g.fillStyle = col;
+                            g.fillRect(x * S, y * S, S, S);
+                        }
+                    });
+                    return c;
+                };
+                Player._shieldCanvasBlue = makeC(palBlue);
+                Player._shieldCanvasRed = makeC(palRed);
+            }
             ctx.save();
+            ctx.imageSmoothingEnabled = false;
             const isLow = this.shieldHp <= 4;
-            const outerColor = isLow ? '#c82800' : '#1858d8';
-            const midColor = isLow ? '#f87820' : '#48a8ff';
-            const coreColor = isLow ? '#fff0a0' : '#ffffff';
-            const shieldX = Math.round(this.x + this.width + 9);
-            const shieldOffsetsY = [Math.round(this.y + 1), Math.round(this.y + this.height - 1)];
-            const rotStep = Math.floor(this.shieldAnimTimer) % 2;
-
-            shieldOffsetsY.forEach((sy, idx) => {
-                ctx.save();
-                ctx.translate(shieldX, sy);
-                // 2基のスターシールドが交互位相で高速スピン点滅
-                const phase = (rotStep + idx) % 2;
-                const rOuter = phase === 0 ? 9 : 8;
-                const rInner = phase === 0 ? 4 : 5;
-
-                // 外周8角スター（ブルー／低HP時レッド）
-                ctx.fillStyle = outerColor;
-                ctx.beginPath();
-                for (let i = 0; i < 8; i++) {
-                    const ang = (i * Math.PI) / 4 + (phase * Math.PI) / 8;
-                    const rad = (i % 2 === 0) ? rOuter : rInner;
-                    const vx = Math.cos(ang) * rad;
-                    const vy = Math.sin(ang) * rad;
-                    if (i === 0) ctx.moveTo(vx, vy);
-                    else ctx.lineTo(vx, vy);
-                }
-                ctx.closePath();
-                ctx.fill();
-
-                // 中間十字/ひし形輝き
-                ctx.fillStyle = midColor;
-                ctx.fillRect(-5, -2, 10, 4);
-                ctx.fillRect(-2, -5, 4, 10);
-                if (phase === 0) {
-                    ctx.fillRect(-4, -4, 8, 8);
-                }
-
-                // 中心ホワイトコア
-                ctx.fillStyle = coreColor;
-                ctx.fillRect(-2, -2, 4, 4);
-                ctx.restore();
-            });
+            const spr = isLow ? Player._shieldCanvasRed : Player._shieldCanvasBlue;
+            const shieldX = Math.round(this.x + this.width + 4);
+            const shieldY = Math.round(this.y + this.height / 2 - spr.height / 2);
+            ctx.drawImage(spr, shieldX, shieldY);
             ctx.restore();
         }
     }

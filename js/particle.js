@@ -1,3 +1,160 @@
+// ==========================================
+// 1985年アーケード版『グラディウス』実機抽出 爆発エフェクトスプライト
+// (grad0017.png: スターバースト爆発 / grad0027.png: 雲型モコモコ火炎爆発)
+// ==========================================
+const _explosionSpriteCache = {};
+function getExplosionArcadeCanvas(key, rows, palette, scale = 3) {
+    const cacheKey = key + '_' + scale;
+    if (_explosionSpriteCache[cacheKey]) return _explosionSpriteCache[cacheKey];
+    const h = rows.length;
+    const w = rows[0].length;
+    const c = document.createElement('canvas');
+    c.width = w * scale;
+    c.height = h * scale;
+    const g = c.getContext('2d');
+    g.imageSmoothingEnabled = false;
+    for (let y = 0; y < h; y++) {
+        const row = rows[y];
+        for (let x = 0; x < w; x++) {
+            const ch = row[x];
+            if (ch === '.' || ch === ' ') continue;
+            const col = palette[ch];
+            if (!col) continue;
+            g.fillStyle = col;
+            g.fillRect(x * scale, y * scale, scale, scale);
+        }
+    }
+    _explosionSpriteCache[cacheKey] = c;
+    return c;
+}
+
+// 1. スターバースト小爆発 (grad0017.png 16x14)
+const ARCADE_STARBURST_PALETTE = {
+    '1': '#DCB2B4',
+    '2': '#ECEEEC',
+    '3': '#DC8A9C',
+    '4': '#C45E74',
+    '5': '#A44254',
+    '6': '#FCFEFC'
+};
+const ARCADE_STARBURST_FRAME0 = [
+    "......12........",
+    "....24.4.5..32..",
+    "..6.3...64.4.4..",
+    ".....34.53434...",
+    ".......322243...",
+    "..3.3.4.4223.3.3",
+    ".....3.4343.4...",
+    "...32.4.42...23.",
+    "....4.2....3.4..",
+    "..42...26..3..24",
+    "................",
+    "....6.....3....."
+];
+const ARCADE_STARBURST_FRAME1 = [
+    ".......6........",
+    "....24.4.5..32..",
+    "..6.3...64.4.4..",
+    ".....34.53434...",
+    ".......322243...",
+    "..3.3.4.4263.3.3",
+    "....43.436633..3",
+    "......3.666333..",
+    "....32.466622223",
+    "....4.2.6622.4..",
+    "..42...26623..24",
+    "....6.....3....."
+];
+
+// 2. 雲型モコモコ中爆発 (grad0027.png 16x16)
+const ARCADE_CLOUD_PALETTE = {
+    '2': '#DCB2B4',
+    '3': '#C45E74',
+    '4': '#A44254',
+    '5': '#DC8A9C',
+    '6': '#ECEEEC',
+    '9': '#C40204',
+    'A': '#8C0224',
+    'B': '#A4022C',
+    'C': '#6C020C',
+    'D': '#EC0224'
+};
+const ARCADE_CLOUD_FRAME0 = [
+    "..663.33445623..",
+    ".66623..26623543",
+    "4266234466663324",
+    ".3223464323235.5",
+    "..34435443532636",
+    ".6...56234466354",
+    ".....22445666233",
+    "...235..56266235",
+    "......5336322343",
+    ".....55663233443",
+    "...5.56662356235",
+    ".....4266236466.",
+    "......322343432.",
+    "...ABBC34466.4.5",
+    "...99BACC..325.5",
+    "..9D9ACCACC..5.."
+];
+const ARCADE_CLOUD_FRAME1 = [
+    "....C99DE9BDDDBB",
+    "...CA9DDDB9DD99A",
+    "..FCB9DDE9B9DABB",
+    "...A99DDE9B9DACA",
+    "..AB9DEEE9B9DACC",
+    ".AB9DDEEEBBEBACC",
+    ".B999DEEEBBDBACC",
+    "BB999DEEDBDDBACC",
+    "BB99DDEEDDDDBACC",
+    "BB999DDED9DEDBAC",
+    "B999DEDED9DD9AAC",
+    "999DDDDEDEDD9ACC",
+    "B999DDDEDDDDD9AC",
+    "999DDEEDEDEE9BAC",
+    "BBBDDDDD9EEDBBAA",
+    "B9DD99DD9EDD9BAA"
+];
+
+class ArcadeExplosion {
+    constructor(x, y, isBig = false) {
+        this.x = x;
+        this.y = y;
+        this.isBig = isBig;
+        this.frame = 0;
+        this.timer = 0;
+        this.maxFrames = 18; // 約0.3秒
+        this.active = true;
+    }
+
+    update() {
+        this.timer++;
+        if (this.timer >= this.maxFrames) {
+            this.active = false;
+        }
+    }
+
+    draw(ctx) {
+        if (!this.active) return;
+        ctx.save();
+        ctx.imageSmoothingEnabled = false;
+        const sub = Math.floor(this.timer / 4);
+        let spr = null;
+        if (this.isBig) {
+            const rows = (sub % 2 === 0) ? ARCADE_CLOUD_FRAME0 : ARCADE_CLOUD_FRAME1;
+            spr = getExplosionArcadeCanvas('exp_cloud_' + (sub % 2), rows, ARCADE_CLOUD_PALETTE, 3);
+        } else {
+            const rows = (sub % 2 === 0) ? ARCADE_STARBURST_FRAME0 : ARCADE_STARBURST_FRAME1;
+            spr = getExplosionArcadeCanvas('exp_star_' + (sub % 2), rows, ARCADE_STARBURST_PALETTE, 3);
+        }
+        if (spr) {
+            ctx.drawImage(spr, Math.round(this.x - spr.width / 2), Math.round(this.y - spr.height / 2));
+        }
+        ctx.restore();
+    }
+}
+window.ArcadeExplosion = ArcadeExplosion;
+
 class Particle {
     constructor(x, y, color) {
         this.x = x;

@@ -3,8 +3,7 @@ class UI {
         this.powerUpItems = ['SPEEDUP', 'MISSILE', 'DOUBLE', 'LASER', 'OPTION', '?' ];
         this.itemWidth = 92;
         this.itemHeight = 24;
-        this.padding = 4;
-        this.y = 568; // 画面最下部（地表ライン y=532〜556 の下に配置し地上物を隠さない）
+        this.y = 572; // 画面最下部（1985年AC実機同様、最下段フロアタイルの下半分に配置）
 
         // スコア＆ハイスコア管理（コナミ伝統の初期ハイスコア 57300 点）
         this.score = 0;
@@ -204,32 +203,32 @@ class UI {
             const isSelected = (i === powerUpIndex);
 
             if (isSelected) {
-                // 選択中スロット：外枠シルバー＋黄色ハイライト枠＋濃紺背景＋黄色文字（参照画像の「DOUBLE」状態）
-                ctx.fillStyle = '#c0c4cc';
+                // 選択中スロット：外枠#8C726C + 黄色ハイライト枠#FCEE04 + 濃紺背景#040224 + 黄色文字#ECDE04（1985年AC実機 grad0010.png）
+                ctx.fillStyle = '#DCDECC';
                 ctx.fillRect(x, this.y, this.itemWidth, this.itemHeight);
-                ctx.fillStyle = '#f0d830';
+                ctx.fillStyle = '#ECDE04';
                 ctx.fillRect(x + 2, this.y + 2, this.itemWidth - 4, this.itemHeight - 4);
-                ctx.fillStyle = '#101858';
+                ctx.fillStyle = '#040224';
                 ctx.fillRect(x + 4, this.y + 4, this.itemWidth - 8, this.itemHeight - 8);
             } else {
-                // 通常スロット：シルバーグレーの立体プレート（装備済みスロットは文字が消えてブランク銀板になる本家仕様）
-                ctx.fillStyle = '#787c88';
+                // 通常スロット：外枠#8C726C、内枠#DCDECC、銀プレート#C4B2A4
+                ctx.fillStyle = '#8C726C';
                 ctx.fillRect(x, this.y, this.itemWidth, this.itemHeight);
-                ctx.fillStyle = '#d8dce4';
+                ctx.fillStyle = '#DCDECC';
                 ctx.fillRect(x + 1, this.y + 1, this.itemWidth - 2, 2);
-                ctx.fillStyle = '#b0b4bc';
+                ctx.fillStyle = '#C4B2A4';
                 ctx.fillRect(x + 2, this.y + 3, this.itemWidth - 4, this.itemHeight - 5);
             }
 
-            // 装備済みでない場合（または選択中）のみラベル文字を描画（装備済みは参照画像のMISSILE欄の通りブランク表示）
+            // 装備済みでない場合（または選択中）のみラベル文字を描画（装備済みはブランク銀板になる本家仕様）
             if (canActivate) {
-                ctx.font = 'bold 13px "Courier New", monospace';
+                ctx.font = 'bold 12px "Press Start 2P", "Courier New", monospace';
                 ctx.textAlign = 'center';
                 ctx.textBaseline = 'middle';
                 if (isSelected) {
-                    ctx.fillStyle = '#f8e830';
+                    ctx.fillStyle = '#ECDE04';
                 } else {
-                    ctx.fillStyle = '#0c1028';
+                    ctx.fillStyle = '#04023C';
                 }
                 ctx.fillText(this.powerUpItems[i], x + this.itemWidth / 2, this.y + this.itemHeight / 2 + 1);
             }

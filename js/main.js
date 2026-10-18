@@ -835,8 +835,11 @@ function getEnemyScore(enemy) {
     return 100;
 }
 
-function createExplosion(x, y, color) {
-    for (let i = 0; i < 18; i++) {
+function createExplosion(x, y, color, isBig = false) {
+    if (typeof ArcadeExplosion !== 'undefined') {
+        particles.push(new ArcadeExplosion(x, y, isBig));
+    }
+    for (let i = 0; i < 6; i++) {
         particles.push(new Particle(x, y, color));
     }
 }
