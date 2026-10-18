@@ -3,7 +3,8 @@ class UI {
         this.powerUpItems = ['SPEEDUP', 'MISSILE', 'DOUBLE', 'LASER', 'OPTION', '?' ];
         this.itemWidth = 92;
         this.itemHeight = 24;
-        this.y = 572; // 画面最下部（1985年AC実機同様、最下段フロアタイルの下半分に配置）
+        this.padding = 4;
+        this.y = 568; // 画面最下部（1985年AC実機同様、最下段フロアタイルの下半分に配置）
 
         // スコア＆ハイスコア管理（コナミ伝統の初期ハイスコア 57300 点）
         this.score = 0;
@@ -194,30 +195,33 @@ class UI {
         // ====================================================
         // 3. 画面下部 パワーアップメーターの描画（参照画像の銀プレート＆濃紺＋黄色選択枠を完全再現）
         // ====================================================
-        const startX = Math.round((canvasWidth - (this.itemWidth * this.powerUpItems.length + this.padding * (this.powerUpItems.length - 1))) / 2);
+        const pad = (typeof this.padding === 'number' && !isNaN(this.padding)) ? this.padding : 4;
+        const totalW = this.itemWidth * this.powerUpItems.length + pad * (this.powerUpItems.length - 1);
+        const startX = Math.round((canvasWidth - totalW) / 2);
+        const py = (typeof this.y === 'number' && !isNaN(this.y)) ? this.y : 568;
 
         ctx.save();
         for (let i = 0; i < this.powerUpItems.length; i++) {
-            const x = startX + i * (this.itemWidth + this.padding);
+            const x = startX + i * (this.itemWidth + pad);
             const canActivate = player ? player.canActivatePowerUp(i) : true;
             const isSelected = (i === powerUpIndex);
 
             if (isSelected) {
                 // 選択中スロット：外枠#8C726C + 黄色ハイライト枠#FCEE04 + 濃紺背景#040224 + 黄色文字#ECDE04（1985年AC実機 grad0010.png）
                 ctx.fillStyle = '#DCDECC';
-                ctx.fillRect(x, this.y, this.itemWidth, this.itemHeight);
+                ctx.fillRect(x, py, this.itemWidth, this.itemHeight);
                 ctx.fillStyle = '#ECDE04';
-                ctx.fillRect(x + 2, this.y + 2, this.itemWidth - 4, this.itemHeight - 4);
+                ctx.fillRect(x + 2, py + 2, this.itemWidth - 4, this.itemHeight - 4);
                 ctx.fillStyle = '#040224';
-                ctx.fillRect(x + 4, this.y + 4, this.itemWidth - 8, this.itemHeight - 8);
+                ctx.fillRect(x + 4, py + 4, this.itemWidth - 8, this.itemHeight - 8);
             } else {
                 // 通常スロット：外枠#8C726C、内枠#DCDECC、銀プレート#C4B2A4
                 ctx.fillStyle = '#8C726C';
-                ctx.fillRect(x, this.y, this.itemWidth, this.itemHeight);
+                ctx.fillRect(x, py, this.itemWidth, this.itemHeight);
                 ctx.fillStyle = '#DCDECC';
-                ctx.fillRect(x + 1, this.y + 1, this.itemWidth - 2, 2);
+                ctx.fillRect(x + 1, py + 1, this.itemWidth - 2, 2);
                 ctx.fillStyle = '#C4B2A4';
-                ctx.fillRect(x + 2, this.y + 3, this.itemWidth - 4, this.itemHeight - 5);
+                ctx.fillRect(x + 2, py + 3, this.itemWidth - 4, this.itemHeight - 5);
             }
 
             // 装備済みでない場合（または選択中）のみラベル文字を描画（装備済みはブランク銀板になる本家仕様）
@@ -230,7 +234,7 @@ class UI {
                 } else {
                     ctx.fillStyle = '#04023C';
                 }
-                ctx.fillText(this.powerUpItems[i], x + this.itemWidth / 2, this.y + this.itemHeight / 2 + 1);
+                ctx.fillText(this.powerUpItems[i], x + this.itemWidth / 2, py + this.itemHeight / 2 + 1);
             }
         }
         ctx.restore();
