@@ -844,22 +844,15 @@ function createExplosion(x, y, color, isBig = false) {
     }
 }
 
-// グラディウス風 ボス撃破時の超巨大連鎖爆発＆部位飛散演出
+// 1985年アーケード版『グラディウス』ビッグコア撃破時完全再現：連続爆発＆消滅演出（叫び声なし・本家ドット爆破）
 function triggerBossDefeatExplosion(boss) {
     if (boss.isDying) return;
     boss.isDying = true;
 
-    if (typeof boss.triggerDeathScream === 'function') {
-        boss.triggerDeathScream();
-    } else {
-        boss.isScreaming = true;
-        boss.screamText = '';
-        if (typeof Sound !== 'undefined' && typeof Sound.playBossScream === 'function') {
-            Sound.playBossScream();
-        }
-    }
+    boss.isScreaming = false;
+    boss.screamText = '';
 
-    // サウンド再生（重低音連続大爆発）
+    // サウンド再生（本家アーケード準拠の高速小爆発連打＋重低音大爆破）
     if (typeof Sound !== 'undefined') Sound.playBossExplode();
 
     const isStage2 = (typeof GolemBoss !== 'undefined' && boss instanceof GolemBoss);
@@ -877,59 +870,55 @@ function triggerBossDefeatExplosion(boss) {
         addScore(bossPts, cx, cy - 20, '#ffea00');
     }
 
-    // 撃破した瞬間にも第1波として部品・岩石/砂・内臓/血液が激しく飛び散る！
-    if (!boss._initialDismembered && typeof spawnBossDismembermentWave === 'function') {
+    // 生体ボス（2面・3面）の場合のみ部位飛散、メカボス（1面・4面）は叫び声・肉片なし
+    if ((isStage2 || isStage3) && !boss._initialDismembered && typeof spawnBossDismembermentWave === 'function') {
         boss._initialDismembered = true;
         spawnBossDismembermentWave(boss, true);
     }
 
-    // 1. ボス各部（遮蔽板、上下アーム、外装、コア）から次々と巨大火炎球と破片・内容物が炸裂！（計28発）
-    for (let i = 0; i < 28; i++) {
+    // 1. ボス各部（遮蔽板、上下アーム、外装、コア）から次々とアーケード爆発が高速炸裂！（計24発、42ms間隔）
+    for (let i = 0; i < 24; i++) {
         setTimeout(() => {
             if (!boss) return;
             const { cx, cy } = getBossCenter();
-            const offsetX = (Math.random() - 0.5) * (boss.width + 40);
-            const offsetY = (Math.random() - 0.5) * (boss.height + 40);
+            const offsetX = (Math.random() - 0.5) * (boss.width * 0.85);
+            const offsetY = (Math.random() - 0.5) * (boss.height * 0.85);
             const explosionX = cx + offsetX;
             const explosionY = cy + offsetY;
-            const radius = 35 + Math.random() * 30; // 半径35〜65pxの巨大火球
-            if (typeof BossExplosion !== 'undefined') {
-                particles.push(new BossExplosion(explosionX, explosionY, radius));
+            const isBig = (i % 2 === 1);
+            if (typeof ArcadeExplosion !== 'undefined') {
+                particles.push(new ArcadeExplosion(explosionX, explosionY, isBig));
+            } else {
+                createExplosion(explosionX, explosionY, '#ffaa00', isBig);
             }
-            if (!isStage3) {
-                const sparkColor = isStage2 ? '#e6ccb2' : (isStage4 ? '#ff5500' : '#ffaa00');
-                createExplosion(explosionX, explosionY, sparkColor);
+            // 金属火花パーティクル
+            for (let p = 0; p < 4; p++) {
+                particles.push(new Particle(explosionX, explosionY, (p % 2 === 0) ? '#ffcc00' : '#ffffff'));
             }
-            const shouldSpawnWave = isStage3 ? (i === 9 || i === 18) : (i % 3 === 0);
-            if (shouldSpawnWave && typeof spawnBossDismembermentWave === 'function') {
-                spawnBossDismembermentWave(boss, false);
-            }
-        }, i * 45);
+        }, i * 42);
     }
 
-    // 2. 最後に中心で超特大のファイナル大爆発＆全身の部品・岩石砂・内臓血液が完全にバラバラに四散！
+    // 2. 最後に中心で超特大のファイナル大爆発（1.05秒後）
     setTimeout(() => {
         if (!boss) return;
         const { cx: centerX, cy: centerY } = getBossCenter();
-        if (typeof BossExplosion !== 'undefined') {
-            particles.push(new BossExplosion(centerX, centerY, 90));
-            particles.push(new BossExplosion(centerX - 20, centerY, 75));
-            particles.push(new BossExplosion(centerX + 20, centerY, 75));
+        if (typeof ArcadeExplosion !== 'undefined') {
+            particles.push(new ArcadeExplosion(centerX, centerY, true));
+            particles.push(new ArcadeExplosion(centerX - 35, centerY - 15, true));
+            particles.push(new ArcadeExplosion(centerX + 35, centerY + 15, true));
+            particles.push(new ArcadeExplosion(centerX, centerY - 25, true));
+            particles.push(new ArcadeExplosion(centerX, centerY + 25, true));
         }
-        if (typeof spawnBossDismembermentWave === 'function') {
-            spawnBossDismembermentWave(boss, true);
+        for (let j = 0; j < 30; j++) {
+            particles.push(new Particle(centerX, centerY, '#ffffff'));
+            particles.push(new Particle(centerX, centerY, '#ffea00'));
         }
-        if (!isStage3) {
-            for (let j = 0; j < 20; j++) {
-                createExplosion(centerX, centerY, isStage2 ? '#ddb892' : (isStage4 ? '#ffaa00' : '#ffffff'));
-            }
-        }
-    }, 1100);
+    }, 1050);
 
-    // 3. 大爆発の後にボス本体が完全に消滅（飛び散った部品・岩石・砂・内臓・血しぶきは画面上を舞い続ける）
+    // 3. 大爆発と同時にボス本体が完全に消滅（本家仕様通り、残骸や叫び声なくクリーンに爆散！）
     setTimeout(() => {
         boss.active = false;
-    }, 1400);
+    }, 1250);
 }
 
 function addPlayerBullet(bullet) {

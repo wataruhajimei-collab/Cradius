@@ -804,23 +804,15 @@ class Boss {
     }
 
     triggerDeathScream() {
-        if (this.isScreaming) return;
-        this.isScreaming = true;
+        this.isScreaming = false;
         this.screamText = '';
-        if (typeof Sound !== 'undefined' && typeof Sound.playBossScream === 'function') {
-            Sound.playBossScream();
-        }
-        if (!this._initialDismembered && typeof spawnBossDismembermentWave === 'function') {
-            this._initialDismembered = true;
-            spawnBossDismembermentWave(this, true);
-        }
     }
 
     hitCore(damage = 1) {
         this.hitFlashTimer = 4;
         this.hp -= damage;
         if (this.hp <= 0 && !this.isDying) {
-            this.triggerDeathScream();
+            this.isDying = true;
             if (typeof triggerBossDefeatExplosion === 'function') {
                 triggerBossDefeatExplosion(this);
             }
@@ -881,8 +873,8 @@ class Boss {
             createExplosion(bullet.x + bullet.width / 2, bullet.y, '#52adef');
             if (typeof Sound !== 'undefined') Sound.playBossHit();
 
-            if (this.hp <= 0) {
-                this.triggerDeathScream();
+            if (this.hp <= 0 && !this.isDying) {
+                this.isDying = true;
                 if (typeof triggerBossDefeatExplosion === 'function') {
                     triggerBossDefeatExplosion(this);
                 }

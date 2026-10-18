@@ -1607,16 +1607,8 @@ class Stage4Boss {
     }
 
     triggerDeathScream() {
-        if (this.isScreaming) return;
-        this.isScreaming = true;
+        this.isScreaming = false;
         this.screamText = '';
-        if (typeof Sound !== 'undefined' && typeof Sound.playBossScream === 'function') {
-            Sound.playBossScream();
-        }
-        if (!this._initialDismembered && typeof spawnBossDismembermentWave === 'function') {
-            this._initialDismembered = true;
-            spawnBossDismembermentWave(this, true);
-        }
     }
 
     update() {

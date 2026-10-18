@@ -1081,11 +1081,25 @@ class LevelManager {
                 this.terrain.update();
                 this.eruptionTimer += dt;
 
-                // 約10.5秒間噴火を耐え抜くと噴火が収まり、二連火山が画面に残った状態 (grad0030.png) でビッグコアが登場！
-                if (this.eruptionTimer >= 10500) {
+                // 1985年アーケード実機完全準拠：約15.5秒間、猛烈な大噴火サバイバル！
+                if (this.eruptionTimer >= 15500) {
                     this.terrain.twinVolcanoes.forEach(v => {
                         if (v) v.isErupting = false;
                     });
+                    // 本家実機通り、噴火が収まるとスクロールが再開！
+                    this.state = 'VOLCANO_SCROLL_OUT';
+                    this.terrain.scrollSpeed = 1.8;
+                }
+            } else if (this.state === 'VOLCANO_SCROLL_OUT') {
+                // 本家アーケード完全再現：二連火山と地上地形が画面左端へスクロールアウト！
+                this.terrain.update();
+
+                // 二連火山がすべて画面左外へ消え去り、地上地形が完全に抜けて星空（宇宙空間）が開けたらボス戦へ！
+                const allVolcanoesGone = (!this.terrain.twinVolcanoes || this.terrain.twinVolcanoes.length === 0 || this.terrain.twinVolcanoes.every(v => v.x + v.width < -10));
+                const terrainCleared = (!this.terrain.active || this.terrain.bottomPoints.length <= 2 || this.terrain.bottomPoints[this.terrain.bottomPoints.length - 1].x < 0);
+
+                if (allVolcanoesGone && terrainCleared) {
+                    this.terrain.active = false;
                     this.state = 'BOSS';
                     this.bossEntryTimer = 0;
                     if (typeof Sound !== 'undefined' && typeof Sound.playBossBgm === 'function') {
@@ -1095,23 +1109,9 @@ class LevelManager {
                         this.boss = new Boss(this.starfield.width, 210);
                     }
                 }
-            } else if (this.state === 'BOSS_ENTRY') {
-                this.terrain.update();
-                this.bossEntryTimer += dt;
-                if (this.bossEntryTimer >= 1000) {
-                    this.state = 'BOSS';
-                    if (typeof Sound !== 'undefined' && typeof Sound.playBossBgm === 'function') {
-                        Sound.playBossBgm();
-                    }
-                    if (typeof Boss !== 'undefined' && !this.boss) {
-                        this.boss = new Boss(this.starfield.width, 210);
-                    }
-                }
             } else if (this.state === 'BOSS') {
-                // 実機 grad0030.png 完全再現：ビッグコア登場時は二連火山が眼下に残っており、その後ゆっくり左へスクロールアウト (sakura_02.png)！
-                this.bossEntryTimer += dt;
+                // 開けた宇宙空間（星空）でビッグコアとの一騎打ち！
                 if (this.terrain.active) {
-                    this.terrain.scrollSpeed = (this.bossEntryTimer < 4500) ? 0 : 1.8;
                     this.terrain.update();
                 }
                 if (this.boss) {

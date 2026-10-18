@@ -580,55 +580,51 @@ class SoundManager {
         this.autoClean(osc1, totalDur, osc2, gain1, gain2, resonance);
     }
 
-    // ボス大爆発音: グラディウス風 超ド級・重低音連続爆発（ズドドドド…ドッカーン！）
+    // ボス大爆発音: 1985年アーケード版『グラディウス』ビッグコア撃破音完全再現（PSG連続爆発パルス＋超ド級・重低音大爆破）
     playBossExplode() {
         if (!this.initialized || this.isMuted) return;
         this.stopBgm(); // ボスBGMをストップして静寂と爆発の余韻を作る
 
-        // 断末魔の叫び声（「ウワーーーー！」）が鳴っている最中は、爆発のホワイトノイズを大幅に抑えて人間の叫び声をクリアに聴かせる
-        const isScreamingNow = Boolean(this._lastScreamTime && (Date.now() - this._lastScreamTime < 1800));
-
-        // 1. 連続連鎖爆発（叫び声の最中はノイズを最小限にダッキング）
-        for (let i = 0; i < 9; i++) {
+        // 1. 本家実機通りの高速小爆発連打（14発、約70ms間隔で機体全体が連続誘爆！）
+        for (let i = 0; i < 14; i++) {
             setTimeout(() => {
                 if (!this.ctx) return;
                 const now = this.ctx.currentTime;
-                const duck = (isScreamingNow && i < 7) ? 0.08 : 1.0;
                 if (this.noiseBuffer) {
                     const noise = this.ctx.createBufferSource();
                     noise.buffer = this.noiseBuffer;
                     const filter = this.ctx.createBiquadFilter();
                     filter.type = 'lowpass';
-                    filter.frequency.setValueAtTime(380, now);
-                    filter.frequency.exponentialRampToValueAtTime(55, now + 0.35);
+                    filter.frequency.setValueAtTime(450, now);
+                    filter.frequency.exponentialRampToValueAtTime(80, now + 0.28);
 
                     const gain = this.ctx.createGain();
-                    gain.gain.setValueAtTime(0.35 * duck, now);
-                    gain.gain.exponentialRampToValueAtTime(0.005, now + 0.35);
+                    gain.gain.setValueAtTime(0.40, now);
+                    gain.gain.exponentialRampToValueAtTime(0.005, now + 0.28);
 
                     noise.connect(filter);
                     filter.connect(gain);
                     gain.connect(this.seGain);
                     noise.start(now);
-                    noise.stop(now + 0.35);
-                    this.autoClean(noise, 0.35, filter, gain);
+                    noise.stop(now + 0.28);
+                    this.autoClean(noise, 0.28, filter, gain);
                 }
                 const sub = this.ctx.createOscillator();
                 const subGain = this.ctx.createGain();
-                sub.type = 'sine';
-                sub.frequency.setValueAtTime(100 - i * 4, now);
-                sub.frequency.exponentialRampToValueAtTime(32, now + 0.3);
-                subGain.gain.setValueAtTime(0.25 * duck, now);
-                subGain.gain.linearRampToValueAtTime(0.001, now + 0.3);
+                sub.type = 'square';
+                sub.frequency.setValueAtTime(140 - i * 5, now);
+                sub.frequency.exponentialRampToValueAtTime(40, now + 0.25);
+                subGain.gain.setValueAtTime(0.22, now);
+                subGain.gain.linearRampToValueAtTime(0.001, now + 0.25);
                 sub.connect(subGain);
                 subGain.connect(this.seGain);
                 sub.start(now);
-                sub.stop(now + 0.3);
-                this.autoClean(sub, 0.3, subGain);
-            }, i * 120);
+                sub.stop(now + 0.25);
+                this.autoClean(sub, 0.25, subGain);
+            }, i * 70);
         }
 
-        // 2. 最後にトドメの超巨大爆発（叫び声がしっかり聴こえた後に炸裂させる）
+        // 2. 最後にトドメの超巨大爆発（1.05秒後、機体消滅と同時に轟く重厚な低音ノイズ爆発）
         setTimeout(() => {
             if (!this.ctx) return;
             const now = this.ctx.currentTime;
@@ -637,12 +633,12 @@ class SoundManager {
                 noise.buffer = this.noiseBuffer;
                 const filter = this.ctx.createBiquadFilter();
                 filter.type = 'lowpass';
-                filter.frequency.setValueAtTime(520, now);
-                filter.frequency.exponentialRampToValueAtTime(40, now + 1.1);
+                filter.frequency.setValueAtTime(680, now);
+                filter.frequency.exponentialRampToValueAtTime(35, now + 1.2);
 
                 const gain = this.ctx.createGain();
-                gain.gain.setValueAtTime(0.48, now);
-                gain.gain.exponentialRampToValueAtTime(0.001, now + 1.1);
+                gain.gain.setValueAtTime(0.55, now);
+                gain.gain.exponentialRampToValueAtTime(0.001, now + 1.2);
 
                 noise.connect(filter);
                 filter.connect(gain);
@@ -652,16 +648,16 @@ class SoundManager {
             const boom = this.ctx.createOscillator();
             const boomGain = this.ctx.createGain();
             boom.type = 'sine';
-            boom.frequency.setValueAtTime(90, now);
-            boom.frequency.exponentialRampToValueAtTime(25, now + 1.0);
-            boomGain.gain.setValueAtTime(0.45, now);
-            boomGain.gain.linearRampToValueAtTime(0.001, now + 1.0);
+            boom.frequency.setValueAtTime(120, now);
+            boom.frequency.exponentialRampToValueAtTime(25, now + 1.2);
+            boomGain.gain.setValueAtTime(0.55, now);
+            boomGain.gain.linearRampToValueAtTime(0.001, now + 1.2);
             boom.connect(boomGain);
             boomGain.connect(this.seGain);
             boom.start(now);
-            boom.stop(now + 1.0);
-            this.autoClean(boom, 1.0, boomGain);
-        }, 1250);
+            boom.stop(now + 1.2);
+            this.autoClean(boom, 1.2, boomGain);
+        }, 1050);
     }
 
     // 物理モデル（LF声門パルス＋Klatt 4段直列カスケード声道共鳴＋声帯の苦悶かすれ・K.O.エコー）による断末魔PCMバッファ生成
@@ -914,84 +910,9 @@ class SoundManager {
         return buf;
     }
 
-    // ボス撃破時の断末魔の絶叫: 3倍の大声量＋極端に響き渡るロングエコーで「ウワァァァーー！！」を轟かせる
+    // ボス撃破時の叫び声（本家アーケード版グラディウスには存在しないため完全無効化）
     playBossScream() {
-        this.screamCount = (this.screamCount || 0) + 1;
-        this.lastScreamText = '';
-        this._lastScreamTime = Date.now();
-        this.init();
-        if (this.ctx && this.ctx.state === 'suspended') {
-            this.ctx.resume().catch(() => {});
-        }
-
-        if (!this.initialized || this.isMuted || !this.ctx) return;
-        const now = this.ctx.currentTime;
-        const screamBuf = this.getBossScreamBuffer();
-        if (!screamBuf) return;
-
-        const src = this.ctx.createBufferSource();
-        src.buffer = screamBuf;
-
-        // 人間の声の帯域（600Hz〜2400Hz）を分厚く押し出す2段プレゼンス＆ボディブースト
-        const bodyBoost = this.ctx.createBiquadFilter();
-        bodyBoost.type = 'peaking';
-        bodyBoost.frequency.setValueAtTime(750, now);
-        bodyBoost.Q.setValueAtTime(0.85, now);
-        bodyBoost.gain.setValueAtTime(6.5, now);
-
-        const presence = this.ctx.createBiquadFilter();
-        presence.type = 'peaking';
-        presence.frequency.setValueAtTime(1350, now);
-        presence.Q.setValueAtTime(0.95, now);
-        presence.gain.setValueAtTime(7.5, now);
-
-        // さらに外部フィードバック・ディレイ回路を重ねてエコーを極端に響かせる！
-        const extDelay = this.ctx.createDelay(1.0);
-        extDelay.delayTime.setValueAtTime(0.24, now);
-        const extFeedback = this.ctx.createGain();
-        extFeedback.gain.setValueAtTime(0.62, now);
-        const extFilter = this.ctx.createBiquadFilter();
-        extFilter.type = 'lowpass';
-        extFilter.frequency.setValueAtTime(2800, now);
-        const extWet = this.ctx.createGain();
-        extWet.gain.setValueAtTime(0.85, now);
-
-        extDelay.connect(extFilter);
-        extFilter.connect(extFeedback);
-        extFeedback.connect(extDelay);
-        extFilter.connect(extWet);
-
-        // 音割れを防ぎつつ従来の3倍の体感音量を実現するマキシマイズ出力段
-        const limiter = this.ctx.createDynamicsCompressor();
-        limiter.threshold.setValueAtTime(-3.0, now);
-        limiter.knee.setValueAtTime(4.0, now);
-        limiter.ratio.setValueAtTime(12.0, now);
-        limiter.attack.setValueAtTime(0.001, now);
-        limiter.release.setValueAtTime(0.06, now);
-
-        const outGain = this.ctx.createGain();
-        outGain.gain.setValueAtTime(5.2, now); // 従来の約3倍の大音量ゲイン！
-
-        src.connect(bodyBoost);
-        bodyBoost.connect(presence);
-        presence.connect(limiter);
-        presence.connect(extDelay);
-        extWet.connect(limiter);
-        limiter.connect(outGain);
-        outGain.connect(this.ctx.destination);
-
-        // 叫び声とロングエコーが響き渡る間、BGMを完全ミュートして断末魔を最前面に際立たせる
-        if (this.bgmGain) {
-            try {
-                this.bgmGain.gain.cancelScheduledValues(now);
-                this.bgmGain.gain.setValueAtTime(0.0, now);
-                this.bgmGain.gain.setValueAtTime(0.0, now + 3.2);
-                this.bgmGain.gain.linearRampToValueAtTime(0.70, now + 3.9);
-            } catch (e) {}
-        }
-
-        src.start(now);
-        this.autoClean(src, 4.0, bodyBoost, presence, extDelay, extFeedback, extFilter, extWet, limiter, outGain);
+        return;
     }
 
     // --- BGM エンジン (本格 KONAMI 矩形波倶楽部スタイル) ---
