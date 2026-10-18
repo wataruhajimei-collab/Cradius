@@ -466,30 +466,50 @@ const VOLCANO_ROCK_ROWS = [
     "....111111......"
 ];
 
-// 1985年アーケード版 ファン (Fan 16x14 ドット絵)
+// 1985年アーケード版 ファン (Fan 16x16 回転プロペラスプライト2フレーム完全再現)
 const FAN_BLUE_PALETTE = {
-    '1': '#7C4A8C', '2': '#9C6AB4', '3': '#9C7EC4', '4': '#9CC2DC',
-    '5': '#5C425C', '6': '#A4DEDC', '7': '#FCFEFC', '8': '#040274'
+    '1': '#5C425C', '2': '#7C4A8C', '3': '#9C6AB4', '4': '#9C7EC4',
+    '5': '#9CC2DC', '6': '#A4DEDC', '7': '#FCFEFC', '8': '#CCEEFC'
 };
 const FAN_RED_PALETTE = {
-    '1': '#740204', '2': '#A42224', '3': '#C44244', '4': '#FCA69C',
-    '5': '#5C1214', '6': '#FCC2B4', '7': '#FCFEFC', '8': '#EC9A04'
+    '1': '#5C1214', '2': '#740204', '3': '#A42224', '4': '#C44244',
+    '5': '#FCA69C', '6': '#FCC2B4', '7': '#FCFEFC', '8': '#FCD654'
 };
-const FAN_ROWS = [
+const FAN_FRAME0_ROWS = [
     "......1111......",
-    "....22333322....",
-    "...2334444332...",
-    "..134444444431..",
-    "..244466664442..",
-    ".23446777764432.",
-    ".13446888864431.",
-    ".13446888864431.",
-    ".23446777764432.",
-    "..244466664442..",
-    "..134444444431..",
-    "...2334444332...",
-    "....22333322....",
+    "......2332......",
+    "......2332......",
+    "......2442......",
+    "....22344322....",
+    "...2345555432...",
+    ".12345677654321.",
+    ".13456788765431.",
+    ".13456788765431.",
+    ".12345677654321.",
+    "...2345555432...",
+    "....22344322....",
+    "......2442......",
+    "......2332......",
+    "......2332......",
     "......1111......"
+];
+const FAN_FRAME1_ROWS = [
+    "11............11",
+    ".232........232.",
+    "..2342....2432..",
+    "...2344..4432...",
+    "....23455432....",
+    ".....246642.....",
+    "....25677652....",
+    "...2578888752...",
+    "...2578888752...",
+    "....25677652....",
+    ".....246642.....",
+    "....23455432....",
+    "...2344..4432...",
+    "..2342....2432..",
+    ".232........232.",
+    "11............11"
 ];
 
 class FanEnemy extends Enemy {
@@ -507,7 +527,7 @@ class FanEnemy extends Enemy {
         this.diagTimer = 0;
         this.vx = -3.4;
         this.vy = 0;
-        this.spinAngle = 0;
+        this.frameIndex = 0;
     }
 
     update() {
@@ -522,8 +542,8 @@ class FanEnemy extends Enemy {
         }
 
         this.time++;
-        this.animTimer += 0.22;
-        this.spinAngle += 0.28;
+        this.animTimer += 0.28;
+        this.frameIndex = Math.floor(this.time / 4) % 2;
 
         if (this.phase === 'STRAIGHT') {
             this.x += this.vx;
@@ -560,8 +580,9 @@ class FanEnemy extends Enemy {
         ctx.save();
         ctx.imageSmoothingEnabled = false;
         const pal = this.isRed ? FAN_RED_PALETTE : FAN_BLUE_PALETTE;
-        const key = this.isRed ? 'fan_red_16x14' : 'fan_blue_16x14';
-        const spr = getEnemyArcadeCanvas(key, FAN_ROWS, pal, 2.5);
+        const rows = (this.frameIndex === 0) ? FAN_FRAME0_ROWS : FAN_FRAME1_ROWS;
+        const key = (this.isRed ? 'fan_red_' : 'fan_blue_') + this.frameIndex;
+        const spr = getEnemyArcadeCanvas(key, rows, pal, 2.3);
         if (spr) {
             ctx.drawImage(spr, Math.round(this.x), Math.round(this.y));
         }
@@ -1307,18 +1328,21 @@ class Volcano extends Enemy {
         const isEruptPhase = (typeof levelManager !== 'undefined' && levelManager.state === 'VOLCANO_ERUPTION');
         if ((this.isErupting || isEruptPhase) && this.x > -40 && this.x < 780) {
             this.burstTimer++;
-            const interval = isEruptPhase ? 16 : 26;
+            const interval = isEruptPhase ? 6 : 14;
             if (this.burstTimer >= interval) {
                 this.burstTimer = 0;
                 if (typeof enemies !== 'undefined') {
-                    const count = isEruptPhase ? (Math.random() < 0.65 ? 2 : 1) : 1;
+                    const count = isEruptPhase ? (Math.random() < 0.65 ? 2 : 3) : 1;
+                    const isLeftVolcano = (this.x < 300);
                     for (let i = 0; i < count; i++) {
-                        const vx = (Math.random() - 0.58) * 5.4 - 0.5;
-                        const vy = -(Math.random() * 4.4 + 6.4);
-                        const size = 42;
+                        // 1985年アーケード実機完全再現：左火山は右方向へ、右火山は左方向へ扇状にダイナミック噴出！
+                        const bias = isLeftVolcano ? 0.35 : -0.35;
+                        const vx = (Math.random() - 0.5 + bias) * 6.5;
+                        const vy = -(Math.random() * 4.5 + 8.5); // 画面上部まで高く力強く打ち上げ！
+                        const size = Math.random() < 0.4 ? 42 : (Math.random() < 0.5 ? 32 : 24);
                         enemies.push(new VolcanoRock(
-                            this.x + this.width / 2 + (Math.random() - 0.5) * 18 - size / 2,
-                            this.groundY - this.height + 6,
+                            this.x + this.width / 2 + (Math.random() - 0.5) * 24 - size / 2,
+                            this.groundY - this.height + 4,
                             vx,
                             vy,
                             size
@@ -1454,9 +1478,9 @@ class SuperVolcano extends Enemy {
 class VolcanoRock extends Enemy {
     constructor(x, y, vx, vy, size = 42) {
         super(x, y);
-        this.size = 42;
-        this.width = 42;
-        this.height = 38;
+        this.size = size;
+        this.width = size;
+        this.height = Math.round(size * (14 / 16));
         this.vx = vx;
         this.vy = vy;
         this.gravity = 0.13;
@@ -1482,8 +1506,10 @@ class VolcanoRock extends Enemy {
             const ceiling = levelManager.terrain.getTopY(cx);
             if (this.vy > 0 && this.y + this.height >= ground) {
                 this.active = false;
-            } else if (this.vy < 0 && ceiling > 0 && this.y <= ceiling) {
-                this.active = false;
+            } else if (this.vy < 0 && this.y <= Math.max(8, ceiling)) {
+                // 天井に激突しても消滅せず、下向きに跳ね返って激しく降り注ぐ！（本家AC版の激しい噴火シャワー再現）
+                this.y = Math.max(8, ceiling);
+                this.vy = Math.abs(this.vy) * 0.65;
             }
         }
     }
@@ -1492,7 +1518,7 @@ class VolcanoRock extends Enemy {
         ctx.save();
         ctx.imageSmoothingEnabled = false;
         const spr = getEnemyArcadeCanvas('volcano_rock_16x14', VOLCANO_ROCK_ROWS, VOLCANO_ROCK_PALETTE, 3);
-        ctx.drawImage(spr, Math.round(this.x), Math.round(this.y));
+        ctx.drawImage(spr, Math.round(this.x), Math.round(this.y), this.width, this.height);
         ctx.restore();
     }
 }
