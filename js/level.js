@@ -53,38 +53,39 @@ class Terrain {
         this.floatingIslands = [];
         this.twinVolcanoes = [];
 
-        // 1985年アーケード版『グラディウス』Stage 1（火山面）完全再現プロファイルデータ
-        // 序盤は下部のみの火山連山から始まり、中盤から天井岩盤と浮き岩が出現、終盤に二連火山が鎮座！
+        // 1985年アーケード版『グラディウス』Stage 1 の地形：
+        // 参照画面の通り、地面・天井は画面端に張り付く「薄い」金茶色の岩帯で、起伏はなだらか。
+        // 画面の大半は宇宙空間のまま。背景の山脈は存在しない。
         this.topProfile = [
-            // 導入部 (seg 0-14): 上空は開けており、地上側の連山と対峙
-            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 20, 42, 56, 62, 62,
-            // 第1洞窟・天井岩盤エリア (seg 15-31): 天井の火山岩盤とハッチ・砲台
-            60, 64, 74, 82, 76, 64, 58, 62, 76, 96, 112, 102, 80, 66, 60, 62, 66,
-            // 第1浮き岩エリア (seg 32-47): 中央に浮き岩があるため天井はやや高め
-            64, 58, 52, 48, 48, 52, 58, 66, 78, 92, 86, 70, 60, 58, 64, 72,
-            // 中盤の狭隘洞窟エリア (seg 48-65): 天井鍾乳岩と第2浮き岩
-            84, 108, 134, 138, 114, 84, 64, 54, 48, 48, 52, 58, 68, 86, 106, 98, 78, 64,
-            // 後半ハッチ＆ジャンパー地帯 (seg 66-85): 第3浮き岩と激しい起伏
-            60, 66, 78, 88, 76, 62, 52, 46, 46, 50, 58, 68, 82, 96, 88, 72, 62, 58, 56, 52,
-            // クライマックス：二連火山エリア (seg 86-102): 二連火山の噴火空間を確保する天井岩盤
-            48, 44, 40, 36, 36, 36, 40, 44, 40, 32, 22, 12, 0, 0, 0, 0, 0,
-            // 宇宙空間への脱出 (seg 103-114)
+            // seg 0-14: 天井なし
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            // seg 15-31: 薄い天井帯（ハッチ・砲台）
+            0, 0, 24, 30, 34, 32, 28, 26, 30, 34, 38, 34, 28, 24, 0, 0, 0,
+            // seg 32-47: 天井なし
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            // seg 48-65: 薄い天井帯
+            0, 0, 22, 28, 32, 36, 34, 30, 26, 28, 32, 36, 34, 28, 22, 0, 0, 0,
+            // seg 66-85: 天井なし
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            // seg 86-102: 二連火山エリア（天井なし）
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            // seg 103-114: 宇宙空間への脱出
             0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
         ];
         this.bottomProfile = [
-            // 導入部 (seg 0-14): 平坦な火山地表から第1の丘陵へ
-            600, 575, 545, 525, 516, 512, 508, 492, 464, 438, 432, 452, 482, 504, 512,
-            // 第1洞窟・天井岩盤エリア (seg 15-31): ハッチが鎮座する盆地と第2の丘陵
-            508, 490, 464, 448, 462, 488, 512, 518, 506, 482, 456, 442, 456, 484, 508, 516, 508,
-            // 第1浮き岩エリア (seg 32-47): 浮き岩の下をくぐれるルートと起伏
-            496, 508, 520, 526, 526, 520, 506, 484, 456, 434, 442, 472, 502, 516, 512, 494,
-            // 中盤の狭隘洞窟エリア (seg 48-65): 激しい山岳起伏と第2浮き岩
-            468, 444, 436, 454, 484, 510, 522, 526, 526, 522, 510, 488, 458, 436, 446, 478, 506, 516,
-            // 後半ハッチ＆ジャンパー地帯 (seg 66-85): ジャンパーが跳ねる大地と第3浮き岩
-            512, 496, 472, 458, 474, 502, 520, 526, 526, 520, 506, 482, 458, 448, 468, 496, 514, 518, 516, 512,
-            // クライマックス：二連火山エリア (seg 86-102): 2つの火山が並んでそびえる台地！
-            504, 492, 482, 476, 476, 476, 480, 476, 476, 476, 488, 508, 534, 562, 586, 600, 600,
-            // 宇宙空間への脱出 (seg 103-114)
+            // seg 0-14: 地面が下端からせり上がり、薄い地表へ
+            600, 590, 575, 560, 560, 556, 552, 548, 546, 550, 556, 560, 562, 560, 556,
+            // seg 15-31
+            552, 548, 544, 544, 548, 554, 560, 562, 558, 552, 548, 546, 550, 556, 560, 560, 558,
+            // seg 32-47
+            556, 552, 548, 548, 552, 558, 562, 562, 558, 552, 546, 542, 544, 550, 556, 560,
+            // seg 48-65
+            556, 550, 544, 540, 540, 544, 550, 556, 560, 560, 556, 550, 544, 540, 542, 548, 554, 558,
+            // seg 66-85
+            556, 552, 548, 546, 550, 556, 560, 562, 560, 556, 552, 548, 546, 548, 554, 558, 560, 558, 556, 554,
+            // seg 86-102: 二連火山が載る平坦な台地、その後地面が消える
+            552, 548, 546, 546, 546, 546, 546, 546, 546, 546, 548, 552, 560, 580, 600, 600, 600,
+            // seg 103-114
             600, 600, 600, 600, 600, 600, 600, 600, 600, 600, 600, 600
         ];
 
@@ -152,6 +153,7 @@ class Terrain {
             { seg: 94, type: 'VOLCANO_TWIN' }  // 第2火山（2基並んだ火山が画面中央右に来るとスクロール停止＆大噴火！）
         ];
 
+        this.spawns = this.spawns.filter(s => s.type !== 'ISLAND');
         Terrain._initTexture();
     }
 
@@ -164,7 +166,7 @@ class Terrain {
 
         // 1985年アーケード版『グラディウス』1面特有の「細胞状・塊状の茶褐色ドット絵岩盤」テクスチャ！
         // 最暗部（黒茶色の隙間・亀裂）
-        pctx.fillStyle = '#240c00';
+        pctx.fillStyle = '#4a2c00';
         pctx.fillRect(0, 0, 64, 64);
 
         // 塊状の岩セル（16x16および16x12の丸みを帯びたピクセル岩塊）を互い違いに敷き詰める
@@ -183,20 +185,20 @@ class Terrain {
 
         cells.forEach(c => {
             // 暗褐色ベース
-            pctx.fillStyle = '#5c2604';
+            pctx.fillStyle = '#8a5a10';
             pctx.fillRect(c.x + 2, c.y, c.w - 4, c.h);
             pctx.fillRect(c.x, c.y + 2, c.w, c.h - 4);
             // 中間茶色（赤茶〜黄土色）
-            pctx.fillStyle = '#9c4c14';
+            pctx.fillStyle = '#b8801c';
             pctx.fillRect(c.x + 2, c.y + 2, c.w - 4, c.h - 4);
             // 明部オレンジブラウン
-            pctx.fillStyle = '#cf7824';
+            pctx.fillStyle = '#d8a030';
             pctx.fillRect(c.x + 4, c.y + 2, c.w - 8, c.h - 6);
             // ハイライトドット（黄土色）
-            pctx.fillStyle = '#f0a840';
+            pctx.fillStyle = '#f0c850';
             pctx.fillRect(c.x + 6, c.y + 3, Math.max(4, c.w - 14), 2);
             // 内部のドット亀裂
-            pctx.fillStyle = '#381400';
+            pctx.fillStyle = '#3a2400';
             pctx.fillRect(c.x + Math.floor(c.w / 2), c.y + Math.floor(c.h / 2), 4, 2);
         });
 
@@ -233,8 +235,8 @@ class Terrain {
         this.topPoints.forEach(p => p.x -= this.scrollSpeed);
         this.bottomPoints.forEach(p => p.x -= this.scrollSpeed);
         this.textureOffsetX -= this.scrollSpeed;
-        // 背景山岳はパララックス効果でゆっくりスクロール
-        this.bgOffsetX -= this.scrollSpeed * 0.25;
+        // 背景の山は地形に固定されて同じ速度で左へ流れる（遅いと地面に対して右へ滑って見える）
+        this.bgOffsetX -= this.scrollSpeed;
 
         // 浮き岩の更新
         this.floatingIslands.forEach(isl => {
@@ -289,7 +291,8 @@ class Terrain {
         if (typeof enemies === 'undefined') return;
 
         while (this.spawnIndex < this.spawns.length && this.spawns[this.spawnIndex].seg <= segIdx) {
-            const sp = this.spawns[this.spawnIndex];
+            let sp = this.spawns[this.spawnIndex];
+            if (sp.isCeiling && topY < 8) sp = Object.assign({}, sp, { isCeiling: false });
             if (sp.seg === segIdx) {
                 if (sp.type === 'TURRET' && typeof TurretEnemy !== 'undefined') {
                     const gy = sp.isCeiling ? topY : bottomY;
@@ -353,9 +356,9 @@ class Terrain {
             ];
 
             peaks.forEach(pk => {
-                const gy = this.getBottomY(pk.cx);
-                if (gy >= 595) return;
-                const topY = gy - pk.h;
+                // 背景山岳は固定したベースラインで描画し、上下揺れを防止
+                const baseY = 600; // 遠景山岳の基準高さ（画面外下部）
+                const topY = baseY - pk.h;
                 const halfW = pk.w / 2;
                 const halfC = pk.craterW / 2;
 
@@ -369,7 +372,7 @@ class Terrain {
                     const hw = Math.round(halfC + t0 * (halfW - halfC));
 
                     // 外側の暗褐色シャドウ
-                    ctx.fillStyle = '#381400';
+                    ctx.fillStyle = '#3a2400';
                     ctx.fillRect(Math.round(pk.cx - hw), y0, hw * 2, y1 - y0);
                     // 山肌の中間茶色
                     ctx.fillStyle = '#6c2c08';
@@ -378,7 +381,7 @@ class Terrain {
                     ctx.fillStyle = '#9c4814';
                     ctx.fillRect(Math.round(pk.cx - hw * 0.55), y0, Math.round(hw * 1.1), y1 - y0);
                     // 縦方向の岩盤ストライプ溝
-                    ctx.fillStyle = '#240c00';
+                    ctx.fillStyle = '#4a2c00';
                     for (let sx = -hw + 12; sx < hw - 10; sx += 14) {
                         ctx.fillRect(Math.round(pk.cx + sx), y0, 3, y1 - y0);
                     }
@@ -398,7 +401,7 @@ class Terrain {
         ctx.save();
 
         // 1. 背後の1985年アーケード版「火山連山（ドット絵山脈）」を描画
-        this.drawArcadeMountainRange(ctx);
+        // （本家に背景山脈は無い）
 
         // 2. 前景の細胞状・塊状火山岩盤ポリゴンを描画
         if (Terrain._pattern) {
@@ -407,7 +410,7 @@ class Terrain {
             }
             ctx.fillStyle = Terrain._pattern;
         } else {
-            ctx.fillStyle = '#9c4c14';
+            ctx.fillStyle = '#b8801c';
         }
 
         // 天井ポリゴン（ドット絵らしい階段状ステップエッジで描画）
@@ -454,11 +457,11 @@ class Terrain {
                 const bx = Math.round(p1.x + (p2.x - p1.x) * (s / steps));
                 const bw = Math.ceil((p2.x - p1.x) / steps) + 1;
                 const by = Math.round(p1.y + (p2.y - p1.y) * (s / steps));
-                ctx.fillStyle = '#381400';
+                ctx.fillStyle = '#3a2400';
                 ctx.fillRect(bx, by - 2, bw, 10);
-                ctx.fillStyle = '#df8428';
+                ctx.fillStyle = '#d8a030';
                 ctx.fillRect(bx + 1, by, bw - 2, 6);
-                ctx.fillStyle = '#f8c050';
+                ctx.fillStyle = '#f8dc70';
                 ctx.fillRect(bx + 2, by, Math.max(2, bw - 4), 2);
             }
         }
@@ -472,11 +475,11 @@ class Terrain {
                 const tx = Math.round(p1.x + (p2.x - p1.x) * (s / steps));
                 const tw = Math.ceil((p2.x - p1.x) / steps) + 1;
                 const ty = Math.round(p1.y + (p2.y - p1.y) * (s / steps));
-                ctx.fillStyle = '#381400';
+                ctx.fillStyle = '#3a2400';
                 ctx.fillRect(tx, ty - 8, tw, 10);
-                ctx.fillStyle = '#b86018';
+                ctx.fillStyle = '#b8801c';
                 ctx.fillRect(tx + 1, ty - 6, tw - 2, 5);
-                ctx.fillStyle = '#df8428';
+                ctx.fillStyle = '#d8a030';
                 ctx.fillRect(tx + 2, ty - 3, Math.max(2, tw - 4), 2);
             }
         }
@@ -600,11 +603,11 @@ class FloatingIsland {
         const h = Math.round(this.height);
 
         // 1985年アーケード版特有のゴツゴツした細胞状・塊状の浮き岩をドット絵で描画
-        ctx.fillStyle = '#381400';
+        ctx.fillStyle = '#3a2400';
         ctx.fillRect(x + 8, y, w - 16, h);
         ctx.fillRect(x, y + 8, w, h - 16);
 
-        ctx.fillStyle = '#5c2604';
+        ctx.fillStyle = '#8a5a10';
         ctx.fillRect(x + 10, y + 2, w - 20, h - 4);
         ctx.fillRect(x + 4, y + 8, w - 8, h - 16);
 
@@ -617,11 +620,11 @@ class FloatingIsland {
             for (let c = 0; c < cols; c++) {
                 const cx = x + 8 + c * cw + (r % 2 === 1 ? 4 : -2);
                 const cy = y + 4 + r * ch;
-                ctx.fillStyle = '#9c4c14';
+                ctx.fillStyle = '#b8801c';
                 ctx.fillRect(cx + 2, cy + 2, cw - 4, ch - 4);
-                ctx.fillStyle = '#df8428';
+                ctx.fillStyle = '#d8a030';
                 ctx.fillRect(cx + 4, cy + 3, cw - 8, ch - 8);
-                ctx.fillStyle = '#f8c050';
+                ctx.fillStyle = '#f8dc70';
                 ctx.fillRect(cx + 6, cy + 4, Math.max(4, cw - 12), 2);
             }
         }
