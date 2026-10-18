@@ -41,8 +41,9 @@ class Terrain {
         this.segmentWidth = 40;
         this.topPoints = [];
         this.bottomPoints = [];
-        this.scrollSpeed = 1.6;
-        this.baseScrollSpeed = 1.6;
+        this.scrollSpeed = 1.5;
+        this.baseScrollSpeed = 1.5; // arcade original approx 1.5 px per frame
+        // ... later in code (line 729) will use baseScrollSpeed
         this.textureOffsetX = 0;
         this.bgOffsetX = 0;
         this.active = false;
@@ -232,7 +233,8 @@ class Terrain {
         this.topPoints.forEach(p => p.x -= this.scrollSpeed);
         this.bottomPoints.forEach(p => p.x -= this.scrollSpeed);
         this.textureOffsetX -= this.scrollSpeed;
-        this.bgOffsetX -= this.scrollSpeed;
+        // 背景山岳はパララックス効果でゆっくりスクロール
+        this.bgOffsetX -= this.scrollSpeed * 0.25;
 
         // 浮き岩の更新
         this.floatingIslands.forEach(isl => {
