@@ -33,7 +33,7 @@ class UI {
 
     formatScore(val) {
         const n = Math.max(0, Math.floor(val || 0));
-        return String(n).padStart(7, '0');
+        return String(n);
     }
 
     syncTitleScoreDom() {
@@ -121,16 +121,17 @@ class UI {
 
         const topY = 8;
 
-        // 左: 1P スコア
+        // 左: 1P スコア（1985年AC版準拠の右寄せスコア配置）
         ctx.textAlign = 'left';
-        ctx.fillStyle = '#98c8f8';
-        ctx.fillText('1P', 24, topY);
-        ctx.fillStyle = '#d8e8ff';
-        ctx.fillText(String(Math.floor(this.score || 0)), 110, topY);
+        ctx.fillStyle = '#88b8f8';
+        ctx.fillText('1P', 36, topY);
+        ctx.textAlign = 'right';
+        ctx.fillStyle = '#e0ecff';
+        ctx.fillText(String(Math.floor(this.score || 0)), 228, topY);
 
         // 1P下の残機アイコン（上向きビックバイパー小型ドット絵 × 2機）
         for (let li = 0; li < 2; li++) {
-            const lx = 26 + li * 20;
+            const lx = 38 + li * 20;
             const ly = topY + 18;
             // オレンジのバーニア＆ベース
             ctx.fillStyle = '#d87818';
@@ -145,21 +146,14 @@ class UI {
             ctx.fillRect(lx + 7, ly + 4, 2, 4);
         }
 
-        // 中央: HI (ハイスコア)
+        // 中央: HI (ハイスコア - 1985年AC版準拠の配置)
         ctx.textAlign = 'left';
-        const hiStartX = Math.round(canvasWidth * 0.36);
-        ctx.fillStyle = '#98c8f8';
+        const hiStartX = 290;
+        ctx.fillStyle = '#88b8f8';
         ctx.fillText('HI', hiStartX, topY);
-        ctx.fillStyle = (this.score > 0 && this.score >= this.hiScore) ? '#ffea00' : '#d8e8ff';
-        ctx.fillText(String(Math.floor(this.hiScore || 57300)), hiStartX + 96, topY);
-
-        // 右: STAGE 表示
-        const currentStage = (typeof levelManager !== 'undefined' && levelManager && levelManager.stage) ? levelManager.stage : 1;
         ctx.textAlign = 'right';
-        ctx.fillStyle = '#98c8f8';
-        ctx.fillText('STAGE', canvasWidth - 48, topY);
-        ctx.fillStyle = '#d8e8ff';
-        ctx.fillText(String(currentStage), canvasWidth - 22, topY);
+        ctx.fillStyle = (this.score > 0 && this.score >= this.hiScore) ? '#ffea00' : '#e0ecff';
+        ctx.fillText(String(Math.floor(this.hiScore || 57300)), hiStartX + 188, topY);
 
         // ボーナス到達バナー演出
         if (this.bonusBannerTimer > 0) {

@@ -1,17 +1,18 @@
 class PowerUpCapsule {
-    constructor(x, y) {
+    constructor(x, y, isBlue = false) {
         this.x = x;
         this.y = y;
-        this.width = 38; // 横長のパワーコア
-        this.height = 22;
+        this.width = 22;
+        this.height = 18;
         this.speedX = -1.5; // 背景と同じようにスクロール
         this.active = true;
-        this.animTimer = Math.random() * Math.PI * 2;
+        this.isBlue = isBlue;
+        this.animTimer = Math.random() * 10;
     }
 
     update() {
         this.x += this.speedX;
-        this.animTimer += 0.14;
+        this.animTimer += 0.25;
         // 画面外に出たら消す
         if (this.x + this.width < 0) {
             this.active = false;
@@ -19,91 +20,46 @@ class PowerUpCapsule {
     }
 
     draw(ctx) {
+        // 1985年アーケード版 パワーカプセル（赤カプセル／青カプセル）：
+        // 四隅に白い斜めプロング（爪）を備え、中央の赤オレンジ（または青）の十字コアが点滅回転するドット絵
         ctx.save();
-        const cx = this.x + this.width / 2;
-        const cy = this.y + this.height / 2;
-        const pulse = (Math.sin(this.animTimer) + 1) * 0.5; // 0.0 ~ 1.0
+        const cx = Math.round(this.x + this.width / 2);
+        const cy = Math.round(this.y + this.height / 2);
+        const phase = Math.floor(this.animTimer) % 2;
 
         ctx.translate(cx, cy);
 
-        // 1. 上下合計6本のトゲ（上3本・下3本）
-        const spikeXOffsets = [-10, 0, 10];
-        ctx.fillStyle = '#cbd5e1';
-        ctx.strokeStyle = '#334155';
-        ctx.lineWidth = 1.2;
+        // 1. 四隅のシルバーホワイト・プロング（斜め突起）
+        ctx.fillStyle = phase === 0 ? '#dce8f8' : '#98b0d0';
+        ctx.fillRect(-8, -7, 4, 3);
+        ctx.fillRect(4, -7, 4, 3);
+        ctx.fillRect(-8, 4, 4, 3);
+        ctx.fillRect(4, 4, 4, 3);
 
-        // 上側3本のトゲ
-        spikeXOffsets.forEach(sx => {
-            ctx.beginPath();
-            ctx.moveTo(sx - 3.5, -5);
-            ctx.lineTo(sx, -12);
-            ctx.lineTo(sx + 3.5, -5);
-            ctx.closePath();
-            ctx.fill();
-            ctx.stroke();
-        });
+        // 2. カプセル外周リング（赤カプセル＝ダークレッド＆オレンジ、青カプセル＝ディープブルー＆シアン）
+        const outerCol = this.isBlue ? '#1848c8' : '#b82000';
+        const midCol   = this.isBlue ? '#3898ff' : '#f86818';
+        const coreCol  = this.isBlue ? '#b8f0ff' : '#f8e830';
 
-        // 下側3本のトゲ
-        spikeXOffsets.forEach(sx => {
-            ctx.beginPath();
-            ctx.moveTo(sx - 3.5, 5);
-            ctx.lineTo(sx, 12);
-            ctx.lineTo(sx + 3.5, 5);
-            ctx.closePath();
-            ctx.fill();
-            ctx.stroke();
-        });
+        ctx.fillStyle = outerCol;
+        ctx.fillRect(-7, -5, 14, 10);
+        ctx.fillRect(-5, -7, 10, 14);
 
-        // 2. 横長カプセル外殻フレーム（メタリックグレー・八角形風の横長ボディ）
-        const bodyGrad = ctx.createLinearGradient(0, -6, 0, 6);
-        bodyGrad.addColorStop(0.0, '#f8fafc');
-        bodyGrad.addColorStop(0.35, '#94a3b8');
-        bodyGrad.addColorStop(0.7, '#475569');
-        bodyGrad.addColorStop(1.0, '#1e293b');
-        ctx.fillStyle = bodyGrad;
+        // 3. 中間発光ボディ
+        ctx.fillStyle = midCol;
+        ctx.fillRect(-5, -4, 10, 8);
+        ctx.fillRect(-3, -6, 6, 12);
 
-        ctx.beginPath();
-        ctx.moveTo(-13, -6);
-        ctx.lineTo(13, -6);
-        ctx.lineTo(18, -2.5);
-        ctx.lineTo(18, 2.5);
-        ctx.lineTo(13, 6);
-        ctx.lineTo(-13, 6);
-        ctx.lineTo(-18, 2.5);
-        ctx.lineTo(-18, -2.5);
-        ctx.closePath();
-        ctx.fill();
-
-        ctx.strokeStyle = '#0f172a';
-        ctx.lineWidth = 1.4;
-        ctx.stroke();
-
-        // 左右のメカニカルキャップ装飾
-        ctx.fillStyle = '#38bdf8';
-        ctx.fillRect(-16, -2, 3, 4);
-        ctx.fillRect(13, -2, 3, 4);
-
-        // 3. 中央の横長発光エネルギーコア（赤〜オレンジ〜イエローの明滅グラデーション）
-        const coreGrad = ctx.createRadialGradient(-2, -1, 1, 0, 0, 11);
-        coreGrad.addColorStop(0.0, '#ffffff');
-        coreGrad.addColorStop(0.25, pulse > 0.5 ? '#ffff66' : '#ffcc00');
-        coreGrad.addColorStop(0.65, '#ff5500');
-        coreGrad.addColorStop(1.0, '#b91c1c');
-
-        ctx.save();
-        ctx.shadowColor = '#ff4400';
-        ctx.shadowBlur = 6 + pulse * 6;
-        ctx.fillStyle = coreGrad;
-        ctx.beginPath();
-        ctx.ellipse(0, 0, 10, 4.5, 0, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.restore();
-
-        // コア中心のハイライト
+        // 4. 中心コア（フレームごとに十字⇔ひし形に脈動）
+        ctx.fillStyle = coreCol;
+        if (phase === 0) {
+            ctx.fillRect(-4, -2, 8, 4);
+            ctx.fillRect(-2, -4, 4, 8);
+        } else {
+            ctx.fillRect(-3, -3, 6, 6);
+        }
         ctx.fillStyle = '#ffffff';
-        ctx.beginPath();
-        ctx.ellipse(-2.5, -1.2, 4, 1.3, 0, 0, Math.PI * 2);
-        ctx.fill();
+        ctx.fillRect(-1, -1, 2, 2);
 
         ctx.restore();
     }

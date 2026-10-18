@@ -1,19 +1,21 @@
 class Bullet {
-    constructor(x, y, speedX, speedY, color = '#ffffff', isEnemy = false) {
+    constructor(x, y, speedX, speedY, color = '#fff8e8', isEnemy = false) {
         this.x = x;
         this.y = y;
-        this.width = isEnemy ? 10 : 15;
-        this.height = isEnemy ? 10 : 4;
+        this.width = isEnemy ? 10 : 20;
+        this.height = isEnemy ? 10 : 5;
         this.speedX = speedX;
         this.speedY = speedY;
         this.color = color;
         this.active = true;
         this.isEnemy = isEnemy;
+        this.animTimer = Math.floor(Math.random() * 10);
     }
 
     update(canvasHeight = 600) {
         this.x += this.speedX;
         this.y += this.speedY;
+        this.animTimer++;
         if (this.x < -80 || this.x > 880 || this.y < -50 || this.y > canvasHeight + 50) {
             this.active = false;
         }
@@ -21,43 +23,62 @@ class Bullet {
 
     draw(ctx) {
         if (this.isEnemy) {
+            // 1985年アーケード版 敵通常弾：回転・明滅するピンク＆ホワイトのドットひし形弾 (◆)
             ctx.save();
-            const r = this.width / 2;
-            const cx = this.x + r;
-            const cy = this.y + r;
+            const cx = Math.round(this.x + this.width / 2);
+            const cy = Math.round(this.y + this.height / 2);
+            const phase = Math.floor(this.animTimer / 2) % 2;
 
-            // Fast draw
-
-            const grad = ctx.createRadialGradient(cx - 1.5, cy - 1.5, 0.5, cx, cy, r);
-            grad.addColorStop(0.0, '#ffffff'); // 超高輝度ハイライト
-            grad.addColorStop(0.35, '#f4f6f9'); // 艶やかな白
-            grad.addColorStop(0.65, '#cbd5e1'); // 陰影・スチールグレー
-            grad.addColorStop(0.92, '#475569'); // 球体の立体影
-            grad.addColorStop(1.0, '#1e293b');  // 輪郭のエッジリム
-
-            ctx.fillStyle = grad;
+            // 外周ピンク・コーラル枠
+            ctx.fillStyle = phase === 0 ? '#d86888' : '#e88868';
             ctx.beginPath();
-            ctx.arc(cx, cy, r, 0, Math.PI * 2);
+            ctx.moveTo(cx, cy - 5);
+            ctx.lineTo(cx + 5, cy);
+            ctx.lineTo(cx, cy + 5);
+            ctx.lineTo(cx - 5, cy);
+            ctx.closePath();
             ctx.fill();
 
-            ctx.shadowBlur = 0;
+            // 中間ピーチピンク層
+            ctx.fillStyle = '#ffb8d0';
+            ctx.fillRect(cx - 3, cy - 1, 6, 2);
+            ctx.fillRect(cx - 1, cy - 3, 2, 6);
+
+            // 中心ホワイトハイライト
             ctx.fillStyle = '#ffffff';
-            ctx.beginPath();
-            ctx.arc(cx - 1.6, cy - 1.6, 1.2, 0, Math.PI * 2);
-            ctx.fill();
-
+            ctx.fillRect(cx - 1, cy - 1, 2, 2);
             ctx.restore();
         } else {
-            ctx.fillStyle = this.color;
-            ctx.fillRect(this.x, this.y, this.width, this.height);
+            // 1985年アーケード版 自機ノーマル／ダブルショット：4連ドットペレット型エネルギー弾 (▪▪▪▪)
+            ctx.save();
+            const cx = this.x + this.width / 2;
+            const cy = this.y + this.height / 2;
+            ctx.translate(cx, cy);
+            if (Math.abs(this.speedY) > 0.5) {
+                ctx.rotate(Math.atan2(this.speedY, this.speedX));
+            }
+            const segCount = 4;
+            const segW = 4;
+            const gap = 1;
+            const startX = -((segCount * segW + (segCount - 1) * gap) / 2);
+            for (let i = 0; i < segCount; i++) {
+                const sx = Math.round(startX + i * (segW + gap));
+                // 外縁のアンバーオレンジ陰影
+                ctx.fillStyle = '#d87838';
+                ctx.fillRect(sx, -2, segW, 5);
+                // 中心のウォームホワイト高輝度コア
+                ctx.fillStyle = '#fff8e8';
+                ctx.fillRect(sx + 1, -1, segW - 1, 3);
+            }
+            ctx.restore();
         }
     }
 }
 
-// グラディウス伝統の陰影のある白い球体弾
+// 1985年アーケード版 敵ひし形弾
 class EnemyBullet extends Bullet {
     constructor(x, y, speedX, speedY) {
-        super(x - 5, y - 5, speedX, speedY, '#ffffff', true);
+        super(x - 5, y - 5, speedX, speedY, '#ffb8d0', true);
         this.radius = 5;
         this.width = 10;
         this.height = 10;
@@ -68,12 +89,13 @@ class Missile {
     constructor(x, y) {
         this.x = x;
         this.y = y;
-        this.width = 12;
-        this.height = 6;
-        this.speedX = 4;
-        this.speedY = 6;
-        this.color = '#ff8800'; // ミサイルの色
+        this.width = 14;
+        this.height = 7;
+        this.speedX = 3.6;
+        this.speedY = 5.4;
+        this.color = '#e8f0f8';
         this.active = true;
+        this.onGround = false;
     }
 
     update(canvasHeight) {
@@ -93,35 +115,61 @@ class Missile {
 
         if (this.y + this.height >= groundY) {
             this.y = groundY - this.height;
-            this.speedY = 0; // 落下ストップ
-            this.speedX = 6; // 地上を這う速度を少し上げる
-        } else if (this.speedY === 0) {
-            // 地形が下がった場合は再び落ちる
-            this.speedY = 6;
-            this.speedX = 4;
+            this.speedY = 0; // 落下ストップ・地形追従モード
+            this.speedX = 5.5;
+            this.onGround = true;
+        } else if (this.onGround) {
+            // 緩やかな下り斜面なら追従し、大きく離れたら再び斜め落下
+            if (groundY - (this.y + this.height) <= 10) {
+                this.y = groundY - this.height;
+                this.speedY = 0;
+            } else {
+                this.speedY = 5.4;
+                this.speedX = 3.6;
+                this.onGround = false;
+            }
         }
     }
 
     draw(ctx) {
-        ctx.fillStyle = this.color;
-        // ミサイルの形
-        ctx.beginPath();
-        ctx.moveTo(this.x + this.width, this.y + this.height / 2);
-        ctx.lineTo(this.x, this.y);
-        ctx.lineTo(this.x, this.y + this.height);
-        ctx.closePath();
-        ctx.fill();
+        // 1985年アーケード版 対地ミサイル：白銀＆ブルーグレーの円筒ロケット弾（落下時は斜め右下、着地時は水平走行）
+        ctx.save();
+        const cx = this.x + this.width / 2;
+        const cy = this.y + this.height / 2;
+        ctx.translate(cx, cy);
+        const angle = this.onGround ? 0 : Math.atan2(this.speedY, this.speedX);
+        ctx.rotate(angle);
+
+        // 後部バーニア噴射ドット
+        const flicker = Math.floor(Date.now() / 45) % 2;
+        ctx.fillStyle = flicker === 0 ? '#ff9820' : '#ffffa0';
+        ctx.fillRect(-9, -1, 3, 3);
+
+        // 尾翼フィン（ブルーグレー）
+        ctx.fillStyle = '#486898';
+        ctx.fillRect(-6, -3, 4, 7);
+
+        // ミサイル円筒ボディ（白銀ハイライト＋シルバー陰影）
+        ctx.fillStyle = '#8898b0';
+        ctx.fillRect(-5, -2, 10, 5);
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(-5, -2, 10, 2);
+
+        // 弾頭ノーズコーン（赤オレンジ）
+        ctx.fillStyle = '#e84818';
+        ctx.fillRect(5, -1, 3, 3);
+        ctx.restore();
     }
 }
 
 class Laser {
-    constructor(owner, offsetY, x, speedX, color = '#00ffff', shotId = null) {
+    constructor(owner, offsetY, x, speedX, color = '#f89818', shotId = null) {
         this.owner = owner;
         this.offsetY = offsetY;
         this.x = x;
         this.y = owner.y + offsetY;
         this.width = 5000; // 長い貫通レーザー
-        this.height = 3; // 極細シャープなグラディウスレーザー
+        this.height = 4;   // 1985年AC版の黄金オレンジ＋白黄コアレーザー
         this.speedX = speedX;
         this.color = color;
         this.active = true;
@@ -138,19 +186,20 @@ class Laser {
     update(canvasHeight) {
         this.framesAlive++;
         this.x += this.speedX;
-        // 常に発射元（自機またはオプション）のY座標にリアルタイム追従
+        // 常に発射元（自機またはオプション）のY座標にリアルタイム追従（レーザーワインダー対応）
         this.y = this.owner.y + this.offsetY;
     }
 
     draw(ctx) {
         ctx.save();
-        // 外側のシアン発光ビーム
-        ctx.fillStyle = this.color;
-        ctx.fillRect(this.x, this.y, this.width, this.height);
-
-        // 中心の高輝度白コア（極細1px）
-        ctx.fillStyle = '#ffffff';
-        ctx.fillRect(this.x, this.y + 1, this.width, 1);
+        const ly = Math.round(this.y);
+        // 1985年アーケード版 黄金オレンジ〜アンバー外縁＋高輝度イエローホワイト中心コア
+        ctx.fillStyle = '#c85000';
+        ctx.fillRect(this.x, ly, this.width, 4);
+        ctx.fillStyle = this.color || '#f89818';
+        ctx.fillRect(this.x, ly + 1, this.width, 2);
+        ctx.fillStyle = '#ffffb8';
+        ctx.fillRect(this.x, ly + 1, this.width, 1);
         ctx.restore();
     }
 }

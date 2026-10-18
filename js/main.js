@@ -34,7 +34,7 @@ function equipFullPowerForTest() {
     player.hasMissile = true;
     player.weaponType = 'LASER';
     player.shieldActive = true;
-    player.shieldHp = player.maxShieldHp || 3;
+    player.shieldHp = player.maxShieldHp || 16;
     if (typeof Option !== 'undefined') {
         while (player.options.length < (player.maxOptions || 4)) {
             const idx = player.options.length + 1;
@@ -942,7 +942,13 @@ function draw() {
     if (gameStarted) {
         capsules.forEach(c => c.draw(ctx));
         particles.forEach(p => p.draw(ctx));
-        enemies.forEach(e => e.draw(ctx));
+        enemies.forEach(e => {
+            if (e._drawnByTerrain) {
+                e._drawnByTerrain = false;
+                return;
+            }
+            e.draw(ctx);
+        });
         enemyBullets.forEach(b => b.draw(ctx));
         playerBullets.forEach(b => b.draw(ctx));
     }

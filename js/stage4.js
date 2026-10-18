@@ -124,45 +124,61 @@ class JumperEnemy extends Enemy {
         ctx.translate(cx, cy);
         if (this.isCeiling) ctx.scale(1, -1);
 
-        const S = 2;
-        // バネ脚の伸縮高さ（着地時は縮み、ジャンプ中は伸びる）
-        const legH = Math.round(Math.max(3, 8 * (1 - this.springCompress * 0.55)));
-        const bodyY = (-legH - 6) * S;
+        // 1985年アーケード版「ジャンパー (step_160_1.jpg)」完全再現：
+        // 地上待機時はストライプドーム形状に縮み、大ジャンプ時は縦縞の円筒ボディの中央に青い丸目（砲口）が現れ、下部に着地脚パッドが伸びる！
+        const compress = Math.round(this.springCompress * 6);
+        const baseOffset = -compress;
 
-        const cLight = this.isRed ? '#fecdd3' : '#e0f2fe';
-        const cMain  = this.isRed ? '#ef4444' : '#38bdf8';
-        const cDark  = this.isRed ? '#991b1b' : '#0369a1';
-        const cLeg   = this.isRed ? '#fde047' : '#fb923c';
+        const cCapEdge = this.isRed ? '#b82818' : '#207888';
+        const cCapMid  = this.isRed ? '#ec5838' : '#48b8c8';
+        const cCapHigh = this.isRed ? '#ff9878' : '#88e8f0';
+        const cFoot    = this.isRed ? '#5878c8' : '#d89824';
 
-        // 1. 左右のバネ関節脚（ドット絵ジグザグ脚）
-        ctx.fillStyle = cLeg;
-        const kneeOut = (this.springCompress > 0.2) ? 6 * S : 4 * S;
-        // 左脚
-        ctx.fillRect(-4 * S, bodyY + 4 * S, 2 * S, Math.round(legH * 0.5) * S);
-        ctx.fillRect(-kneeOut, -Math.round(legH * 0.6) * S, 3 * S, 2 * S);
-        ctx.fillRect(-5 * S, -Math.round(legH * 0.4) * S, 2 * S, Math.round(legH * 0.4) * S);
-        ctx.fillRect(-7 * S, -2 * S, 5 * S, 2 * S);
-        // 右脚
-        ctx.fillRect(2 * S, bodyY + 4 * S, 2 * S, Math.round(legH * 0.5) * S);
-        ctx.fillRect(kneeOut - 3 * S, -Math.round(legH * 0.6) * S, 3 * S, 2 * S);
-        ctx.fillRect(3 * S, -Math.round(legH * 0.4) * S, 2 * S, Math.round(legH * 0.4) * S);
-        ctx.fillRect(2 * S, -2 * S, 5 * S, 2 * S);
+        // 1. 下部の着地用スプリング脚＆ゴールドフランジベース
+        ctx.fillStyle = '#283858';
+        ctx.fillRect(-10, -8 - baseOffset, 4, 6 + baseOffset);
+        ctx.fillRect(6, -8 - baseOffset, 4, 6 + baseOffset);
+        ctx.fillStyle = cFoot;
+        ctx.fillRect(-16, -4, 32, 4);
+        ctx.fillStyle = '#f8e878';
+        ctx.fillRect(-12, -3, 8, 2);
+        ctx.fillRect(4, -3, 8, 2);
 
-        // 2. ドーム型ジャンパー本体（1985年アーケード版ドット絵造形）
-        ctx.fillStyle = cDark;
-        ctx.fillRect(-7 * S, bodyY - 3 * S, 14 * S, 8 * S);
-        ctx.fillRect(-5 * S, bodyY - 5 * S, 10 * S, 10 * S);
-        ctx.fillStyle = cMain;
-        ctx.fillRect(-6 * S, bodyY - 2 * S, 12 * S, 6 * S);
-        ctx.fillRect(-4 * S, bodyY - 4 * S, 8 * S, 8 * S);
-        ctx.fillStyle = cLight;
-        ctx.fillRect(-4 * S, bodyY - 3 * S, 5 * S, 2 * S);
+        // 2. 縦ストライプ円筒胴体＋中央の青い丸目アイ (step_160_1.jpg の象徴的デザイン)
+        const cylY = -22 + compress;
+        ctx.fillStyle = '#080c18';
+        ctx.fillRect(-16, cylY, 32, 14);
 
-        // 3. 中央バイザー＆カメラアイ
-        ctx.fillStyle = '#0f172a';
-        ctx.fillRect(-5 * S, bodyY - 1 * S, 10 * S, 3 * S);
-        ctx.fillStyle = this.hasShotInJump ? '#fde047' : '#f97316';
-        ctx.fillRect(-2 * S, bodyY - 1 * S, 4 * S, 2 * S);
+        const stripeX = [-14, -9, -4, 1, 6, 11];
+        stripeX.forEach((sx, idx) => {
+            ctx.fillStyle = (idx === 1 || idx === 4) ? '#f0f8ff' : (this.isRed ? '#e84838' : '#58c8d8');
+            ctx.fillRect(sx, cylY + 1, 3, 12);
+        });
+
+        // 中央の青いカメラアイ／発射口（ジャンプ中に露出！）
+        if (this.springCompress < 0.6) {
+            ctx.fillStyle = '#081028';
+            ctx.fillRect(-6, cylY + 2, 12, 10);
+            ctx.fillStyle = '#2060e8';
+            ctx.fillRect(-5, cylY + 3, 10, 8);
+            ctx.fillStyle = this.hasShotInJump ? '#ffe850' : '#68c8ff';
+            ctx.fillRect(-3, cylY + 4, 6, 6);
+            ctx.fillStyle = '#ffffff';
+            ctx.fillRect(-2, cylY + 5, 2, 2);
+        }
+
+        // 3. 上部の半円ドームキャップ
+        const capY = cylY - 11;
+        ctx.fillStyle = cCapEdge;
+        ctx.fillRect(-16, capY + 6, 32, 5);
+        ctx.fillRect(-13, capY + 2, 26, 4);
+        ctx.fillStyle = cCapMid;
+        ctx.fillRect(-13, capY + 6, 26, 5);
+        ctx.fillRect(-10, capY + 2, 20, 4);
+        ctx.fillStyle = cCapHigh;
+        ctx.fillRect(-8, capY, 16, 4);
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(-4, capY, 8, 2);
 
         ctx.restore();
     }

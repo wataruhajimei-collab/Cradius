@@ -23,42 +23,42 @@ class Option {
     }
 
     draw(ctx) {
+        // 1985年アーケード版 オプション（OPTION / MULTIPUL）：
+        // 4段階の同心円ドット層（ダークレッド外縁→朱赤→オレンジ→イエロー中心）が脈動する楕円エネルギー体
         ctx.save();
-        const cx = this.x + this.width / 2;
-        const cy = this.y + this.height / 2;
-        const pulse = Math.sin(this.pulseTimer) * 1.2;
-        const rx = (this.width / 2) + pulse * 0.6;
-        const ry = (this.height / 2) + pulse * 0.4;
+        const cx = Math.round(this.x + this.width / 2);
+        const cy = Math.round(this.y + this.height / 2);
+        const step = Math.floor(this.pulseTimer * 1.5) % 4;
+        const expand = (step === 1 || step === 3) ? 0 : (step === 2 ? 1 : -1);
 
-        // 外側のエネルギー発光オーラ
-        ctx.shadowColor = '#ff5500';
-        ctx.shadowBlur = 10 + pulse * 2;
+        const w0 = 24 + expand * 2;
+        const h0 = 16 + expand * 2;
 
-        // グラディウス伝統の多段階プラズマグラデーション（白黄〜黄金オレンジ〜紅蓮レッド）
-        const grad = ctx.createRadialGradient(cx - 3, cy - 3, 1.5, cx, cy, rx);
-        grad.addColorStop(0.0, '#ffffff');
-        grad.addColorStop(0.22, '#fff066');
-        grad.addColorStop(0.50, '#ff9900');
-        grad.addColorStop(0.80, '#ff3300');
-        grad.addColorStop(1.0, '#990a00');
+        // 1. 最外周ダークレッド層 (#881800)
+        ctx.fillStyle = '#881800';
+        ctx.fillRect(cx - w0 / 2 + 3, cy - h0 / 2, w0 - 6, h0);
+        ctx.fillRect(cx - w0 / 2, cy - h0 / 2 + 3, w0, h0 - 6);
+        ctx.fillRect(cx - w0 / 2 + 1, cy - h0 / 2 + 1, w0 - 2, h0 - 2);
 
-        ctx.fillStyle = grad;
-        ctx.beginPath();
-        ctx.ellipse(cx, cy, rx, ry, 0, 0, Math.PI * 2);
-        ctx.fill();
+        // 2. 第2層 クリムゾンオレンジ層 (#d84000)
+        const w1 = w0 - 4;
+        const h1 = h0 - 4;
+        ctx.fillStyle = '#d84000';
+        ctx.fillRect(cx - w1 / 2 + 2, cy - h1 / 2, w1 - 4, h1);
+        ctx.fillRect(cx - w1 / 2, cy - h1 / 2 + 2, w1, h1 - 4);
 
-        // 内部の光のリング＆ハイライトコア
-        ctx.shadowBlur = 0;
-        ctx.strokeStyle = 'rgba(255, 240, 150, 0.65)';
-        ctx.lineWidth = 1.5;
-        ctx.beginPath();
-        ctx.ellipse(cx - 1, cy - 0.5, rx * 0.65, ry * 0.62, 0, 0, Math.PI * 2);
-        ctx.stroke();
+        // 3. 第3層 ブライトオレンジ層 (#f88818)
+        const w2 = w1 - 4;
+        const h2 = h1 - 4;
+        ctx.fillStyle = '#f88818';
+        ctx.fillRect(cx - w2 / 2 + 1, cy - h2 / 2, w2 - 2, h2);
+        ctx.fillRect(cx - w2 / 2, cy - h2 / 2 + 1, w2, h2 - 2);
 
+        // 4. 中心 ゴールデンイエロー発光核 (#f8e828)
+        ctx.fillStyle = '#f8e828';
+        ctx.fillRect(cx - 4, cy - 2, 8, 4);
         ctx.fillStyle = '#ffffff';
-        ctx.beginPath();
-        ctx.ellipse(cx - 3.5, cy - 2.5, 4.2, 2.5, -0.2, 0, Math.PI * 2);
-        ctx.fill();
+        ctx.fillRect(cx - 2, cy - 1, 3, 2);
 
         ctx.restore();
     }

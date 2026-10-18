@@ -20,12 +20,14 @@ class Player {
 
         this.shieldActive = false;
         this.shieldHp = 0;
-        this.maxShieldHp = 3;
+        this.maxShieldHp = 16; // 1985年AC版準拠のシールド耐久力（残量低下で赤く変色）
 
         this.hasMissile = false; // ミサイルを持っているか
         this.hitFlashTimer = 0;  // 被弾時の赤白フラッシュ＆シェイク演出タイマー
         this.hitCooldown = 0;    // 連続被弾クールダウン
         this.hitCount = 0;
+        this.bankAngle = 0;      // 上下移動時の機体ロール（バンク）状態 (-1: 上, 0: 水平, 1: 下)
+        this.shieldAnimTimer = 0;
     }
 
     onHit(sourceX) {
@@ -65,13 +67,23 @@ class Player {
     update(canvasWidth, canvasHeight) {
         if (this.hitFlashTimer > 0) this.hitFlashTimer--;
         if (this.hitCooldown > 0) this.hitCooldown--;
+        this.shieldAnimTimer += 0.25;
 
-        // 入力による移動処理
+        // 入力による移動処理＆1985年AC版バンク姿勢制御
+        let moveY = 0;
         if (Input.isDown('ArrowUp')) {
             this.y -= this.speed;
+            moveY = -1;
         }
         if (Input.isDown('ArrowDown')) {
             this.y += this.speed;
+            moveY = 1;
+        }
+        if (moveY !== 0) {
+            this.bankAngle += (moveY - this.bankAngle) * 0.35;
+        } else {
+            this.bankAngle *= 0.7;
+            if (Math.abs(this.bankAngle) < 0.05) this.bankAngle = 0;
         }
         if (Input.isDown('ArrowLeft')) {
             this.x -= this.speed;
@@ -175,7 +187,9 @@ class Player {
                 if (levelManager.stage === 1) {
                     levelManager.state = 'TERRAIN';
                     levelManager.terrain.start();
-                    levelManager.terrain.currentSegIndex = 28;
+                    levelManager.terrain.currentSegIndex = 82;
+                    levelManager.terrain.spawnIndex = levelManager.terrain.spawns.findIndex(s => s.seg >= 82);
+                    if (levelManager.terrain.spawnIndex < 0) levelManager.terrain.spawnIndex = levelManager.terrain.spawns.length;
                     levelManager.time = 18000;
                     if (typeof Sound !== 'undefined' && typeof Sound.playStageBgm === 'function') {
                         Sound.playStageBgm();
@@ -295,23 +309,23 @@ class Player {
     fireBulletFromOrigin(originOwner, originX, originY, offsetY, shotId = null) {
         if (typeof addPlayerBullet === 'function') {
             if (this.weaponType === 'LASER') {
-                const laser = new Laser(originOwner, offsetY, originX, 20, '#00ffff', shotId);
+                const laser = new Laser(originOwner, offsetY, originX, 22, '#f89818', shotId);
                 addPlayerBullet(laser);
             } else if (this.weaponType === 'DOUBLE') {
-                const b1 = new Bullet(originX, originY, 10, 0);
-                const b2 = new Bullet(originX, originY - 5, 9.5, -4.0); // 前方にしっかり伸びてボスや上下の標的を捉える最適弾道
+                const b1 = new Bullet(originX, originY, 11, 0);
+                const b2 = new Bullet(originX, originY - 5, 8.5, -8.5); // 1985年AC版準拠の前方＋斜め上45度ショット
                 b1.isDouble = true;
                 b2.isDouble = true;
                 addPlayerBullet(b1);
                 addPlayerBullet(b2);
             } else {
-                addPlayerBullet(new Bullet(originX, originY, 10, 0));
+                addPlayerBullet(new Bullet(originX, originY, 11, 0));
             }
 
             // ミサイル発射 (メインショットとは独立して発射される)
             if (this.hasMissile) {
                 // 機体の下部から斜め下へ発射
-                addPlayerBullet(new Missile(originX - 10, originY + 10));
+                addPlayerBullet(new Missile(originX - 16, originY + 8));
             }
         }
     }
@@ -373,40 +387,73 @@ class Player {
                 ctx.filter = 'brightness(2.5) saturate(2.5) hue-rotate(-30deg)';
             }
         }
-        if (typeof images !== 'undefined' && images.player && images.player.complete && images.player.naturalWidth > 0) {
-            // 通常描画（高速・低負荷）
-            ctx.drawImage(images.player, this.x - 8, this.y - 18, 56, 56);
 
-            // 自機のエンジン噴射炎（上下2箇所または中央）
-            const flameLen = 8 + (Math.sin(Date.now() * 0.02) * 3);
-            ctx.fillStyle = '#ff9900';
-            ctx.beginPath();
-            ctx.moveTo(this.x - 2, this.y + 7);
-            ctx.lineTo(this.x - 2 - flameLen, this.y + 9);
-            ctx.lineTo(this.x - 2, this.y + 11);
-            ctx.closePath();
-            ctx.fill();
+        // ============================================================
+        // 1985年アーケード版『グラディウス』ビックバイパー (VIC VIPER) 完全再現ドット描画
+        // 白銀の鋭いデルタウェッジ機体＋中央オレンジキャノピー＋下部ブルーフィン＋青白い後方バーニア炎
+        // ============================================================
+        const px = Math.round(this.x);
+        const py = Math.round(this.y);
+        const bank = this.bankAngle || 0;
+        const wingExpand = Math.round(Math.abs(bank) * 3);
 
-            ctx.fillStyle = '#ffffaa';
-            ctx.beginPath();
-            ctx.moveTo(this.x - 2, this.y + 8);
-            ctx.lineTo(this.x - 2 - flameLen * 0.6, this.y + 9);
-            ctx.lineTo(this.x - 2, this.y + 10);
-            ctx.closePath();
-            ctx.fill();
-        } else {
-            // 仮の描画（機体を示す三角形または四角形）
-            ctx.fillStyle = this.color;
-            ctx.beginPath();
-            ctx.moveTo(this.x + this.width, this.y + this.height / 2); // 先端
-            ctx.lineTo(this.x, this.y); // 左上
-            ctx.lineTo(this.x, this.y + this.height); // 左下
-            ctx.closePath();
-            ctx.fill();
-            
-            ctx.fillStyle = '#ffffff';
-            ctx.fillRect(this.x + 10, this.y + 5, 10, 10);
-        }
+        // 1. 後方エンジン噴射炎（1985年AC版の鮮やかな青〜水色〜白のジェットフレーム）
+        const flicker = Math.floor(Date.now() / 40) % 2;
+        const flameLen = flicker === 0 ? 11 : 8;
+        ctx.fillStyle = '#1858d8';
+        ctx.fillRect(px - flameLen, py + 7, flameLen, 6);
+        ctx.fillStyle = '#58b8ff';
+        ctx.fillRect(px - flameLen + 3, py + 8, flameLen - 3, 4);
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(px - 4, py + 9, 4, 2);
+
+        // 2. 後部垂直尾翼＆下部ブルーベントラルフィン
+        // 上部スwept垂直尾翼（シルバー＆ホワイト）
+        ctx.fillStyle = '#7888a8';
+        ctx.fillRect(px + 2, py + 1 - wingExpand, 10, 6 + wingExpand);
+        ctx.fillStyle = '#dce4f4';
+        ctx.fillRect(px + 1, py - wingExpand, 8, 3);
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(px, py - wingExpand, 5, 2);
+
+        // 下部ブルーフィン＆エンジンブロック（本家特有の鮮やかなコバルトブルー）
+        ctx.fillStyle = '#1848a8';
+        ctx.fillRect(px + 3, py + 13, 14, 5 + wingExpand);
+        ctx.fillStyle = '#3880f8';
+        ctx.fillRect(px + 5, py + 14, 10, 3 + Math.floor(wingExpand * 0.6));
+
+        // 3. メイン・デルタウェッジ船体（重厚なシルバーグレー下地＋純白アッパーカウル）
+        ctx.fillStyle = '#485878'; // 船体下部シャドウライン
+        ctx.fillRect(px + 2, py + 11, 28, 4);
+        ctx.fillRect(px + 30, py + 10, 7, 3);
+
+        ctx.fillStyle = '#98a4bc'; // 中間シルバーグレー装甲
+        ctx.fillRect(px + 2, py + 6, 30, 6);
+        ctx.fillRect(px + 32, py + 8, 6, 4);
+
+        ctx.fillStyle = '#e0e8f8'; // アッパーデッキ明シルバー
+        ctx.fillRect(px + 4, py + 5 - Math.floor(wingExpand * 0.5), 24, 5 + Math.floor(wingExpand * 0.5));
+        ctx.fillRect(px + 28, py + 7, 9, 3);
+
+        ctx.fillStyle = '#ffffff'; // 先端まで貫く純白ハイライトライン（双胴ウェッジノーズ）
+        ctx.fillRect(px + 6, py + 5 - Math.floor(wingExpand * 0.5), 18, 3);
+        ctx.fillRect(px + 24, py + 7, 13, 3);
+        ctx.fillRect(px + 37, py + 8, 4, 2);
+
+        // 4. 機体中央のオレンジ・アンバーキャノピー（1985年AC版ビックバイパーの象徴）
+        ctx.fillStyle = '#982000';
+        ctx.fillRect(px + 15, py + 6, 11, 5);
+        ctx.fillStyle = '#e85818';
+        ctx.fillRect(px + 16, py + 6, 9, 4);
+        ctx.fillStyle = '#f8a030';
+        ctx.fillRect(px + 17, py + 7, 6, 2);
+        ctx.fillStyle = '#fff0a0';
+        ctx.fillRect(px + 18, py + 7, 3, 1);
+
+        // 5. 翼端・エアインテークの黒スリットディテール
+        ctx.fillStyle = '#101828';
+        ctx.fillRect(px + 11, py + 9, 4, 2);
+        ctx.fillRect(px + 26, py + 10, 4, 1);
 
         // 被弾時のショックウェーブリング描画
         if (this.hitFlashTimer > 0) {
@@ -419,16 +466,55 @@ class Player {
 
         ctx.restore();
 
-        // シールドの描画
+        // ============================================================
+        // 1985年アーケード版 シールド（機首前方に上下2つ並ぶ回転八角スター結晶体）
+        // 耐久力が減ると青（#3888ff）から赤オレンジ（#f85818）に変化する本家仕様
+        // ============================================================
         if (this.shieldActive) {
             ctx.save();
-            ctx.strokeStyle = `rgba(0, 255, 255, ${this.shieldHp / this.maxShieldHp})`;
-            ctx.lineWidth = 3;
-            ctx.shadowColor = '#00ffff';
-            ctx.shadowBlur = 8;
-            ctx.beginPath();
-            ctx.arc(this.x + this.width + 10, this.y + this.height / 2, 25, -Math.PI / 3, Math.PI / 3);
-            ctx.stroke();
+            const isLow = this.shieldHp <= 4;
+            const outerColor = isLow ? '#c82800' : '#1858d8';
+            const midColor = isLow ? '#f87820' : '#48a8ff';
+            const coreColor = isLow ? '#fff0a0' : '#ffffff';
+            const shieldX = Math.round(this.x + this.width + 9);
+            const shieldOffsetsY = [Math.round(this.y + 1), Math.round(this.y + this.height - 1)];
+            const rotStep = Math.floor(this.shieldAnimTimer) % 2;
+
+            shieldOffsetsY.forEach((sy, idx) => {
+                ctx.save();
+                ctx.translate(shieldX, sy);
+                // 2基のスターシールドが交互位相で高速スピン点滅
+                const phase = (rotStep + idx) % 2;
+                const rOuter = phase === 0 ? 9 : 8;
+                const rInner = phase === 0 ? 4 : 5;
+
+                // 外周8角スター（ブルー／低HP時レッド）
+                ctx.fillStyle = outerColor;
+                ctx.beginPath();
+                for (let i = 0; i < 8; i++) {
+                    const ang = (i * Math.PI) / 4 + (phase * Math.PI) / 8;
+                    const rad = (i % 2 === 0) ? rOuter : rInner;
+                    const vx = Math.cos(ang) * rad;
+                    const vy = Math.sin(ang) * rad;
+                    if (i === 0) ctx.moveTo(vx, vy);
+                    else ctx.lineTo(vx, vy);
+                }
+                ctx.closePath();
+                ctx.fill();
+
+                // 中間十字/ひし形輝き
+                ctx.fillStyle = midColor;
+                ctx.fillRect(-5, -2, 10, 4);
+                ctx.fillRect(-2, -5, 4, 10);
+                if (phase === 0) {
+                    ctx.fillRect(-4, -4, 8, 8);
+                }
+
+                // 中心ホワイトコア
+                ctx.fillStyle = coreColor;
+                ctx.fillRect(-2, -2, 4, 4);
+                ctx.restore();
+            });
             ctx.restore();
         }
     }
