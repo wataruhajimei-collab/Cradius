@@ -529,46 +529,42 @@ class FanEnemy extends Enemy {
         }
     }
 
+// 1985年アーケード版 ファン (Fan 16x14 ドット絵)
+const FAN_BLUE_PALETTE = {
+    '1': '#7C4A8C', '2': '#9C6AB4', '3': '#9C7EC4', '4': '#9CC2DC',
+    '5': '#5C425C', '6': '#A4DEDC', '7': '#FCFEFC', '8': '#040274'
+};
+const FAN_RED_PALETTE = {
+    '1': '#740204', '2': '#A42224', '3': '#C44244', '4': '#FCA69C',
+    '5': '#5C1214', '6': '#FCC2B4', '7': '#FCFEFC', '8': '#EC9A04'
+};
+const FAN_ROWS = [
+    "......1111......",
+    "....22333322....",
+    "...2334444332...",
+    "..134444444431..",
+    "..244466664442..",
+    ".23446777764432.",
+    ".13446888864431.",
+    ".13446888864431.",
+    ".23446777764432.",
+    "..244466664442..",
+    "..134444444431..",
+    "...2334444332...",
+    "....22333322....",
+    "......1111......"
+];
+
     draw(ctx) {
-        if (!this.visible) return;
+        if (!this.visible || !this.active) return;
         ctx.save();
-        const cx = Math.round(this.x + this.width / 2);
-        const cy = Math.round(this.y + this.height / 2);
-        ctx.translate(cx, cy);
-
-        // 1985年アーケード版「ファン (stage_1-1.png)」完全再現：
-        // 3枚羽根の銀青ラベンダー（赤機は朱赤）風車スプライト
-        const cLight = this.isRed ? '#FCFEFC' : '#FCFEFC';
-        const cSub   = this.isRed ? '#FCC2B4' : '#A4DEDC';
-        const cMain  = this.isRed ? '#C44244' : '#9C7EC4';
-        const cDark  = this.isRed ? '#740204' : '#7C4A8C';
-
-        const stepAngle = Math.floor(this.spinAngle / (Math.PI / 6)) * (Math.PI / 6);
-        ctx.rotate(stepAngle);
-
-        for (let b = 0; b < 3; b++) {
-            ctx.save();
-            ctx.rotate((b * Math.PI * 2) / 3);
-            ctx.fillStyle = cDark;
-            ctx.fillRect(-5, -15, 10, 12);
-            ctx.fillRect(-3, -18, 6, 3);
-            ctx.fillStyle = cMain;
-            ctx.fillRect(-3, -15, 8, 9);
-            ctx.fillRect(-6, -12, 3, 6);
-            ctx.fillStyle = cSub;
-            ctx.fillRect(-3, -14, 5, 6);
-            ctx.fillStyle = cLight;
-            ctx.fillRect(-2, -13, 3, 4);
-            ctx.restore();
+        ctx.imageSmoothingEnabled = false;
+        const pal = this.isRed ? FAN_RED_PALETTE : FAN_BLUE_PALETTE;
+        const key = this.isRed ? 'fan_red_16x14' : 'fan_blue_16x14';
+        const spr = getEnemyArcadeCanvas(key, FAN_ROWS, pal, 2.5);
+        if (spr) {
+            ctx.drawImage(spr, Math.round(this.x), Math.round(this.y));
         }
-
-        ctx.fillStyle = cMain;
-        ctx.fillRect(-6, -6, 12, 12);
-        ctx.fillStyle = cLight;
-        ctx.fillRect(-4, -4, 6, 3);
-        ctx.fillStyle = '#040204';
-        ctx.fillRect(-3, -3, 6, 6);
-
         ctx.restore();
     }
 }
@@ -1347,6 +1343,11 @@ class Volcano extends Enemy {
     }
 
     draw(ctx) {
+        if (!this.active) return;
+        if (typeof levelManager !== 'undefined') {
+            if (levelManager.terrain && !levelManager.terrain.active) return;
+            if (levelManager.state === 'STAGE_CLEAR' && levelManager.terrain && levelManager.terrain.wipeProgress >= 1.0) return;
+        }
         ctx.save();
         ctx.imageSmoothingEnabled = false;
         const isCrimson = (typeof levelManager !== 'undefined' &&

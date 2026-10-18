@@ -351,8 +351,8 @@ class Terrain {
 
             // --- Section 5: クライマックス・深紅パレット変化＋緑の樹海＋二連火山大噴火 (sakura_04.png, grad0027.png, grad0030.png) ---
             { seg: 86, type: 'TREES',   widthPx: 1800 },                   // 二連火山の麓一面に広がる緑の樹林帯 (grad0027 / grad0030)
-            { seg: 88, type: 'VOLCANO_TWIN' },                             // 第1深紅火山（画面左端付近 x ≈ 36 に停止）
-            { seg: 101, type: 'VOLCANO_TWIN' }                             // 第2深紅火山（画面右端付近 x ≈ 556 に停止、2つの火山の間からビッグコアがせり上がる！）
+            { seg: 88, type: 'VOLCANO_TWIN' },                             // 第1深紅火山（画面左端付近 x ≈ 20 に停止）
+            { seg: 103, type: 'VOLCANO_TWIN' }                             // 第2深紅火山（画面右端付近 x ≈ 620 に停止、2つの火山の真ん中からビッグコアがせり上がる！）
         ];
 
         Terrain._initSprites();
@@ -914,14 +914,13 @@ class FloatingIsland {
         this.oneUpChecked = false;
         this.turrets = [];
 
-        // sakura_03.png 完全準拠：ひし形浮き岩の左斜面に沿って5基の横向き水色ドーム（ソロモンレーザー砲門）を配置！
+        // sakura_03.png 完全準拠：ひし形浮き岩の左斜面に沿って4基の横向き水色ドーム（ソロモンレーザー砲門）を配置！
         if (typeof DomeEnemy !== 'undefined' && typeof enemies !== 'undefined') {
             const domeSpecs = [
-                { fracY: 0.16, relX: 44, isRed: false },
-                { fracY: 0.33, relX: 18, isRed: hasRedTurret },
-                { fracY: 0.49, relX: -6, isRed: false },
-                { fracY: 0.65, relX: 18, isRed: false },
-                { fracY: 0.82, relX: 44, isRed: false }
+                { fracY: 0.18, relX: 36, isRed: false },
+                { fracY: 0.38, relX: 10, isRed: hasRedTurret },
+                { fracY: 0.58, relX: 10, isRed: false },
+                { fracY: 0.78, relX: 36, isRed: false }
             ];
             domeSpecs.forEach(d => {
                 const relY = Math.round(this.height * d.fracY) - 18;
@@ -935,6 +934,8 @@ class FloatingIsland {
                     relY,
                     'LEFT_WALL'
                 );
+                dome.hp = 8; // 本家アーケード完全再現：しっかり撃ち込まないと破壊できない頑丈なレーザー砲台！
+                dome.maxHp = 8;
                 this.turrets.push(dome);
                 enemies.push(dome);
             });
@@ -1076,10 +1077,10 @@ class LevelManager {
                 }
 
                 // 本家1面クライマックス (grad0027.png / sakura_04.png)：
-                // 第1火山が画面左端 (x <= 36)、第2火山が画面右端 (x ≈ 556) に到達したらスクロール完全停止＆大噴火開始！
+                // 第1火山が画面左端 (x <= 20)、第2火山が画面右端 (x ≈ 620) に到達したらスクロール完全停止＆大噴火開始！
                 if (this.terrain.twinVolcanoes && this.terrain.twinVolcanoes.length >= 2) {
                     const v1 = this.terrain.twinVolcanoes[0];
-                    if (v1 && v1.active && v1.x <= 36) {
+                    if (v1 && v1.active && v1.x <= 20) {
                         this.state = 'VOLCANO_ERUPTION';
                         this.eruptionTimer = 0;
                         this.terrain.scrollSpeed = 0; // スクロール完全停止！
@@ -1144,6 +1145,12 @@ class LevelManager {
                     this.terrain.wipeProgress = Math.min(1.0, this.stageClearTimer / 1800);
                     if (this.terrain.wipeProgress >= 1.0) {
                         this.terrain.active = false;
+                        // 地形消滅後は火山も完全に不活性化し、山がパッと復活する現象を完全根絶！
+                        if (this.terrain.twinVolcanoes) {
+                            this.terrain.twinVolcanoes.forEach(v => {
+                                if (v) v.active = false;
+                            });
+                        }
                     }
                 }
                 if (this.stageClearTimer > 3200) {

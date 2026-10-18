@@ -210,13 +210,14 @@ class Laser {
         this.offsetY = offsetY;
         this.x = x;
         this.y = owner.y + offsetY;
-        this.width = 5000;
-        this.height = 3; // 1985年AC版 (grad0017.png / grad0027.png) のシャープな青白レーザー (#B4DEFC)
-        this.speedX = speedX;
+        this.width = 320; // 1985年AC版完全再現：画面の半分以上を突き抜ける長大な青白レーザー光線！
+        this.height = 5;  // 1dot=3px シャープな青白レーザー
+        this.speedX = speedX || 24;
         this.color = color;
         this.active = true;
         this.framesAlive = 0;
-        this.minFrames = 22;
+        this.minFrames = 35; // 画面を突き抜けるまでしっかり持続
+        this.hitCooldown = 0;
         if (shotId !== null) {
             this.shotId = shotId;
         } else {
@@ -228,17 +229,23 @@ class Laser {
     update(canvasHeight) {
         this.framesAlive++;
         this.x += this.speedX;
-        this.y = this.owner.y + this.offsetY;
+        // 発射後数フレームは自機の上下移動に少し追従（実機特有の自機追従レーザー！）
+        if (this.framesAlive <= 10 && this.owner) {
+            this.y = this.owner.y + this.offsetY;
+        }
     }
 
     draw(ctx) {
         ctx.save();
         const ly = Math.round(this.y);
-        // 1985年アーケード版 実機キャプチャ (grad0017.png / grad0027.png) の1dot=3px青白レーザー (#B4DEFC)
-        ctx.fillStyle = '#B4DEFC';
-        ctx.fillRect(Math.round(this.x), ly, this.width, 3);
+        const lx = Math.round(this.x);
+        // 1985年アーケード版 実機キャプチャ (grad0017.png / grad0027.png) の長大青白レーザー (#B4DEFC / #FCFEFC)
+        ctx.fillStyle = '#1C72C4';
+        ctx.fillRect(lx, ly - 1, this.width, 5);
+        ctx.fillStyle = '#7CC2FC';
+        ctx.fillRect(lx, ly, this.width, 3);
         ctx.fillStyle = '#FCFEFC';
-        ctx.fillRect(Math.round(this.x), ly + 1, this.width, 1);
+        ctx.fillRect(lx, ly + 1, this.width, 1);
         ctx.restore();
     }
 }
@@ -270,15 +277,15 @@ class EnemyLaser extends Bullet {
     }
 }
 
-// 1985年AC版ビッグコア専用：長大で迫力ある青白4連極太レーザー光線 (BigCoreLaser)
+// 1985年AC版ビッグコア専用：短い青っぽい太いレーザー弾 (BigCoreLaser: 元の26px仕様に戻す)
 class BigCoreLaser extends Bullet {
     constructor(x, y, speedX, speedY = 0) {
-        // 本家アーケード完全再現：幅175px × 高さ10pxの長大な青白レーザービーム
-        super(x - 175, y - 5, speedX, speedY, '#38bdf8', true);
-        this.width = 175;
-        this.height = 10;
-        this.length = 175;
-        this.thickness = 10;
+        // 当たり判定は長さ26px × 太さ8pxの短く太い矩形（ユーザー指示により完全復元）
+        super(x - 13, y - 4, speedX, speedY, '#38bdf8', true);
+        this.width = 26;
+        this.height = 8;
+        this.length = 26;
+        this.thickness = 8;
     }
 
     draw(ctx) {

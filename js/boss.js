@@ -693,9 +693,8 @@ class Boss {
         this.drawW = 294;
         this.drawH = 198;
         this.width = 294;
-        this.height = 198;
-        this.targetX = 635; // 画面内に全体像が美しく収まる定位置
-        this.x = 635;
+        this.targetX = 490; // 二連火山（左端x=20と右端x=620）の真ん中の平地に位置する定位置！
+        this.x = 490;
         this.targetY = y || 220;
         this.baseY = y || 220;
         this.y = 660; // 1985年アーケード実機完全再現：二連火山の合間（画面下外）からせり上がる！
