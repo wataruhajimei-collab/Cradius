@@ -877,49 +877,57 @@ function triggerBossDefeatExplosion(boss) {
         spawnBossDismembermentWave(boss, true);
     }
 
-    // 1. ボス各部（遮蔽板、上下アーム、外装、コア）から次々とアーケード爆発が高速炸裂！（計24発、42ms間隔）
-    for (let i = 0; i < 24; i++) {
+    // 1. ボス各部（遮蔽板、上下アーム、外装、コア）から次々とアーケード火炎爆発が高速炸裂！（計36発、32ms間隔）
+    for (let i = 0; i < 36; i++) {
         setTimeout(() => {
             if (!boss) return;
             const { cx, cy } = getBossCenter();
-            const offsetX = (Math.random() - 0.5) * (boss.width * 0.85);
-            const offsetY = (Math.random() - 0.5) * (boss.height * 0.85);
+            const offsetX = (Math.random() - 0.5) * (boss.width * 0.9);
+            const offsetY = (Math.random() - 0.5) * (boss.height * 0.9);
             const explosionX = cx + offsetX;
             const explosionY = cy + offsetY;
-            const isBig = (i % 2 === 1);
+            const isBig = (i % 3 === 0);
             if (typeof ArcadeExplosion !== 'undefined') {
                 particles.push(new ArcadeExplosion(explosionX, explosionY, isBig));
             } else {
                 createExplosion(explosionX, explosionY, '#ffaa00', isBig);
             }
+            if (i % 4 === 0 && typeof Sound !== 'undefined' && typeof Sound.playBossHit === 'function') {
+                Sound.playBossHit();
+            }
             // 金属火花パーティクル
-            for (let p = 0; p < 4; p++) {
+            for (let p = 0; p < 3; p++) {
                 particles.push(new Particle(explosionX, explosionY, (p % 2 === 0) ? '#ffcc00' : '#ffffff'));
             }
-        }, i * 42);
+        }, i * 32);
     }
 
-    // 2. 最後に中心で超特大のファイナル大爆発（1.05秒後）
+    // 2. 最後に中心・四方で超特大のファイナル大爆発（1.15秒後）
     setTimeout(() => {
         if (!boss) return;
         const { cx: centerX, cy: centerY } = getBossCenter();
         if (typeof ArcadeExplosion !== 'undefined') {
+            particles.push(new ArcadeExplosion(centerX, centerY, 'giant'));
+            particles.push(new ArcadeExplosion(centerX - 45, centerY - 20, true));
+            particles.push(new ArcadeExplosion(centerX + 45, centerY + 20, true));
+            particles.push(new ArcadeExplosion(centerX - 25, centerY + 35, true));
+            particles.push(new ArcadeExplosion(centerX + 25, centerY - 35, true));
             particles.push(new ArcadeExplosion(centerX, centerY, true));
-            particles.push(new ArcadeExplosion(centerX - 35, centerY - 15, true));
-            particles.push(new ArcadeExplosion(centerX + 35, centerY + 15, true));
-            particles.push(new ArcadeExplosion(centerX, centerY - 25, true));
-            particles.push(new ArcadeExplosion(centerX, centerY + 25, true));
         }
-        for (let j = 0; j < 30; j++) {
+        if (typeof Sound !== 'undefined' && typeof Sound.playBossExplode === 'function') {
+            Sound.playBossExplode();
+        }
+        for (let j = 0; j < 45; j++) {
             particles.push(new Particle(centerX, centerY, '#ffffff'));
             particles.push(new Particle(centerX, centerY, '#ffea00'));
+            particles.push(new Particle(centerX, centerY, '#ff3300'));
         }
-    }, 1050);
+    }, 1150);
 
     // 3. 大爆発と同時にボス本体が完全に消滅（本家仕様通り、残骸や叫び声なくクリーンに爆散！）
     setTimeout(() => {
         boss.active = false;
-    }, 1250);
+    }, 1280);
 }
 
 function addPlayerBullet(bullet) {

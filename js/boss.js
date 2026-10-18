@@ -721,25 +721,30 @@ class Boss {
         this.bullets = [];
         this.isDying = false;
         this._defeatTriggered = false;
+        this.hasEntered = false;
     }
 
     update() {
         if (this.isDying) return;
 
         // 登場シーン（二連火山の隙間・画面下から上方定位置へせり上がる本家演出！）
-        if (this.y > this.targetY) {
-            this.y -= 2.6;
-            this.isEntering = true;
-            return;
+        if (!this.hasEntered) {
+            if (this.y > this.targetY) {
+                this.y -= 2.6;
+                this.isEntering = true;
+                return;
+            }
+            this.y = this.targetY;
+            this.hasEntered = true;
+            this.isEntering = false;
         }
-        this.isEntering = false;
 
         // 原作ビッグコア準拠：自機の装備が充実しているほど上下追尾スピードとレーザー連射・弾速が速くなる！
         const rank = getPlayerEquipmentRank();
         const baseTrack = this.trackSpeed || 1.45;
         const trackSpeed = baseTrack + rank * 1.95 + (this.shields === 0 ? 0.35 : 0);
         const py = (typeof player !== 'undefined' && player) ? (player.y + player.height / 2) : this.baseY;
-        const targetY = Math.max(140, Math.min(460, py));
+        const targetY = Math.max(130, Math.min(460, py));
         const dy = targetY - this.y;
         this.y += Math.max(-trackSpeed, Math.min(trackSpeed, dy));
         this.rotationAngle += 0.04 + rank * 0.03;

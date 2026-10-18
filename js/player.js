@@ -1,4 +1,4 @@
-// 1985年アーケード版 ビックバイパー 32x14 ドット行列 (grad0017.png より抽出)
+// 1985年アーケード版 ビックバイパー 32x14 ドット行列 (grad0017.png より抽出・3姿勢完全再現)
 const VIC_VIPER_PALETTE = {
     '1': '#8C0204', '2': '#5C4A44', '3': '#7C6A5C', '4': '#8C726C', '5': '#A48A7C',
     '6': '#DCDECC', '7': '#C4B2A4', '8': '#547EC4', '9': '#DCB2B4', 'A': '#C47E54',
@@ -6,7 +6,45 @@ const VIC_VIPER_PALETTE = {
     'G': '#7CC2FC', 'H': '#FCFEFC', 'I': '#A44234', 'J': '#B4DEFC', 'K': '#0402C4',
     'L': '#DCFEFC', 'M': '#A44254'
 };
-const VIC_VIPER_ROWS = [
+
+// 1. 水平・停止時（真横向き：上下対称デルタ翼、中央キャノピー、ツインノーズ）
+const VIC_VIPER_NEUTRAL_ROWS = [
+    "................................",
+    "............5675................",
+    "...........56678.22222..........",
+    ".....BB....766695555543.........",
+    "...BBEFG...466666733AAA555775...",
+    ".BBKKFGL.H.HHHHHHH73CCDDAA4444JJ",
+    "...BBKFG.6.7766666673DCDDDI2JJJJ",
+    "...BBKFG.6.776666667MIIII.2JJJJ.",
+    ".BBKKFGL.H.HHHHHHH73CCDDAA4444JJ",
+    "...BBEFG...466666733AAA555775...",
+    ".....BB....766695555543.........",
+    "...........56678.22222..........",
+    "............5675................",
+    "................................"
+];
+
+// 2. 上昇時（バンク上・背側を見せる姿勢：上翼と上面アッパー装甲・キャノピーが展開）
+const VIC_VIPER_UP_ROWS = [
+    "...........JH8.66666HH533.......",
+    "...........H8.5777777776H543....",
+    ".....BB...2..576666666666667532.",
+    "...BBKFG.5.44766666666HHHHHHHH7.",
+    ".BBKKFGL.6.776666667MIIII.2.....",
+    "...BBEFG.H.HHHHHHH73DCDDDI2JJJJJ",
+    ".....BB....66666673CCDDAA444444.",
+    "..........466666733AAA555777775.",
+    "..........766695555555444433....",
+    ".........56678.2222222222.......",
+    "........5675...3333333..........",
+    "...............33422............",
+    "...............22...............",
+    "..............1................."
+];
+
+// 3. 下降時（バンク下・腹側を見せる姿勢：下翼と青いエンジンフィン・下面装甲が展開）
+const VIC_VIPER_DOWN_ROWS = [
     "..............1.................",
     "...............22...............",
     "...............33422............",
@@ -22,25 +60,31 @@ const VIC_VIPER_ROWS = [
     "...........H8.5777777776H543....",
     "...........JH8.66666HH533......."
 ];
-let _vicViperCanvas = null;
-function getVicViperCanvas() {
-    if (_vicViperCanvas) return _vicViperCanvas;
+
+const _vicViperCache = {};
+function getVicViperCanvasByRows(key, rows) {
+    if (_vicViperCache[key]) return _vicViperCache[key];
     const S = 3;
     const c = document.createElement('canvas');
     c.width = 32 * S;
     c.height = 14 * S;
     const g = c.getContext('2d');
-    for (let y = 0; y < VIC_VIPER_ROWS.length; y++) {
+    g.imageSmoothingEnabled = false;
+    for (let y = 0; y < rows.length; y++) {
         for (let x = 0; x < 32; x++) {
-            const col = VIC_VIPER_PALETTE[VIC_VIPER_ROWS[y][x]];
+            const col = VIC_VIPER_PALETTE[rows[y][x]];
             if (!col) continue;
             g.fillStyle = col;
             g.fillRect(x * S, y * S, S, S);
         }
     }
-    _vicViperCanvas = c;
+    _vicViperCache[key] = c;
     return c;
 }
+function getVicViperNeutralCanvas() { return getVicViperCanvasByRows('neutral', VIC_VIPER_NEUTRAL_ROWS); }
+function getVicViperUpCanvas() { return getVicViperCanvasByRows('up', VIC_VIPER_UP_ROWS); }
+function getVicViperDownCanvas() { return getVicViperCanvasByRows('down', VIC_VIPER_DOWN_ROWS); }
+function getVicViperCanvas() { return getVicViperNeutralCanvas(); }
 
 class Player {
     constructor(x, y) {
@@ -433,18 +477,27 @@ class Player {
         }
 
         // ============================================================
-        // 1985年アーケード版 ビックバイパー (grad0017.png から抽出した 32x14 ドット行列を 1dot=3px で描画)
+        // 1985年アーケード版 ビックバイパー (真横・上昇・下降の3姿勢完全切り替え描画)
         // ============================================================
-        const vv = getVicViperCanvas();
+        let vv = getVicViperNeutralCanvas();
+        let flameOffsetY = 21; // 水平時のバーニア炎位置
+        if (this.bankAngle < -0.22) {
+            vv = getVicViperUpCanvas();     // 上昇時：背側（上面アッパー装甲・キャノピー）を見せる姿勢
+            flameOffsetY = 16;
+        } else if (this.bankAngle > 0.22) {
+            vv = getVicViperDownCanvas();   // 下降時：腹側（青フィン・下面装甲）を見せる姿勢
+            flameOffsetY = 25;
+        }
+
         ctx.imageSmoothingEnabled = false;
         const px = Math.round(this.x + this.width / 2 - vv.width / 2);
         const py = Math.round(this.y + this.height / 2 - vv.height / 2);
         ctx.drawImage(vv, px, py);
 
-        // 後方バーニア炎（実機同様の2フレーム点滅）
+        // 後方バーニア炎（実機同様の2フレーム点滅＋機体姿勢に連動した発射口座標）
         const flicker = Math.floor(Date.now() / 50) % 2;
         ctx.fillStyle = flicker === 0 ? '#ECDE04' : '#FCA67C';
-        ctx.fillRect(px - (flicker === 0 ? 6 : 3), py + 24, flicker === 0 ? 6 : 3, 3);
+        ctx.fillRect(px - (flicker === 0 ? 6 : 3), py + flameOffsetY, flicker === 0 ? 6 : 3, 3);
 
         // 被弾時のショックウェーブリング描画
         if (this.hitFlashTimer > 0) {

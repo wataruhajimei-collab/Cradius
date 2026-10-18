@@ -270,15 +270,15 @@ class EnemyLaser extends Bullet {
     }
 }
 
-// 1985年AC版ビッグコア専用：短い青っぽい太いレーザー弾 (BigCoreLaser)
+// 1985年AC版ビッグコア専用：長大で迫力ある青白4連極太レーザー光線 (BigCoreLaser)
 class BigCoreLaser extends Bullet {
     constructor(x, y, speedX, speedY = 0) {
-        // 当たり判定は長さ26px × 太さ8pxの短く太い矩形
-        super(x - 13, y - 4, speedX, speedY, '#38bdf8', true);
-        this.width = 26;
-        this.height = 8;
-        this.length = 26;
-        this.thickness = 8;
+        // 本家アーケード完全再現：幅175px × 高さ10pxの長大な青白レーザービーム
+        super(x - 175, y - 5, speedX, speedY, '#38bdf8', true);
+        this.width = 175;
+        this.height = 10;
+        this.length = 175;
+        this.thickness = 10;
     }
 
     draw(ctx) {

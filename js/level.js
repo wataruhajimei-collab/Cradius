@@ -350,9 +350,9 @@ class Terrain {
             { seg: 84, type: 'DUCKER_BACK', isCeiling: false, isRed: true },
 
             // --- Section 5: クライマックス・深紅パレット変化＋緑の樹海＋二連火山大噴火 (sakura_04.png, grad0027.png, grad0030.png) ---
-            { seg: 86, type: 'TREES',   widthPx: 920 },                    // 二連火山の麓一面に広がる緑の樹林帯 (grad0027 / grad0030)
-            { seg: 88, type: 'VOLCANO_TWIN' },                             // 第1深紅火山（左峰：grad0027 x=8..72 -> 画面左 x=50 で停止）
-            { seg: 95, type: 'VOLCANO_TWIN' }                              // 第2深紅火山（右峰：grad0027 x=120..184 -> 画面中央右 x=330 で停止）
+            { seg: 86, type: 'TREES',   widthPx: 1800 },                   // 二連火山の麓一面に広がる緑の樹林帯 (grad0027 / grad0030)
+            { seg: 88, type: 'VOLCANO_TWIN' },                             // 第1深紅火山（画面左端付近 x ≈ 36 に停止）
+            { seg: 101, type: 'VOLCANO_TWIN' }                             // 第2深紅火山（画面右端付近 x ≈ 556 に停止、2つの火山の間からビッグコアがせり上がる！）
         ];
 
         Terrain._initSprites();
@@ -1076,10 +1076,10 @@ class LevelManager {
                 }
 
                 // 本家1面クライマックス (grad0027.png / sakura_04.png)：
-                // 第1火山が画面左 (x <= 56)、第2火山が画面中央右 (x ≈ 336) に到達したらスクロール完全停止＆大噴火開始！
+                // 第1火山が画面左端 (x <= 36)、第2火山が画面右端 (x ≈ 556) に到達したらスクロール完全停止＆大噴火開始！
                 if (this.terrain.twinVolcanoes && this.terrain.twinVolcanoes.length >= 2) {
                     const v1 = this.terrain.twinVolcanoes[0];
-                    if (v1 && v1.active && v1.x <= 56) {
+                    if (v1 && v1.active && v1.x <= 36) {
                         this.state = 'VOLCANO_ERUPTION';
                         this.eruptionTimer = 0;
                         this.terrain.scrollSpeed = 0; // スクロール完全停止！

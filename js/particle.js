@@ -123,7 +123,7 @@ class ArcadeExplosion {
         this.isBig = isBig;
         this.frame = 0;
         this.timer = 0;
-        this.maxFrames = 18; // 約0.3秒
+        this.maxFrames = (isBig === 'giant') ? 28 : (isBig ? 22 : 16);
         this.active = true;
     }
 
@@ -140,12 +140,13 @@ class ArcadeExplosion {
         ctx.imageSmoothingEnabled = false;
         const sub = Math.floor(this.timer / 4);
         let spr = null;
+        const scale = (this.isBig === 'giant') ? 6 : (this.isBig ? 4 : 3);
         if (this.isBig) {
             const rows = (sub % 2 === 0) ? ARCADE_CLOUD_FRAME0 : ARCADE_CLOUD_FRAME1;
-            spr = getExplosionArcadeCanvas('exp_cloud_' + (sub % 2), rows, ARCADE_CLOUD_PALETTE, 3);
+            spr = getExplosionArcadeCanvas('exp_cloud_' + (sub % 2), rows, ARCADE_CLOUD_PALETTE, scale);
         } else {
             const rows = (sub % 2 === 0) ? ARCADE_STARBURST_FRAME0 : ARCADE_STARBURST_FRAME1;
-            spr = getExplosionArcadeCanvas('exp_star_' + (sub % 2), rows, ARCADE_STARBURST_PALETTE, 3);
+            spr = getExplosionArcadeCanvas('exp_star_' + (sub % 2), rows, ARCADE_STARBURST_PALETTE, scale);
         }
         if (spr) {
             ctx.drawImage(spr, Math.round(this.x - spr.width / 2), Math.round(this.y - spr.height / 2));
