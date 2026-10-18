@@ -694,10 +694,11 @@ class Boss {
         this.drawH = 198;
         this.width = 294;
         this.height = 198;
-        this.x = (x || 800) + 150; // 950 (画面外右側から登場)
         this.targetX = 635; // 画面内に全体像が美しく収まる定位置
-        this.baseY = 300; // 中心Y
-        this.y = 300;
+        this.x = 635;
+        this.targetY = y || 220;
+        this.baseY = y || 220;
+        this.y = 660; // 1985年アーケード実機完全再現：二連火山の合間（画面下外）からせり上がる！
         this.maxHp = 7;
         this.hp = 7;
         this.active = true;
@@ -719,14 +720,15 @@ class Boss {
         this.rotationAngle = 0;
         this.bullets = [];
         this.isDying = false;
+        this._defeatTriggered = false;
     }
 
     update() {
         if (this.isDying) return;
 
-        // 登場シーン（画面外から定位置へ前進）
-        if (this.x > this.targetX) {
-            this.x -= 3.2;
+        // 登場シーン（二連火山の隙間・画面下から上方定位置へせり上がる本家演出！）
+        if (this.y > this.targetY) {
+            this.y -= 2.6;
             this.isEntering = true;
             return;
         }
@@ -811,7 +813,8 @@ class Boss {
     hitCore(damage = 1) {
         this.hitFlashTimer = 4;
         this.hp -= damage;
-        if (this.hp <= 0 && !this.isDying) {
+        if (this.hp <= 0 && !this._defeatTriggered) {
+            this._defeatTriggered = true;
             this.isDying = true;
             if (typeof triggerBossDefeatExplosion === 'function') {
                 triggerBossDefeatExplosion(this);
@@ -872,13 +875,6 @@ class Boss {
             this.hitCore(1);
             createExplosion(bullet.x + bullet.width / 2, bullet.y, '#52adef');
             if (typeof Sound !== 'undefined') Sound.playBossHit();
-
-            if (this.hp <= 0 && !this.isDying) {
-                this.isDying = true;
-                if (typeof triggerBossDefeatExplosion === 'function') {
-                    triggerBossDefeatExplosion(this);
-                }
-            }
             return;
         }
 
@@ -897,10 +893,7 @@ class Boss {
         ctx.save();
 
         if (this.isDying) {
-            ctx.translate((Math.random() - 0.5) * 12, (Math.random() - 0.5) * 12);
-            if (Math.floor(Date.now() / 60) % 2 === 0) {
-                ctx.filter = 'brightness(2.2) saturate(2.0)';
-            }
+            ctx.translate((Math.random() - 0.5) * 8, (Math.random() - 0.5) * 8);
         }
 
         // 1985年AC版『グラディウス』ビッグコア完全再現描画（船体＋動的4枚遮蔽板＋ブルーコア）

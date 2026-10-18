@@ -439,8 +439,10 @@ class Terrain {
     update() {
         if (!this.active) return;
 
-        // 二連火山エリア突入で実機 (sakura_04.png / grad0027.png) の深紅クリムゾンパレットへ遷移
-        if (this.currentSegIndex >= 86 || (typeof levelManager !== 'undefined' && (levelManager.state === 'VOLCANO_ERUPTION' || levelManager.state === 'BOSS_ENTRY' || levelManager.state === 'BOSS'))) {
+        // 二連火山エリア噴火直前 (v1.x <= 80) または噴火・ボス戦フェーズで実機 (sakura_04.png / grad0027.png) の深紅クリムゾンパレットへ遷移
+        const isVolcanoNear = this.twinVolcanoes && this.twinVolcanoes.length > 0 && this.twinVolcanoes[0].x <= 80;
+        const isVolcanoOrBossPhase = typeof levelManager !== 'undefined' && (levelManager.state === 'VOLCANO_ERUPTION' || levelManager.state === 'BOSS_ENTRY' || levelManager.state === 'BOSS' || levelManager.state === 'STAGE_CLEAR');
+        if (isVolcanoNear || isVolcanoOrBossPhase) {
             this.isCrimsonPalette = true;
         }
 
@@ -734,20 +736,20 @@ class Terrain {
                     ctx.drawImage(floorWavyTile, tx, 557);
                 }
                 // 樹林や山岳・火山がある区間は隙間ができないよう実機通りソリッド岩盤タイルを上書き
+                // ※iOS/SafariでのFPS低下・描画遅延を防ぐため、ネストされたctx.clip()を排除しdrawImageスライスで超高速描画
                 for (let i = 0; i < this.treeClusters.length; i++) {
                     const tc = this.treeClusters[i];
                     const sx0 = Math.max(clipStartX, Math.round(tc.x));
                     const sx1 = Math.min(clipEndX, Math.round(tc.x + tc.widthPx));
-                    if (sx1 > sx0) {
-                        ctx.save();
-                        ctx.beginPath();
-                        ctx.rect(sx0, 557, sx1 - sx0, 43);
-                        ctx.clip();
-                        for (let tx = scrollMod - tileW; tx < sx1; tx += tileW) {
-                            if (tx + tileW < sx0) continue;
-                            ctx.drawImage(floorSolidTile, tx, 557);
-                        }
-                        ctx.restore();
+                    if (sx1 <= sx0) continue;
+                    let curX = sx0;
+                    while (curX < sx1) {
+                        const drawW = Math.min(tileW, sx1 - curX);
+                        let srcX = Math.round((curX - scrollMod) % tileW);
+                        if (srcX < 0) srcX += tileW;
+                        const chunkW = Math.min(drawW, tileW - srcX);
+                        ctx.drawImage(floorSolidTile, srcX, 0, chunkW, 43, curX, 557, chunkW, 43);
+                        curX += chunkW;
                     }
                 }
                 ctx.restore();
@@ -1068,8 +1070,8 @@ class LevelManager {
             } else if (this.state === 'TERRAIN') {
                 this.terrain.update();
 
-                // 【本家AC版完全再現】噴火の直前に地形全体が深紅クリムゾンパレットへ変化！
-                if (this.terrain.currentSegIndex >= 84 || (this.terrain.twinVolcanoes && this.terrain.twinVolcanoes.length > 0 && this.terrain.twinVolcanoes[0].x < 720)) {
+                // 【本家AC版完全再現】噴火の直前（第1火山が画面左手前 x <= 80）になって初めて地形全体が深紅クリムゾンパレットへ変化！
+                if (this.terrain.twinVolcanoes && this.terrain.twinVolcanoes.length > 0 && this.terrain.twinVolcanoes[0].x <= 80) {
                     this.terrain.isCrimsonPalette = true;
                 }
 

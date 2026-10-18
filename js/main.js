@@ -846,7 +846,8 @@ function createExplosion(x, y, color, isBig = false) {
 
 // 1985年アーケード版『グラディウス』ビッグコア撃破時完全再現：連続爆発＆消滅演出（叫び声なし・本家ドット爆破）
 function triggerBossDefeatExplosion(boss) {
-    if (boss.isDying) return;
+    if (!boss || boss._defeatHandled) return;
+    boss._defeatHandled = true;
     boss.isDying = true;
 
     boss.isScreaming = false;
