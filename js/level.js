@@ -265,6 +265,7 @@ class Terrain {
         this.mounds = [];
         this.scorePopups = [];
         this.isCrimsonPalette = false;
+        this.wipeProgress = 0;
 
         // 1985年アーケード版実機 (256x224 -> 800x600: Yスケール 2.68x) 完全準拠：
         // ・天井岩盤帯は画面最上部 y=0〜42（1P/HIスコア・残機アイコンの背面に重なる！）
@@ -636,11 +637,24 @@ class Terrain {
     }
 
     draw(ctx) {
-        if (this.topPoints.length < 2) return;
+        if (this.topPoints.length < 2 || !this.active) return;
         Terrain._initSprites();
         const spr = Terrain._sprites;
 
         ctx.save();
+
+        // 1985年アーケード版実機完全再現：ボス撃破後、地形が右から左へタイル列単位（24px幅）で徐々に消滅（ワイプ）
+        if (this.wipeProgress > 0) {
+            const wipeWidth = Math.floor((this.width * Math.min(1.0, this.wipeProgress)) / 24) * 24;
+            const visibleW = Math.max(0, this.width - wipeWidth);
+            if (visibleW <= 0) {
+                ctx.restore();
+                return;
+            }
+            ctx.beginPath();
+            ctx.rect(0, 0, visibleW, this.height);
+            ctx.clip();
+        }
 
         // 1. 道中の黄金岩山 ＆ 中を抜けられる5000点ボーナス山を描画（緑の樹林帯の背後に配置：grad0010.png 完全準拠）
         for (let i = 0; i < this.mountains.length; i++) {
@@ -807,6 +821,13 @@ class Terrain {
 
     checkCollision(rect) {
         if (!this.active || this.topPoints.length < 2) return false;
+
+        // ワイプで消去された領域は当たり判定も解除
+        if (this.wipeProgress > 0) {
+            const wipeWidth = Math.floor((this.width * Math.min(1.0, this.wipeProgress)) / 24) * 24;
+            const visibleW = Math.max(0, this.width - wipeWidth);
+            if (rect.x >= visibleW) return false;
+        }
 
         // 1. 天井の隆起マウンドとの衝突判定
         // ※本家1985年AC版仕様通り、1面の基本天井帯 (y<=42) は当たり判定が無く（左上隅の火山安全地帯が成立）、
@@ -1047,6 +1068,11 @@ class LevelManager {
             } else if (this.state === 'TERRAIN') {
                 this.terrain.update();
 
+                // 【本家AC版完全再現】噴火の直前に地形全体が深紅クリムゾンパレットへ変化！
+                if (this.terrain.currentSegIndex >= 84 || (this.terrain.twinVolcanoes && this.terrain.twinVolcanoes.length > 0 && this.terrain.twinVolcanoes[0].x < 720)) {
+                    this.terrain.isCrimsonPalette = true;
+                }
+
                 // 本家1面クライマックス (grad0027.png / sakura_04.png)：
                 // 第1火山が画面左 (x <= 56)、第2火山が画面中央右 (x ≈ 336) に到達したらスクロール完全停止＆大噴火開始！
                 if (this.terrain.twinVolcanoes && this.terrain.twinVolcanoes.length >= 2) {
@@ -1072,36 +1098,23 @@ class LevelManager {
                 if (!this.terrain.active && this.terrain.currentSegIndex >= this.terrain.topProfile.length) {
                     this.state = 'BOSS';
                     if (typeof Boss !== 'undefined') {
-                        this.boss = new Boss(this.starfield.width, 220);
+                        this.boss = new Boss(this.starfield.width, 210);
                     }
                 }
             } else if (this.state === 'VOLCANO_ERUPTION') {
-                // 1985年アーケード版名物 (sakura_04.png / grad0027.png)：
-                // スクロールが停止した状態で深紅の二連火山から火山弾が放物線を描いて降り注ぐ！
+                // スクロール停止のまま深紅の二連火山から火山弾が放物線を描いて激しく降り注ぐ！
                 this.terrain.update();
                 this.eruptionTimer += dt;
 
-                // 1985年アーケード実機完全準拠：約15.5秒間、猛烈な大噴火サバイバル！
+                // 本家実機通りの尺（約15.5秒）噴火を耐え抜くと噴火が収まる
+                // 【本家AC版完全再現】スクロールせず二連火山が画面に残ったまま、2つの火山の間からビッグコアが登場！
                 if (this.eruptionTimer >= 15500) {
                     this.terrain.twinVolcanoes.forEach(v => {
                         if (v) v.isErupting = false;
                     });
-                    // 本家実機通り、噴火が収まるとスクロールが再開！
-                    this.state = 'VOLCANO_SCROLL_OUT';
-                    this.terrain.scrollSpeed = 1.8;
-                }
-            } else if (this.state === 'VOLCANO_SCROLL_OUT') {
-                // 本家アーケード完全再現：二連火山と地上地形が画面左端へスクロールアウト！
-                this.terrain.update();
-
-                // 二連火山がすべて画面左外へ消え去り、地上地形が完全に抜けて星空（宇宙空間）が開けたらボス戦へ！
-                const allVolcanoesGone = (!this.terrain.twinVolcanoes || this.terrain.twinVolcanoes.length === 0 || this.terrain.twinVolcanoes.every(v => v.x + v.width < -10));
-                const terrainCleared = (!this.terrain.active || this.terrain.bottomPoints.length <= 2 || this.terrain.bottomPoints[this.terrain.bottomPoints.length - 1].x < 0);
-
-                if (allVolcanoesGone && terrainCleared) {
-                    this.terrain.active = false;
                     this.state = 'BOSS';
                     this.bossEntryTimer = 0;
+                    this.terrain.scrollSpeed = 0; // スクロール停止を維持！
                     if (typeof Sound !== 'undefined' && typeof Sound.playBossBgm === 'function') {
                         Sound.playBossBgm();
                     }
@@ -1110,20 +1123,28 @@ class LevelManager {
                     }
                 }
             } else if (this.state === 'BOSS') {
-                // 開けた宇宙空間（星空）でビッグコアとの一騎打ち！
+                // ボス戦中：天井と二連火山が画面に残ったステージアリーナでビッグコアと一騎打ち！
                 if (this.terrain.active) {
                     this.terrain.update();
                 }
                 if (this.boss) {
                     this.boss.update();
+                    // ボス撃破でステージクリア＆地形消滅（ワイプ）シーケンスへ移行！
                     if (!this.boss.active) {
                         this.state = 'STAGE_CLEAR';
                         this.stageClearTimer = 0;
                     }
                 }
             } else if (this.state === 'STAGE_CLEAR') {
+                // 【本家AC版完全再現】ボスを倒すと爆発し、地形が右から左へタイル列単位で徐々に消えていく！
                 this.stageClearTimer += dt;
-                if (this.stageClearTimer > 3000) {
+                if (this.terrain.active) {
+                    this.terrain.wipeProgress = Math.min(1.0, this.stageClearTimer / 1800);
+                    if (this.terrain.wipeProgress >= 1.0) {
+                        this.terrain.active = false;
+                    }
+                }
+                if (this.stageClearTimer > 3200) {
                     this.startStage2();
                 }
             }
@@ -1178,6 +1199,8 @@ class LevelManager {
         this.terrain.mounds = [];
         this.terrain.scorePopups = [];
         this.terrain.scrollSpeed = this.terrain.baseScrollSpeed;
+        this.terrain.wipeProgress = 0;
+        this.terrain.isCrimsonPalette = false;
 
         if (typeof stonehengeStage !== 'undefined' && stonehengeStage) {
             stonehengeStage.active = false;
@@ -1214,6 +1237,8 @@ class LevelManager {
         this.terrain.twinVolcanoes = [];
         this.terrain.mountains = [];
         this.terrain.mounds = [];
+        this.terrain.wipeProgress = 0;
+        this.terrain.isCrimsonPalette = false;
 
         if (typeof enemies !== 'undefined' && Array.isArray(enemies)) {
             enemies = enemies.filter(e => {
