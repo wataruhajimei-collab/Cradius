@@ -1460,12 +1460,15 @@ class LevelManager {
     draw(ctx) {
         if (this.stage === 1) {
             this.starfield.draw(ctx);
-            if (this.terrain.active) {
-                this.terrain.draw(ctx);
-            }
 
+            // 1985年AC版：ビッグコアは二連火山の間の地面の「裏」からせり上がる。
+            // 地形より先に描くことで、登場中は地表・樹林に隠れて見えなくなる。
             if (this.state === 'BOSS' && this.boss) {
                 this.boss.draw(ctx);
+            }
+
+            if (this.terrain.active) {
+                this.terrain.draw(ctx);
             }
 
             if (this.state === 'STAGE_CLEAR') {

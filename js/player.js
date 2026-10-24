@@ -1,77 +1,71 @@
-// 1985年アーケード版 ビックバイパー 32x14 ドット行列 (grad0017.png より抽出・3姿勢完全再現)
+// 1985年アーケード版 ビックバイパー 25x12 ドット行列
+// 実機スプライト（50x36 の 2倍拡大リファレンス）を 1/2 に縮小して抽出。
+// 白い機体＋後退した上翼＋橙赤のキャノピー＋青いエンジン。機首は右向き。
 const VIC_VIPER_PALETTE = {
-    '1': '#8C0204', '2': '#5C4A44', '3': '#7C6A5C', '4': '#8C726C', '5': '#A48A7C',
-    '6': '#DCDECC', '7': '#C4B2A4', '8': '#547EC4', '9': '#DCB2B4', 'A': '#C47E54',
-    'B': '#040274', 'C': '#ECDEB4', 'D': '#DCB28C', 'E': '#0402A4', 'F': '#1C72C4',
-    'G': '#7CC2FC', 'H': '#FCFEFC', 'I': '#A44234', 'J': '#B4DEFC', 'K': '#0402C4',
-    'L': '#DCFEFC', 'M': '#A44254'
+    'H': '#FCFEFC', // 白（機体上面・機首）
+    '6': '#D2D4CE', // 明るいグレー（上翼・下面）
+    '7': '#9C9890', // グレー（翼の影）
+    '2': '#4C4A46', // 濃グレー（輪郭）
+    '8': '#547EC4', // 青（エンジン）
+    'J': '#B4DEFC', // 水色（エンジン光）
+    'A': '#E8A050', // 橙（キャノピー）
+    'M': '#C84030'  // 赤（キャノピー）
 };
 
-// 1. 水平・停止時（真横向き：端正なデルタ戦闘機、中央キャノピー、前方に突き出るツインノーズ）
+// 1. 水平・停止時（真横向き）
 const VIC_VIPER_NEUTRAL_ROWS = [
-    "................................",
-    "...............1................",
-    "...............22...............",
-    "...............33422............",
-    "........5675...3333333..........",
-    ".........56678.2222222222.......",
-    ".....BB...766695555555444433....",
-    "...BBEFG...466666733AAA555777775",
-    ".BBKKFGL.H.HHHHHHH73CCDDAA44JJJJ",
-    "...BBEFG.6.7766666673DCDDDI2JJJJ",
-    ".....BB..5.4476666667MIIII.2JJ..",
-    "..........2..576666666HHHHHH75..",
-    "..............H8.577776H53......",
-    "................................"
+    ".........................",
+    ".26672...................",
+    "..266672.................",
+    "...2666672...............",
+    "....26666672.............",
+    "....2HHHHHHH72H6AM2......",
+    "..222HHHHHHHH72HHAMM2....",
+    "..22882HHHHHHHHHHHHHHHH62",
+    "..228J726666666676H67222.",
+    "....8JH726666HH677222....",
+    ".....8JJ86HH66722........",
+    ".........27722..........."
 ];
 
-// 2. 上昇時（上キー入力時：自機の下面・腹側・青いエンジンフィンが見える角度！ユーザー指示に完全準拠）
-const VIC_VIPER_UP_ROWS = [
-    "..............1.................",
-    "...............22...............",
-    "...............33422............",
-    "........5675...3333333..........",
-    ".........56678.2222222222.......",
-    "..........766695555555444433....",
-    "..........466666733AAA555777775.",
-    ".....BB....66666673CCDDAA444444.",
-    "...BBEFG.H.HHHHHHH73DCDDDI2JJJJJ",
-    ".BBKKFGL.6.776666667MIIII.2.....",
-    "...BBKFG.5.44766666666HHHHHHHH7.",
-    ".....BB...2..576666666666667532.",
-    "...........H8.5777777776H543....",
-    "...........JH8.66666HH533......."
-];
-
-// 3. 下降時（下キー入力時：自機の上面・キャノピー・背中側装甲が見える角度）
-const VIC_VIPER_DOWN_ROWS = [
-    "..............1.................",
-    "...........JH8.2266666HH533.....",
-    "...........H8.3345777776H543....",
-    ".....BB...2..576666666666667532.",
-    "...BBKFG.5.44766666666HHHHHHHH7.",
-    ".BBKKFGL.6.7766666673CCDDAA44444",
-    "...BBEFG.H.HHHHHHH73DCDDDI2JJJJJ",
-    ".....BB....66666673MIIII.2JJJJ..",
-    "..........466666733AAA555775....",
-    "..........7666955555543.........",
-    ".........56678.22222............",
-    "........5675....................",
-    "................................",
-    "................................"
-];
+// 2. 上昇時 / 3. 下降時（1985年AC版：機首を上下に傾けた姿勢）
+// 実機の3姿勢スプライトを再現するため、水平姿勢のドット絵を機体中心で回転させて生成する。
+// （旧実装は行をずらして作っていたため、白いスジが入り機体が崩れていた）
+const _vicViperRotCache = {};
+function getVicViperRotatedCanvas(angleDeg) {
+    const key = 'rot' + angleDeg;
+    if (_vicViperRotCache[key]) return _vicViperRotCache[key];
+    const base = getVicViperNeutralCanvas();
+    const rad = angleDeg * Math.PI / 180;
+    const cos = Math.abs(Math.cos(rad));
+    const sin = Math.abs(Math.sin(rad));
+    const w = Math.ceil(base.width * cos + base.height * sin) + 2;
+    const h = Math.ceil(base.width * sin + base.height * cos) + 2;
+    const c = document.createElement('canvas');
+    c.width = w;
+    c.height = h;
+    const g = c.getContext('2d');
+    g.imageSmoothingEnabled = false;
+    g.translate(w / 2, h / 2);
+    g.rotate(rad);
+    g.drawImage(base, -base.width / 2, -base.height / 2);
+    _vicViperRotCache[key] = c;
+    return c;
+}
 
 const _vicViperCache = {};
 function getVicViperCanvasByRows(key, rows) {
     if (_vicViperCache[key]) return _vicViperCache[key];
     const S = 3;
+    const W = rows[0].length;
+    const H = rows.length;
     const c = document.createElement('canvas');
-    c.width = 32 * S;
-    c.height = 14 * S;
+    c.width = W * S;
+    c.height = H * S;
     const g = c.getContext('2d');
     g.imageSmoothingEnabled = false;
-    for (let y = 0; y < rows.length; y++) {
-        for (let x = 0; x < 32; x++) {
+    for (let y = 0; y < H; y++) {
+        for (let x = 0; x < W; x++) {
             const col = VIC_VIPER_PALETTE[rows[y][x]];
             if (!col) continue;
             g.fillStyle = col;
@@ -82,8 +76,10 @@ function getVicViperCanvasByRows(key, rows) {
     return c;
 }
 function getVicViperNeutralCanvas() { return getVicViperCanvasByRows('neutral', VIC_VIPER_NEUTRAL_ROWS); }
-function getVicViperUpCanvas() { return getVicViperCanvasByRows('up', VIC_VIPER_UP_ROWS); }
-function getVicViperDownCanvas() { return getVicViperCanvasByRows('down', VIC_VIPER_DOWN_ROWS); }
+// 1985年AC版の上昇・下降姿勢は機首を約18°上下に振ったもの。実機スプライトに近い角度に設定。
+const VIC_VIPER_BANK_DEG = 18;
+function getVicViperUpCanvas() { return getVicViperRotatedCanvas(-VIC_VIPER_BANK_DEG); }
+function getVicViperDownCanvas() { return getVicViperRotatedCanvas(VIC_VIPER_BANK_DEG); }
 function getVicViperCanvas() { return getVicViperNeutralCanvas(); }
 
 class Player {
@@ -480,24 +476,32 @@ class Player {
         // 1985年アーケード版 ビックバイパー (真横・上昇・下降の3姿勢完全切り替え描画)
         // ============================================================
         let vv = getVicViperNeutralCanvas();
-        let flameOffsetY = 21; // 水平時のバーニア炎位置
+        let bankDeg = 0;
         if (this.bankAngle < -0.22) {
-            vv = getVicViperUpCanvas();     // 上昇時：自機の下面（腹側・青フィン）が見える角度！
-            flameOffsetY = 24;
+            vv = getVicViperUpCanvas();     // 上昇時：機首を上へ振った姿勢
+            bankDeg = -VIC_VIPER_BANK_DEG;
         } else if (this.bankAngle > 0.22) {
-            vv = getVicViperDownCanvas();   // 下降時：自機の上面（背中側装甲・キャノピー）が見える角度
-            flameOffsetY = 18;
+            vv = getVicViperDownCanvas();   // 下降時：機首を下へ振った姿勢
+            bankDeg = VIC_VIPER_BANK_DEG;
         }
 
         ctx.imageSmoothingEnabled = false;
-        const px = Math.round(this.x + this.width / 2 - vv.width / 2);
-        const py = Math.round(this.y + this.height / 2 - vv.height / 2);
+        const centerX = this.x + this.width / 2;
+        const centerY = this.y + this.height / 2;
+        const px = Math.round(centerX - vv.width / 2);
+        const py = Math.round(centerY - vv.height / 2 - 4);
         ctx.drawImage(vv, px, py);
 
-        // 後方バーニア炎（実機同様の2フレーム点滅＋機体姿勢に連動した発射口座標）
+        // 後方バーニア炎（1985年AC版は青白い噴射。2フレーム点滅・機体の傾きに追従）
         const flicker = Math.floor(Date.now() / 50) % 2;
-        ctx.fillStyle = flicker === 0 ? '#ECDE04' : '#FCA67C';
-        ctx.fillRect(px - (flicker === 0 ? 6 : 3), py + flameOffsetY, flicker === 0 ? 6 : 3, 3);
+        const flameLen = flicker === 0 ? 9 : 6;
+        const rad = bankDeg * Math.PI / 180;
+        ctx.save();
+        ctx.translate(centerX, centerY - 4); // スプライトの中心（py の -4 オフセット分を戻す）
+        ctx.rotate(rad);
+        ctx.fillStyle = flicker === 0 ? '#B4DEFC' : '#547EC4';
+        ctx.fillRect(-(30 + flameLen), 7, flameLen, 4); // 尾部ノズル（左端 -32px）の直後から噴射
+        ctx.restore();
 
         // 被弾時のショックウェーブリング描画
         if (this.hitFlashTimer > 0) {
