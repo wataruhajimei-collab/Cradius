@@ -1352,18 +1352,19 @@ class Volcano extends Enemy {
         const isEruptPhase = (typeof levelManager !== 'undefined' && levelManager.state === 'VOLCANO_ERUPTION');
         if ((this.isErupting || isEruptPhase) && this.x > -40 && this.x < 780) {
             this.burstTimer++;
-            const interval = isEruptPhase ? 6 : 14;
+            // 実機は画面内に同時に10〜15個程度。撃ち落とせる密度に抑える。
+            const interval = isEruptPhase ? 16 : 22;
             if (this.burstTimer >= interval) {
                 this.burstTimer = 0;
                 if (typeof enemies !== 'undefined') {
-                    const count = isEruptPhase ? (Math.random() < 0.65 ? 2 : 3) : 1;
+                    const count = isEruptPhase ? (Math.random() < 0.7 ? 1 : 2) : 1;
                     const isLeftVolcano = (this.x < 300);
                     for (let i = 0; i < count; i++) {
                         // 1985年アーケード実機完全再現：左火山は右方向へ、右火山は左方向へ扇状にダイナミック噴出！
                         const bias = isLeftVolcano ? 0.35 : -0.35;
                         const vx = (Math.random() - 0.5 + bias) * 6.5;
                         const vy = -(Math.random() * 4.5 + 8.5); // 画面上部まで高く力強く打ち上げ！
-                        const size = Math.random() < 0.4 ? 42 : (Math.random() < 0.5 ? 32 : 24);
+                        const size = Math.random() < 0.4 ? 28 : (Math.random() < 0.5 ? 24 : 20);
                         enemies.push(new VolcanoRock(
                             this.x + this.width / 2 + (Math.random() - 0.5) * 24 - size / 2,
                             this.groundY - this.height + 4,
@@ -1403,8 +1404,10 @@ class Volcano extends Enemy {
              (levelManager.terrain && levelManager.terrain.isCrimsonPalette)));
 
         if (window.ARCADE_MOUNTAIN_ROWS && window.renderArcadeRowsToCanvas) {
-            const pal = isCrimson ? window.ARCADE_ROCK_PALETTE_CRIMSON : window.ARCADE_ROCK_PALETTE_GOLD;
-            const key = isCrimson ? 'volcano_crimson_96x48' : 'volcano_gold_96x48';
+            const pal = isCrimson
+                ? (window.ARCADE_ROCK_PALETTE_MAGMA || window.ARCADE_ROCK_PALETTE_CRIMSON)
+                : window.ARCADE_ROCK_PALETTE_GOLD;
+            const key = isCrimson ? 'volcano_magma_96x48' : 'volcano_gold_96x48';
             if (!_enemySpriteCache[key]) {
                 _enemySpriteCache[key] = window.renderArcadeRowsToCanvas(window.ARCADE_MOUNTAIN_ROWS, pal, 3);
             }

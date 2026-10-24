@@ -22,6 +22,17 @@ const ARCADE_ROCK_PALETTE_CRIMSON = {
     '6': '#FC0224'  // 頂部ハイライト（鮮紅）
 };
 
+// 実機 sakura_04.png / grad0027.png 抽出：二連火山だけの鮮やかなマゼンタ噴火口パレット
+// 地面の深紅岩盤より明るいピンクで描くことで、実機同様に火山がくっきり浮き上がる
+const ARCADE_ROCK_PALETTE_MAGMA = {
+    '1': '#7C0224', // 噴火口の最深部
+    '2': '#B40244', // 火口の内壁
+    '3': '#D40264', // 溶岩の影
+    '4': '#EC0284', // 溶岩の中間色
+    '5': '#FC3EA4', // 溶岩の明部
+    '6': '#FC8EC4'  // 火口付近の高熱ハイライト
+};
+
 const ARCADE_FOREST_PALETTE = {
     '1': '#042E04', // 深緑シャドウ
     '2': '#8C7E04', // オリーブブラウン
@@ -198,6 +209,7 @@ function renderArcadeRowsToCanvas(rows, palette, scaleX = 3, scaleY = 3, vFlip =
 window.ARCADE_MOUNTAIN_ROWS = ARCADE_MOUNTAIN_ROWS;
 window.ARCADE_ROCK_PALETTE_GOLD = ARCADE_ROCK_PALETTE_GOLD;
 window.ARCADE_ROCK_PALETTE_CRIMSON = ARCADE_ROCK_PALETTE_CRIMSON;
+window.ARCADE_ROCK_PALETTE_MAGMA = ARCADE_ROCK_PALETTE_MAGMA;
 window.ARCADE_FOREST_ROWS = ARCADE_FOREST_ROWS;
 window.ARCADE_FOREST_PALETTE = ARCADE_FOREST_PALETTE;
 window.renderArcadeRowsToCanvas = renderArcadeRowsToCanvas;
@@ -207,38 +219,61 @@ class Starfield {
         this.stars = [];
         this.width = canvasWidth;
         this.height = canvasHeight;
-        // 1985年アーケード版実機 (grad0010, grad0017) のカラフルな1ドット星々
-        const palette = ['#FCFEFC', '#B4DEFC', '#EC0224', '#0402B4', '#ECC204', '#042E04', '#C45E74'];
-        for (let i = 0; i < 95; i++) {
-            this.stars.push({
-                x: Math.random() * this.width,
-                y: Math.random() * (this.height - 44),
-                speed: (i % 3 === 0) ? 1.4 : ((i % 3 === 1) ? 0.85 : 0.45),
-                size: 2,
-                color: palette[i % palette.length],
-                blinkOffset: Math.random() * 100
-            });
-        }
+
+        // 1985年アーケード版 (grad0010, grad0017) の星は「白が主役＋少数の色付き」。
+        // 奥・中・手前の3層で速度とサイズを分け、パララックスを作る。
+        const WHITE = '#FCFEFC';
+        const ACCENTS = ['#B4DEFC', '#EC0224', '#0402B4', '#ECC204', '#042E04', '#C45E74'];
+
+        const layers = [
+            { count: 70, speed: 0.45, size: 1, alpha: 0.50, accent: 0.06, twinkle: 0.00 }, // 遠景
+            { count: 40, speed: 1.00, size: 1, alpha: 0.85, accent: 0.12, twinkle: 0.03 }, // 中景
+            { count: 22, speed: 1.90, size: 2, alpha: 1.00, accent: 0.20, twinkle: 0.06 }, // 近景
+        ];
+
+        layers.forEach((layer, index) => {
+            for (let i = 0; i < layer.count; i++) {
+                this.stars.push({
+                    x: Math.random() * this.width,
+                    y: Math.random() * (this.height - 44),
+                    layer: index,
+                    speed: layer.speed,
+                    size: layer.size,
+                    alpha: layer.alpha,
+                    twinkle: layer.twinkle,
+                    color: Math.random() < layer.accent
+                        ? ACCENTS[(Math.random() * ACCENTS.length) | 0]
+                        : WHITE,
+                    blinkOffset: Math.random() * Math.PI * 2
+                });
+            }
+        });
     }
 
     update() {
+        const maxY = this.height - 44;
         this.stars.forEach(star => {
             star.x -= star.speed;
-            star.blinkOffset += 0.07;
-            if (star.x < 0) {
-                star.x = this.width;
-                star.y = Math.random() * (this.height - 44);
+            star.blinkOffset += star.twinkle;
+            if (star.x < -star.size) {
+                star.x = this.width + star.size;
+                star.y = Math.random() * maxY;
             }
         });
     }
 
     draw(ctx) {
         ctx.save();
-        this.stars.forEach(star => {
-            if (Math.sin(star.blinkOffset) < -0.78) return;
+        for (const star of this.stars) {
+            let alpha = star.alpha;
+            if (star.twinkle > 0) {
+                // 近景ほど明滅させる（AC版のちらつき）
+                alpha *= 0.75 + 0.25 * Math.sin(star.blinkOffset);
+            }
+            ctx.globalAlpha = alpha;
             ctx.fillStyle = star.color;
             ctx.fillRect(Math.round(star.x), Math.round(star.y), star.size, star.size);
-        });
+        }
         ctx.restore();
     }
 }
@@ -275,7 +310,7 @@ class Terrain {
         //   実機から1:1抽出した山岳スプライト (ARCADE_MOUNTAIN_ROWS) を森林帯の背後に配置！
         this.topProfile = [];
         this.bottomProfile = [];
-        for (let s = 0; s <= 200; s++) {
+        for (let s = 0; s <= 260; s++) {
             if (s < 2) {
                 this.topProfile.push(0);
                 this.bottomProfile.push(600);
@@ -291,7 +326,10 @@ class Terrain {
         // Section 3 (seg 49-76): ダグム2＋森林3＋第3岩山 → 地上2連ダグム＆砲台群＋天井ダグム＆2連砲台 (grad0017.png, grad0019.png, gradius_1_39.png)
         // Section 4 (seg 77-85): ひし形の浮き岩（左面に5連ソロモンレーザー砲門）＋地上赤ジャンパー＋1UPポイント (sakura_03.png)
         // Section 5 (seg 86-99): 深紅パレット変化＋緑の樹海＋二連火山大噴火 (sakura_04.png, grad0027.png) → ビッグコア (grad0030.png)
-        this.spawns = [
+        // 実機の地形区間は約75秒と長い。まず「開幕〜第3岩山」の密なパターン（約30秒）を
+        // BASE_SPAWNS として定義し、色違いで2周させて尺と敵密度を両立させる（実機も樹林・砲台の
+        // モチーフを反復する）。その後ろに浮き岩・樹海・二連火山のクライマックスを置く。
+        const BASE_SPAWNS = [
             // --- Section 1: 地形開始 〜 第1岩山 〜 第1ダグムハッチ ---
             { seg: 4,  type: 'DOME',    isCeiling: false, isRed: true },   // 開幕左の赤ドーム (media_1792284490223_685b672c.jpg)
             { seg: 6,  type: 'RUGRA',   y: 235, count: 3, hasRed: false }, // 飛来するルグル (media_1792284490223_685b672c.jpg 右上)
@@ -341,19 +379,44 @@ class Terrain {
             { seg: 72, type: 'TURRET',  isCeiling: false, isRed: true },   // 2基の地上ダグムの間に並ぶ2連ディー01砲台 #2
             { seg: 72, type: 'HATCHER', isCeiling: true,  isRed: false },  // 天井ダグムハッチ (grad0017 / grad0019 / sakura_03 右上〜左上)
             { seg: 74, type: 'HATCHER', isCeiling: false, isRed: false },  // 第4地上ダグムハッチ (grad0017 / grad0019 右側ハッチ)
+        ];
 
+        // 30秒ぶんの密な地形パターンを2周させて約60秒分の地形を作る。
+        // 2周目は赤/青の配色を反転させ、同じ並びでも単調に見えないようにする。
+        this.spawns = [];
+        for (let pass = 0; pass < 2; pass++) {
+            const offset = pass * 76;
+            BASE_SPAWNS.forEach(sp => {
+                const copy = Object.assign({}, sp);
+                copy.seg = sp.seg + offset;
+                if (pass === 1) {
+                    if (typeof copy.isRed === 'boolean') copy.isRed = !copy.isRed;
+                    if (typeof copy.hasRed === 'boolean') copy.hasRed = !copy.hasRed;
+                }
+                this.spawns.push(copy);
+            });
+        }
+
+        // --- クライマックス: ひし形の浮き岩（5連ソロモンレーザー砲門）＋赤ジャンパー＋隠し1UP (sakura_03.png) ---
+        const CLIMAX_SPAWNS = [
             // --- Section 4: ひし形の浮き岩（5連ソロモンレーザー砲門）＋赤ジャンパー＋隠し1UP (sakura_03.png) ---
-            { seg: 77, type: 'JUMPER',  isCeiling: false, isRed: true },   // sakura_03.png 浮き岩の真下で跳ねる赤ジャンパー！
-            { seg: 78, type: 'ISLAND',  y: 146, w: 210, h: 288, hasRedTurret: false }, // sakura_03.png ひし形の浮き岩＋左面5連ドーム＋右端1UP！
-            { seg: 82, type: 'DOME',    isCeiling: false, isRed: false },  // sakura_03.png 右下の水色ドーム
-            { seg: 83, type: 'RUGRA',   y: 230, count: 4, hasRed: true },
-            { seg: 84, type: 'DUCKER_BACK', isCeiling: false, isRed: true },
+            { seg: 152, type: 'JUMPER',  isCeiling: false, isRed: true },   // sakura_03.png 浮き岩の真下で跳ねる赤ジャンパー！
+            { seg: 153, type: 'ISLAND',  y: 146, w: 210, h: 288, hasRedTurret: false }, // sakura_03.png ひし形の浮き岩＋左面5連ドーム＋右端1UP！
+            { seg: 157, type: 'DOME',    isCeiling: false, isRed: false },  // sakura_03.png 右下の水色ドーム
+            { seg: 158, type: 'RUGRA',   y: 230, count: 4, hasRed: true },
+            { seg: 159, type: 'DUCKER_BACK', isCeiling: false, isRed: true },
 
             // --- Section 5: クライマックス・深紅パレット変化＋緑の樹海＋二連火山大噴火 (sakura_04.png, grad0027.png, grad0030.png) ---
-            { seg: 86, type: 'TREES',   widthPx: 1800 },                   // 二連火山の麓一面に広がる緑の樹林帯 (grad0027 / grad0030)
-            { seg: 88, type: 'VOLCANO_TWIN' },                             // 第1深紅火山（画面左端付近 x ≈ 20 に停止）
-            { seg: 101, type: 'VOLCANO_TWIN' }                             // 第2深紅火山（画面右端 x ≈ 540..780 に停止、右半分が切れることなく完全表示！）
+            { seg: 160, type: 'TREES',   widthPx: 2000 },                   // 二連火山の麓一面に広がる緑の樹林帯 (grad0027 / grad0030)
+            { seg: 163, type: 'DOME',    isCeiling: false, isRed: false },  // 樹海の中の水色ドーム
+            { seg: 165, type: 'TURRET',  isCeiling: true,  isRed: false },  // 樹海の天井砲台
+            { seg: 167, type: 'DUCKER',  isCeiling: false, isRed: true },   // 樹海のダッカー
+            { seg: 169, type: 'TURRET',  isCeiling: false, isRed: false },  // 火山手前の地上砲台
+            { seg: 171, type: 'VOLCANO_TWIN' },                             // 第1深紅火山（画面左端付近 x ≈ 20 に停止）
+            { seg: 185, type: 'VOLCANO_TWIN' }                              // 第2深紅火山（噴火停止時に画面右 x ≈ 570 で2つ目が並ぶ）
         ];
+
+        CLIMAX_SPAWNS.forEach(sp => this.spawns.push(Object.assign({}, sp)));
 
         Terrain._initSprites();
     }
@@ -1031,16 +1094,31 @@ class LevelManager {
         this.bossEntryTimer = 0;
         this.stageClearTimer = 0;
 
-        // 1985年アーケード版 1面開幕の宇宙空中戦スケジュール (stage_1-1.png 完全準拠：上下交互のファン編隊＋ガルンV字編隊＋ルグル編隊)
+        // 1985年アーケード版 1面開幕の宇宙空中戦スケジュール
+        // 実機は地形出現まで約30秒。上下交互のファン編隊＋ガルンV字編隊＋ルグル編隊を
+        // 約1.5秒間隔で絶え間なく投入する。
         this.airWaves = [
-            { time: 300,  type: 'FAN',   y: 112, isRed: true },
-            { time: 1800, type: 'FAN',   y: 430, isRed: true },
-            { time: 3300, type: 'FAN',   y: 112, isRed: true },
-            { time: 4800, type: 'FAN',   y: 430, isRed: true },
-            { time: 6100, type: 'GARUN', y: 260, count: 5 },
-            { time: 7400, type: 'FAN',   y: 112, isRed: true },
-            { time: 8600, type: 'FAN',   y: 430, isRed: true },
-            { time: 9600, type: 'RUGRA', y: 240, count: 4, hasRed: true }
+            { time: 300,   type: 'FAN',   y: 112, isRed: true },
+            { time: 1800,  type: 'FAN',   y: 430, isRed: true },
+            { time: 3300,  type: 'FAN',   y: 112, isRed: true },
+            { time: 4800,  type: 'FAN',   y: 430, isRed: true },
+            { time: 6100,  type: 'GARUN', y: 260, count: 5 },
+            { time: 7400,  type: 'FAN',   y: 112, isRed: true },
+            { time: 8600,  type: 'FAN',   y: 430, isRed: true },
+            { time: 9600,  type: 'RUGRA', y: 240, count: 4, hasRed: true },
+            { time: 11000, type: 'FAN',   y: 112, isRed: true },
+            { time: 12500, type: 'FAN',   y: 430, isRed: true },
+            { time: 14000, type: 'GARUN', y: 180, count: 5 },
+            { time: 15500, type: 'FAN',   y: 112, isRed: true },
+            { time: 17000, type: 'FAN',   y: 430, isRed: true },
+            { time: 18500, type: 'RUGRA', y: 240, count: 4, hasRed: true },
+            { time: 20000, type: 'FAN',   y: 112, isRed: true },
+            { time: 21500, type: 'FAN',   y: 430, isRed: true },
+            { time: 23000, type: 'GARUN', y: 260, count: 5 },
+            { time: 24500, type: 'FAN',   y: 112, isRed: true },
+            { time: 26000, type: 'FAN',   y: 430, isRed: true },
+            { time: 27500, type: 'RUGRA', y: 240, count: 4, hasRed: true },
+            { time: 29000, type: 'FAN',   y: 112, isRed: true }
         ];
         this.airWaveSpawned = 0;
     }
@@ -1066,8 +1144,8 @@ class LevelManager {
                     this.airWaveSpawned++;
                 }
 
-                // 10.5秒経過で「Challenger 1985」BGMとともにドーム基地＆緑の樹林・火山連山地帯へ突入！
-                if (this.time >= 10500) {
+                // 実機同様、開幕の空中戦は約30秒。その後「Challenger 1985」BGMとともに地形地帯へ突入。
+                if (this.time >= 30000) {
                     this.state = 'TERRAIN';
                     this.terrain.start();
                     if (typeof Sound !== 'undefined' && typeof Sound.playStageBgm === 'function') {
@@ -1115,9 +1193,9 @@ class LevelManager {
                 this.terrain.update();
                 this.eruptionTimer += dt;
 
-                // 本家実機通りの尺（約15.5秒）噴火を耐え抜くと噴火が収まる
+                // 本家実機通りの尺（約20秒）噴火を耐え抜くと噴火が収まる
                 // 【本家AC版完全再現】スクロールせず二連火山が画面に残ったまま、2つの火山の間からビッグコアが登場！
-                if (this.eruptionTimer >= 15500) {
+                if (this.eruptionTimer >= 20000) {
                     this.terrain.twinVolcanoes.forEach(v => {
                         if (v) v.isErupting = false;
                     });
